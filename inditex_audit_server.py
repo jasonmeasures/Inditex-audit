@@ -189,7 +189,10 @@ CORS(app)  # Wide-open CORS — server is local-only
 @app.route("/")
 def index():
     if DASHBOARD_PATH.exists():
-        return send_file(str(DASHBOARD_PATH), mimetype="text/html")
+        resp = send_file(str(DASHBOARD_PATH), mimetype="text/html")
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
+        return resp
     return Response(
         "<h1>Dashboard not found</h1>"
         f"<p>Expected: <code>{DASHBOARD_PATH}</code></p>",
