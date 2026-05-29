@@ -878,6 +878,7 @@
         <button class="tab" data-tab="agg">Aggregated <span class="pill" id="pillAgg">0</span></button>
         <button class="tab" data-tab="filed">7501 Filed <span class="pill" id="pillFiled">0</span></button>
         <button class="tab" data-tab="findings">Findings <span class="pill" id="pillFindings">0</span></button>
+        <button class="tab" data-tab="mfr">Manufacturer <span class="pill" id="pillMfr">0</span></button>
         <button class="tab" data-tab="hts">HTS Consistency <span class="pill" id="pillHts">0</span></button>
         <button class="tab" data-tab="rules">Chapter 99 Rules <span class="pill" id="pillRulesTab">0</span></button>
         <button class="tab" data-tab="verify">Sources &amp; Verification</button>
@@ -996,6 +997,29 @@
           <span class="filter-count" id="findingsCount">0 findings</span>
         </div>
         <div class="findings" id="findingsList"></div>
+      </div>
+
+      <!-- Manufacturer Rollup Panel -->
+      <div class="tab-panel" id="panel-mfr">
+        <div style="padding: 16px 24px 8px 24px;">
+          <div style="font-size:13px;color:var(--gray-700);max-width:900px;line-height:1.6;">
+            <strong style="color:var(--primary-700);">Manufacturer Rollup.</strong>
+            One row per Manufacturer ID (MID) from the TXT source file, summarising every entry line attributed to that factory: line count, HTS codes, countries of origin, total entered value vs. what the broker filed, and an aggregate MID / CH99 status flag.
+          </div>
+        </div>
+        <div class="filter-bar">
+          <input type="text" class="search" id="mfrSearch" placeholder="Search MID, COO, HTS…" />
+          <select id="mfrFilterStatus">
+            <option value="">All statuses</option>
+            <option value="MATCH">All lines matched</option>
+            <option value="MISMATCH">Has MID mismatch</option>
+            <option value="CH99_ISSUE">Has CH99 issue</option>
+          </select>
+          <span class="filter-count" id="mfrCount">0 of 0</span>
+        </div>
+        <div class="table-wrap">
+          <table class="data" id="mfrTable"></table>
+        </div>
       </div>
 
       <!-- HTS Consistency Panel -->
@@ -3719,6 +3743,7 @@ function render() {
   renderAgg();
   renderFiled();
   renderFindings();
+  renderMfrRollup();
   renderHtsConsistency();
   renderRules();
   renderVerify();
@@ -3729,6 +3754,9 @@ function render() {
   document.getElementById("pillAgg").textContent     = state.agg.length;
   document.getElementById("pillFiled").textContent   = state.filed.length;
   document.getElementById("pillFindings").textContent = state.findings.length;
+  // Manufacturer pill = distinct MID count
+  const mfrSet = new Set(state.cmp.map(r => r.MID_TXT || r.MID_75 || "(blank)"));
+  document.getElementById("pillMfr").textContent = mfrSet.size;
   // HTS pill = total conflicts found across all three layers
   const htsIntra = Number(document.getElementById("htsCountIntra")?.textContent || 0);
   const htsCross = Number(document.getElementById("htsCountCross")?.textContent || 0);
@@ -4316,6 +4344,128 @@ function renderFindings() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Manufacturer Rollup — one summary row per MID
+// ─────────────────────────────────────────────────────────────────────────
+function renderMfrRollup() {
+  const search = (document.getElementById("mfrSearch")?.value || "").toLowerCase().trim();
+  const filterStatus = document.getElementById("mfrFilterStatus")?.value || "";
+
+  // Build rollup map keyed by MID (prefer TXT MID, fall back to 7501 MID)
+  const byMid = new Map();
+  for (const r of state.cmp) {
+    const mid = r.MID_TXT || r.MID_75 || "(blank)";
+    if (!byMid.has(mid)) {
+      byMid.set(mid, {
+        MID: mid,
+        lines: 0,
+        htsSet: new Set(),
+        cooSet: new Set(),
+        entered_txt: 0,
+        entered_75: 0,
+        midMismatches: 0,
+        ch99Issues: 0,     // MISMATCH or MISSING
+        ch99Partials: 0,
+        noMatch: 0,
+      });
+    }
+    const g = byMid.get(mid);
+    g.lines++;
+    if (r.HTS) g.htsSet.add(r.HTS);
+    if (r.COO) g.cooSet.add(r.COO);
+    if (r.ENTERED_VALUE_TXT != null) g.entered_txt += r.ENTERED_VALUE_TXT;
+    if (r.ENTERED_VALUE_75  != null) g.entered_75  += r.ENTERED_VALUE_75;
+    if (r.MID_CHECK === "MISMATCH")  g.midMismatches++;
+    if (r.CH99_CHECK === "MISMATCH" || r.CH99_CHECK === "MISSING") g.ch99Issues++;
+    if (r.CH99_CHECK === "PARTIAL")  g.ch99Partials++;
+    if (r.MATCH && r.MATCH.startsWith("NO")) g.noMatch++;
+  }
+
+  // Convert to array and derive aggregate status
+  let rows = Array.from(byMid.values()).map(g => ({
+    ...g,
+    hts: [...g.htsSet].sort().join(", "),
+    coo: [...g.cooSet].sort().join(", "),
+    entered_diff: g.entered_txt - g.entered_75,
+    STATUS: g.midMismatches > 0 ? "MISMATCH"
+          : g.ch99Issues   > 0 ? "CH99_ISSUE"
+          : g.noMatch      > 0 ? "NO_MATCH"
+          : "MATCH",
+  })).sort((a, b) => b.lines - a.lines);
+
+  // Filters
+  if (filterStatus) {
+    rows = rows.filter(r => r.STATUS === filterStatus ||
+      (filterStatus === "CH99_ISSUE" && r.ch99Issues > 0));
+  }
+  if (search) {
+    rows = rows.filter(r =>
+      r.MID.toLowerCase().includes(search) ||
+      r.coo.toLowerCase().includes(search) ||
+      r.hts.toLowerCase().includes(search)
+    );
+  }
+
+  const tbl = document.getElementById("mfrTable");
+  if (!tbl) return;
+  const total = byMid.size;
+  document.getElementById("mfrCount").textContent = `${rows.length} of ${total}`;
+  document.getElementById("pillMfr").textContent  = total;
+
+  if (rows.length === 0) {
+    tbl.innerHTML = "";
+    return;
+  }
+
+  tbl.innerHTML = `
+    <thead><tr>
+      <th>MID</th>
+      <th class="num">Lines</th>
+      <th>COO</th>
+      <th>HTS Codes</th>
+      <th class="num">Entered $ (TXT)</th>
+      <th class="num">Entered $ (7501)</th>
+      <th class="num">Δ</th>
+      <th class="num">MID issues</th>
+      <th class="num">CH99 issues</th>
+      <th>Status</th>
+    </tr></thead>
+    <tbody>
+      ${rows.map(r => {
+        const statusBadge = r.STATUS === "MATCH"      ? "badge-success"
+                          : r.STATUS === "MISMATCH"   ? "badge-warn"
+                          : r.STATUS === "CH99_ISSUE" ? "badge-danger"
+                          : r.STATUS === "NO_MATCH"   ? "badge-danger"
+                          : "badge-neutral";
+        const statusLabel = r.STATUS === "MATCH"      ? "OK"
+                          : r.STATUS === "MISMATCH"   ? "MID mismatch"
+                          : r.STATUS === "CH99_ISSUE" ? "CH99 issue"
+                          : r.STATUS === "NO_MATCH"   ? "No match"
+                          : r.STATUS;
+        const diffCls = Math.abs(r.entered_diff) < 1 ? "color:var(--green-700)"
+                      : Math.abs(r.entered_diff) < 50 ? "color:var(--marigold-700)"
+                      : "color:var(--red-700)";
+        const htsCells = r.hts.split(", ").map(h =>
+          `<span class="mono" style="display:inline-block;margin:1px 3px 1px 0;font-size:11px;">${h}</span>`
+        ).join("");
+        return `
+        <tr>
+          <td class="mono" style="font-weight:600;">${escapeHtml(r.MID)}</td>
+          <td class="num">${r.lines}</td>
+          <td class="mono" style="font-size:12px;">${escapeHtml(r.coo)}</td>
+          <td style="max-width:280px;white-space:normal;">${htsCells || "—"}</td>
+          <td class="num">${fmtUSD(r.entered_txt)}</td>
+          <td class="num">${fmtUSD(r.entered_75)}</td>
+          <td class="num" style="${diffCls};font-weight:600;">${fmtUSD(r.entered_diff)}</td>
+          <td class="num">${r.midMismatches > 0 ? `<span style="color:var(--marigold-700);font-weight:600;">${r.midMismatches}</span>` : `<span style="color:var(--gray-400);">0</span>`}</td>
+          <td class="num">${r.ch99Issues > 0 ? `<span style="color:var(--red-700);font-weight:600;">${r.ch99Issues}</span>${r.ch99Partials > 0 ? ` <span style="color:var(--marigold-700);font-size:11px;">(+${r.ch99Partials} partial)</span>` : ""}` : r.ch99Partials > 0 ? `<span style="color:var(--marigold-700);">${r.ch99Partials} partial</span>` : `<span style="color:var(--gray-400);">0</span>`}</td>
+          <td><span class="badge ${statusBadge}">${statusLabel}</span></td>
+        </tr>`;
+      }).join("")}
+    </tbody>
+  `;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // HTS Consistency — three layers:
 //   1. Within this entry  — same HTS, different filed MFN rates
 //   2. Across saved runs  — same HTS filed at different rates on different entries
@@ -4617,6 +4767,9 @@ document.getElementById("filedSearch").addEventListener("input", renderFiled);
 document.getElementById("filedFilterCOO").addEventListener("change", renderFiled);
 
 document.getElementById("findingsFilterSev").addEventListener("change", renderFindings);
+
+document.getElementById("mfrSearch").addEventListener("input", renderMfrRollup);
+document.getElementById("mfrFilterStatus").addEventListener("change", renderMfrRollup);
 
 document.getElementById("reRunBtn").addEventListener("click", () => {
   if (!state.txtBuffer) { toast("Re-upload required: file kept only in memory.", "error"); return; }
