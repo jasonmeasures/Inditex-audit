@@ -2636,6 +2636,8 @@ function renderDashboard() {
   const importerMap = new Map();
   // Per-COO stats (from filed rows)
   const cooMap = new Map();
+  // Per-MID stats (from agg/TXT rows)
+  const midMap = new Map();
 
   for (const r of runs) {
     const ctx = r.state?.ctx || {};
@@ -2690,6 +2692,18 @@ function renderDashboard() {
       cs.ch99    += row.CH99_DUTY_FILED||0;
       cs.entered += row.ENTERED_VALUE||0;
     }
+
+    // MID map from agg rows (TXT source — authoritative MID)
+    for (const row of (r.state?.agg || [])) {
+      const mid = (row.MID || "").trim() || "(blank)";
+      if (!midMap.has(mid)) midMap.set(mid, { entries: new Set(), lines:0, cooSet: new Set(), value:0, entered:0 });
+      const ms = midMap.get(mid);
+      ms.entries.add(r.id);
+      ms.lines++;
+      if (row.ORIGIN) ms.cooSet.add(row.ORIGIN.trim());
+      ms.value   += Number(row.INVOICE_VALUE) || 0;
+      ms.entered += Number(row.ENTERED_VALUE)  || 0;
+    }
   }
 
   const totalDutyAll  = totalMFN + totalCH99 + totalMPF + totalCotton;
@@ -2708,6 +2722,13 @@ function renderDashboard() {
   const cooRows = [...cooMap.entries()]
     .sort((a, b) => b[1].duty - a[1].duty)
     .slice(0, 8);
+
+  // Top MIDs by entry count (then lines), cap at 20
+  const midRows = [...midMap.entries()]
+    .map(([mid, g]) => ({ mid, entries: g.entries.size, lines: g.lines, coo: [...g.cooSet].sort().join(", "), value: g.value, entered: g.entered }))
+    .sort((a, b) => b.entries - a.entries || b.lines - a.lines)
+    .slice(0, 20);
+  const totalUniqueMids = midMap.size;
 
   // ── Filter + search for runs table ────────────────────────────────
   let filtered = runs;
@@ -2987,6 +3008,32 @@ function renderDashboard() {
           ${ch99Pct>0?`<div class="coo-row"><span>CH99 %</span><span class="coo-val" style="${ch99Pct>20?"color:var(--red-700)":""}">${ch99Pct}%</span></div>`:""}
         </div>`;
       }).join("")}
+    </div>` : ""}
+
+    <!-- ── By Manufacturer ── -->
+    ${midRows.length > 0 ? `
+    <div class="dash-sec"><span class="dash-sec-lbl">By Manufacturer (MID)</span><div class="dash-sec-line"></div><span style="font-size:11px;color:var(--gray-400);margin-left:10px;">${totalUniqueMids} unique MIDs · top ${midRows.length} by entries</span></div>
+    <div class="imp-tbl-wrap">
+      <table class="imp-tbl">
+        <thead><tr>
+          <th>Manufacturer ID (MID)</th>
+          <th class="r">Entries</th>
+          <th class="r">Agg Lines</th>
+          <th>Countries of Origin</th>
+          <th class="r">Invoice Value</th>
+          <th class="r">Entered Value</th>
+        </tr></thead>
+        <tbody>
+          ${midRows.map(m => `<tr>
+            <td style="font-family:var(--font-mono);font-weight:600;font-size:12px;color:var(--gray-900);">${escapeHtml(m.mid)}</td>
+            <td class="r"><strong>${m.entries}</strong></td>
+            <td class="r">${m.lines.toLocaleString()}</td>
+            <td style="font-size:12px;color:var(--gray-600);">${escapeHtml(m.coo)}</td>
+            <td class="r">${fmtUSD(m.value)}</td>
+            <td class="r">${fmtUSD(m.entered)}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
     </div>` : ""}
 
     <!-- ── Detailed Runs ── -->
