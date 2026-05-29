@@ -571,6 +571,25 @@
   .rd-runs-search { border: 1px solid var(--gray-200); border-radius: var(--radius-sm); padding: 6px 10px; font-size: 12px; color: var(--gray-700); outline: none; font-family: var(--font-sans); min-width: 0; flex: 1; }
   .rd-runs-search:focus { border-color: var(--primary-300); }
   .rd-runs-fsel { border: 1px solid var(--gray-200); border-radius: var(--radius-sm); padding: 6px 10px; font-size: 12px; color: var(--gray-700); background: white; cursor: pointer; font-family: var(--font-sans); outline: none; white-space: nowrap; }
+  /* Manufacturer rollup section */
+  .rd-mfr-section { margin-bottom: 14px; }
+  .rd-mfr-hd { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .rd-mfr-title { font-size: 12px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: .05em; }
+  .rd-mfr-sub { font-size: 12px; color: var(--gray-400); }
+  .rd-mfr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .rd-mfr-card { background: white; border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; }
+  .rd-mfr-card-hd { padding: 10px 14px; background: var(--gray-50); border-bottom: 1px solid var(--gray-200); font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: .05em; display: flex; align-items: center; justify-content: space-between; }
+  .rd-mfr-card-hd .badge { font-size: 11px; }
+  .rd-mfr-tbl-wrap { overflow-x: auto; max-height: 280px; }
+  .rd-mfr-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .rd-mfr-tbl th { position: sticky; top: 0; z-index: 2; background: var(--gray-50); padding: 7px 10px; color: var(--gray-500); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--gray-200); }
+  .rd-mfr-tbl th.r { text-align: right; }
+  .rd-mfr-tbl td { padding: 7px 10px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; }
+  .rd-mfr-tbl td.r { text-align: right; font-variant-numeric: tabular-nums; }
+  .rd-mfr-tbl td.mono { font-family: var(--font-mono); font-size: 11px; }
+  .rd-mfr-tbl tr:last-child td { border-bottom: none; }
+  .rd-mfr-tbl tr:hover td { background: var(--gray-50); }
+  .rd-mfr-empty { padding: 24px 16px; text-align: center; font-size: 13px; color: var(--gray-400); }
   /* Table */
   .runs-tbl-wrap { overflow-x: auto; max-height: calc(100vh - 360px); border: 1px solid var(--gray-200); border-radius: var(--radius); }
   .runs-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -3317,6 +3336,122 @@ function renderRuns() {
         <span>⚠</span>
         <span>Running in <strong>in-memory mode</strong> — runs will be lost when the page closes. Start the local server to persist in PostgreSQL.</span>
       </div>` : ""}
+
+    <!-- ── Manufacturer Rollup ── -->
+    ${(() => {
+      // ── Part A: Current-run MID breakdown (from state.cmp) ─────────────
+      let currentRunRows = [];
+      if (state.cmp && state.cmp.length > 0) {
+        const byMid = new Map();
+        for (const r of state.cmp) {
+          const mid = r.MID_TXT || r.MID_75 || "(blank)";
+          if (!byMid.has(mid)) byMid.set(mid, { MID: mid, lines: 0, cooSet: new Set(), htsSet: new Set(), entered_txt: 0, entered_75: 0, midMismatches: 0, ch99Issues: 0, ch99Partials: 0, noMatch: 0 });
+          const g = byMid.get(mid);
+          g.lines++;
+          if (r.COO) g.cooSet.add(r.COO);
+          if (r.HTS) g.htsSet.add(r.HTS);
+          if (r.ENTERED_VALUE_TXT != null) g.entered_txt += r.ENTERED_VALUE_TXT;
+          if (r.ENTERED_VALUE_75  != null) g.entered_75  += r.ENTERED_VALUE_75;
+          if (r.MID_CHECK === "MISMATCH") g.midMismatches++;
+          if (r.CH99_CHECK === "MISMATCH" || r.CH99_CHECK === "MISSING") g.ch99Issues++;
+          if (r.CH99_CHECK === "PARTIAL") g.ch99Partials++;
+          if (r.MATCH && r.MATCH.startsWith("NO")) g.noMatch++;
+        }
+        currentRunRows = Array.from(byMid.values())
+          .map(g => ({ ...g, coo: [...g.cooSet].sort().join(", "), htsCount: g.htsSet.size, diff: g.entered_txt - g.entered_75,
+            STATUS: g.midMismatches > 0 ? "MISMATCH" : g.ch99Issues > 0 ? "CH99" : g.noMatch > 0 ? "NO MATCH" : "OK" }))
+          .sort((a, b) => b.lines - a.lines);
+      }
+
+      // ── Part B: Cross-run MID frequency (from all saved runs' agg) ─────
+      const midCrossMap = new Map();
+      for (const r of runs) {
+        const agg = r.state?.agg || [];
+        for (const a of agg) {
+          const mid = a.MID || "(blank)";
+          if (!midCrossMap.has(mid)) midCrossMap.set(mid, { entries: new Set(), lines: 0, value: 0 });
+          const g = midCrossMap.get(mid);
+          g.entries.add(r.id);
+          g.lines++;
+          g.value += Number(a.INVOICE_VALUE) || 0;
+        }
+      }
+      const crossRows = Array.from(midCrossMap.entries())
+        .map(([mid, g]) => ({ mid, entries: g.entries.size, lines: g.lines, value: g.value }))
+        .sort((a, b) => b.entries - a.entries || b.lines - a.lines)
+        .slice(0, 15);
+
+      const totalMids = midCrossMap.size;
+
+      // ── Render ──────────────────────────────────────────────────────────
+      const currentRunHtml = currentRunRows.length === 0
+        ? `<div class="rd-mfr-empty">Load an audit run to see per-manufacturer breakdown for that entry.</div>`
+        : `<div class="rd-mfr-tbl-wrap"><table class="rd-mfr-tbl">
+            <thead><tr>
+              <th>MID</th><th>COO</th>
+              <th class="r">Lines</th><th class="r">HTS</th>
+              <th class="r">Entered $ (TXT)</th><th class="r">Entered $ (7501)</th>
+              <th class="r">Δ</th><th class="r">MID iss.</th><th class="r">CH99 iss.</th><th>Status</th>
+            </tr></thead>
+            <tbody>${currentRunRows.map(r => {
+              const sb = r.STATUS === "OK"       ? "badge-success"
+                       : r.STATUS === "MISMATCH" ? "badge-warn"
+                       : r.STATUS === "CH99"     ? "badge-danger"
+                       : "badge-danger";
+              const diffStyle = Math.abs(r.diff) < 1 ? "color:var(--green-700)" : Math.abs(r.diff) < 50 ? "color:var(--marigold-700)" : "color:var(--red-700)";
+              return `<tr>
+                <td class="mono" style="font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(r.MID)}">${escapeHtml(r.MID)}</td>
+                <td class="mono" style="font-size:11px;">${escapeHtml(r.coo)}</td>
+                <td class="r">${r.lines}</td>
+                <td class="r">${r.htsCount}</td>
+                <td class="r">${fmtUSD(r.entered_txt)}</td>
+                <td class="r">${fmtUSD(r.entered_75)}</td>
+                <td class="r" style="${diffStyle};font-weight:600;">${fmtUSD(r.diff)}</td>
+                <td class="r">${r.midMismatches > 0 ? `<span style="color:var(--marigold-700);font-weight:700;">${r.midMismatches}</span>` : `<span style="color:var(--gray-300);">—</span>`}</td>
+                <td class="r">${r.ch99Issues > 0 ? `<span style="color:var(--red-700);font-weight:700;">${r.ch99Issues}</span>` : r.ch99Partials > 0 ? `<span style="color:var(--marigold-700);">${r.ch99Partials}p</span>` : `<span style="color:var(--gray-300);">—</span>`}</td>
+                <td><span class="badge ${sb}">${r.STATUS}</span></td>
+              </tr>`;
+            }).join("")}</tbody>
+          </table></div>`;
+
+      const crossHtml = crossRows.length === 0
+        ? `<div class="rd-mfr-empty">No saved runs yet — save an audit run to see cross-run manufacturer history.</div>`
+        : `<div class="rd-mfr-tbl-wrap"><table class="rd-mfr-tbl">
+            <thead><tr>
+              <th>MID</th><th class="r">Entries</th><th class="r">Lines</th><th class="r">Invoice Value</th>
+            </tr></thead>
+            <tbody>${crossRows.map(r => `<tr>
+              <td class="mono" style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(r.mid)}">${escapeHtml(r.mid)}</td>
+              <td class="r"><strong>${r.entries}</strong></td>
+              <td class="r">${r.lines.toLocaleString()}</td>
+              <td class="r">${fmtUSD(r.value)}</td>
+            </tr>`).join("")}</tbody>
+          </table></div>`;
+
+      return `
+    <div class="rd-mfr-section">
+      <div class="rd-mfr-hd">
+        <span class="rd-mfr-title">Manufacturer Breakdown</span>
+        <span class="rd-mfr-sub">${currentRunRows.length > 0 ? `${currentRunRows.length} MIDs in current run` : "No run loaded"} · ${totalMids} unique MIDs across all runs</span>
+      </div>
+      <div class="rd-mfr-grid">
+        <div class="rd-mfr-card">
+          <div class="rd-mfr-card-hd">
+            <span>Current Run — per MID detail</span>
+            ${currentRunRows.length > 0 ? `<span class="badge badge-neutral">${currentRunRows.length} MIDs</span>` : ""}
+          </div>
+          ${currentRunHtml}
+        </div>
+        <div class="rd-mfr-card">
+          <div class="rd-mfr-card-hd">
+            <span>All Runs — MID frequency (top ${crossRows.length})</span>
+            ${totalMids > 0 ? `<span class="badge badge-neutral">${totalMids} total</span>` : ""}
+          </div>
+          ${crossHtml}
+        </div>
+      </div>
+    </div>`;
+    })()}
 
     <!-- ── Two-column body ── -->
     <div class="rd-body">
