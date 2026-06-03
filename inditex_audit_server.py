@@ -20,14 +20,21 @@ Environment variables (all optional, sensible defaults):
 
 import json
 import os
+import secrets
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from functools import wraps
 from pathlib import Path
 
+import msal
 import psycopg2
 import psycopg2.extras
-from flask import Flask, Response, jsonify, request, send_file
+from dotenv import load_dotenv
+from flask import Flask, Response, jsonify, redirect, request, send_file, session
 from flask_cors import CORS
+
+# Load .env before reading any os.environ values
+load_dotenv(Path(__file__).parent / ".env")
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -42,6 +49,24 @@ PORT       = int(os.environ.get("PORT",   "5252"))
 HOST_PRETTY = os.environ.get("HOSTNAME_PRETTY", "7501-audit.local")
 
 DASHBOARD_PATH = Path(__file__).parent / "inditex_audit_dashboard.html"
+
+# ---------------------------------------------------------------------------
+# Auth — Microsoft Entra ID (SSO)
+# ---------------------------------------------------------------------------
+ENTRA_CLIENT_ID     = os.environ.get("ENTRA_CLIENT_ID",     "")
+ENTRA_CLIENT_SECRET = os.environ.get("ENTRA_CLIENT_SECRET", "")
+# common = any Microsoft org or personal account (multi-tenant)
+ENTRA_AUTHORITY     = os.environ.get("ENTRA_AUTHORITY",
+                        "https://login.microsoftonline.com/common")
+ENTRA_REDIRECT_URI  = os.environ.get("ENTRA_REDIRECT_URI",
+                        f"http://localhost:{PORT}/auth/callback")
+ENTRA_SCOPES        = ["openid", "profile", "email"]
+# Your company's Entra tenant ID — users from this tenant get role='admin'
+ADMIN_TENANT_ID     = os.environ.get("ADMIN_TENANT_ID", "")
+# Stable secret for Flask session signing; generate once and store in .env
+APP_SECRET_KEY      = os.environ.get("APP_SECRET_KEY", secrets.token_hex(32))
+# Set DEV_BYPASS_SSO=true to skip Microsoft login during local development
+DEV_BYPASS_SSO      = os.environ.get("DEV_BYPASS_SSO", "false").lower() == "true"
 
 # ---------------------------------------------------------------------------
 # Database helpers
@@ -112,8 +137,35 @@ def _ensure_schema(conn: psycopg2.extensions.connection) -> None:
     """
     with conn.cursor() as cur:
         cur.execute(ddl)
+        # Users table — keyed on Entra object ID (stable across tenants)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id            SERIAL PRIMARY KEY,
+                entra_oid     TEXT UNIQUE NOT NULL,
+                entra_tid     TEXT NOT NULL DEFAULT '',
+                email         TEXT NOT NULL DEFAULT '',
+                display_name  TEXT NOT NULL DEFAULT '',
+                role          TEXT NOT NULL DEFAULT 'user'
+                              CHECK (role IN ('admin', 'user')),
+                created_at    TIMESTAMPTZ DEFAULT NOW(),
+                last_login_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at    TIMESTAMPTZ DEFAULT NOW()
+            )
+        """)
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS users_email_idx ON users (email)"
+        )
+        # Add user_id FK to audit_runs (idempotent — safe to run on existing DB)
+        cur.execute("""
+            DO $$ BEGIN
+                ALTER TABLE audit_runs
+                    ADD COLUMN user_id INTEGER REFERENCES users(id);
+                CREATE INDEX audit_runs_user_id_idx ON audit_runs (user_id);
+            EXCEPTION WHEN duplicate_column THEN NULL;
+            END $$
+        """)
     conn.commit()
-    print("  • Schema ready (table: audit_runs)")
+    print("  • Schema ready (tables: audit_runs, users)")
 
 
 def get_conn() -> psycopg2.extensions.connection:
@@ -180,6 +232,184 @@ def _to_int(val):
 
 app = Flask(__name__)
 CORS(app)  # Wide-open CORS — server is local-only
+app.secret_key = APP_SECRET_KEY
+app.permanent_session_lifetime = timedelta(days=7)
+
+
+# ---------------------------------------------------------------------------
+# Auth helpers
+# ---------------------------------------------------------------------------
+
+def _get_msal_app() -> msal.ConfidentialClientApplication:
+    return msal.ConfidentialClientApplication(
+        ENTRA_CLIENT_ID,
+        authority=ENTRA_AUTHORITY,
+        client_credential=ENTRA_CLIENT_SECRET,
+    )
+
+
+def _upsert_user(claims: dict) -> dict:
+    """Create or update a user row from Entra ID token claims.
+
+    Role logic:
+    - New users from the admin tenant (ADMIN_TENANT_ID) start as 'admin'.
+    - New users from any other tenant start as 'user'.
+    - Existing users keep their current role — manual promotions persist.
+    """
+    oid   = claims.get("oid") or claims.get("sub", "")
+    tid   = claims.get("tid", "")
+    email = (claims.get("email") or
+             claims.get("preferred_username") or "").lower().strip()
+    name  = claims.get("name") or email or "Unknown"
+    initial_role = "admin" if (ADMIN_TENANT_ID and tid == ADMIN_TENANT_ID) else "user"
+
+    conn = get_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO users (entra_oid, entra_tid, email, display_name, role)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (entra_oid) DO UPDATE SET
+                    email         = EXCLUDED.email,
+                    display_name  = EXCLUDED.display_name,
+                    entra_tid     = EXCLUDED.entra_tid,
+                    last_login_at = NOW(),
+                    updated_at    = NOW()
+                RETURNING id, email, display_name, role
+            """, (oid, tid, email, name, initial_role))
+            user = dict(cur.fetchone())
+        conn.commit()
+    finally:
+        conn.close()
+    return user
+
+
+_DEV_USER = {
+    "id": 0, "email": "dev@localhost",
+    "display_name": "Dev User (SSO bypassed)",
+    "role": "admin", "dev": True,
+}
+
+
+def login_required(f):
+    """Decorator that enforces authentication on a route.
+
+    - DEV_BYPASS_SSO=true  → injects a fake admin session, no redirect.
+    - API routes (/api/*)   → returns 401 JSON so the browser can handle it.
+    - Page routes           → redirects to /login.
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if DEV_BYPASS_SSO:
+            if "user" not in session:
+                session["user"] = _DEV_USER
+            return f(*args, **kwargs)
+        if "user" not in session:
+            if request.path.startswith("/api/"):
+                return jsonify({
+                    "error": "Unauthorized",
+                    "login_url": "/login",
+                }), 401
+            session["next_url"] = request.url
+            return redirect("/login")
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ---------------------------------------------------------------------------
+# Routes — auth
+# ---------------------------------------------------------------------------
+
+@app.route("/login")
+def login():
+    if DEV_BYPASS_SSO:
+        session["user"] = _DEV_USER
+        return redirect("/")
+    if not ENTRA_CLIENT_ID:
+        return Response(
+            "<h2 style='font-family:sans-serif'>SSO not configured</h2>"
+            "<p style='font-family:sans-serif'>Set <code>ENTRA_CLIENT_ID</code>, "
+            "<code>ENTRA_CLIENT_SECRET</code>, and <code>ADMIN_TENANT_ID</code> "
+            "in your <code>.env</code> file, then restart.</p>",
+            mimetype="text/html", status=503,
+        )
+    state = secrets.token_urlsafe(16)
+    session["auth_state"] = state
+    auth_url = _get_msal_app().get_authorization_request_url(
+        scopes=ENTRA_SCOPES,
+        state=state,
+        redirect_uri=ENTRA_REDIRECT_URI,
+    )
+    return redirect(auth_url)
+
+
+@app.route("/auth/callback")
+def auth_callback():
+    # CSRF check
+    if request.args.get("state") != session.pop("auth_state", None):
+        return Response(
+            "<h2 style='font-family:sans-serif'>Auth state mismatch — "
+            "possible CSRF. <a href='/login'>Try again</a>.</h2>",
+            status=400, mimetype="text/html",
+        )
+    error = request.args.get("error")
+    if error:
+        desc = request.args.get("error_description", "")
+        return Response(
+            f"<h2 style='font-family:sans-serif'>Login error: {error}</h2>"
+            f"<pre>{desc}</pre><a href='/login'>Try again</a>",
+            status=400, mimetype="text/html",
+        )
+    code = request.args.get("code")
+    if not code:
+        return redirect("/login")
+
+    result = _get_msal_app().acquire_token_by_authorization_code(
+        code,
+        scopes=ENTRA_SCOPES,
+        redirect_uri=ENTRA_REDIRECT_URI,
+    )
+    if "error" in result:
+        return Response(
+            f"<h2 style='font-family:sans-serif'>Token error</h2>"
+            f"<pre>{result.get('error_description', '')}</pre>"
+            f"<a href='/login'>Try again</a>",
+            status=400, mimetype="text/html",
+        )
+
+    claims = result.get("id_token_claims", {})
+    try:
+        user = _upsert_user(claims)
+    except Exception as e:
+        return Response(
+            f"<h2 style='font-family:sans-serif'>User sync error</h2><pre>{e}</pre>",
+            status=500, mimetype="text/html",
+        )
+
+    session["user"] = user
+    session.permanent = True
+    return redirect(session.pop("next_url", "/"))
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    if DEV_BYPASS_SSO:
+        return redirect("/login")
+    post_logout = ENTRA_REDIRECT_URI.replace("/auth/callback", "/")
+    return redirect(
+        f"https://login.microsoftonline.com/common/oauth2/v2.0/logout"
+        f"?post_logout_redirect_uri={post_logout}"
+    )
+
+
+@app.route("/api/auth/me")
+@login_required
+def auth_me():
+    return jsonify({
+        "user":     session.get("user", {}),
+        "dev_mode": DEV_BYPASS_SSO,
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +417,7 @@ CORS(app)  # Wide-open CORS — server is local-only
 # ---------------------------------------------------------------------------
 
 @app.route("/")
+@login_required
 def index():
     if DASHBOARD_PATH.exists():
         resp = send_file(str(DASHBOARD_PATH), mimetype="text/html")
@@ -206,6 +437,7 @@ def index():
 # ---------------------------------------------------------------------------
 
 @app.route("/api/health")
+@login_required
 def health():
     try:
         conn = get_conn()
@@ -231,6 +463,7 @@ def health():
 # ---------------------------------------------------------------------------
 
 @app.route("/api/runs", methods=["GET"])
+@login_required
 def get_runs():
     """Return all full snapshots, newest first."""
     try:
@@ -251,6 +484,7 @@ def get_runs():
 
 
 @app.route("/api/runs/_summary", methods=["GET"])
+@login_required
 def get_runs_summary():
     """Metadata-only view — no full JSONB payload."""
     try:
@@ -275,6 +509,7 @@ def get_runs_summary():
 
 
 @app.route("/api/runs/<run_id>", methods=["GET"])
+@login_required
 def get_run(run_id: str):
     """Return one full snapshot by id."""
     try:
@@ -294,6 +529,7 @@ def get_run(run_id: str):
 
 
 @app.route("/api/runs", methods=["POST"])
+@login_required
 def upsert_run():
     """Insert or update a run by id (full snapshot in request body)."""
     try:
@@ -302,6 +538,9 @@ def upsert_run():
             return jsonify({"error": "body must be a snapshot with an id field"}), 400
 
         fields = _extract_fields(snapshot)
+        uid = session.get("user", {}).get("id") or None
+        if uid == 0:   # dev-bypass placeholder; no real users row
+            uid = None
         conn = get_conn()
         with conn.cursor() as cur:
             cur.execute("""
@@ -310,13 +549,13 @@ def upsert_run():
                     freight, insurance, entry_num, invoice_num, importer,
                     agg_lines, entered_value, total_duty,
                     findings_count, findings_critical, findings_high,
-                    data, created_at, updated_at
+                    data, user_id, created_at, updated_at
                 ) VALUES (
                     %(id)s, %(name)s, %(saved_at)s, %(txt_name)s, %(xlsx_name)s,
                     %(freight)s, %(insurance)s, %(entry_num)s, %(invoice_num)s,
                     %(importer)s, %(agg_lines)s, %(entered_value)s, %(total_duty)s,
                     %(findings_count)s, %(findings_critical)s, %(findings_high)s,
-                    %(data)s, NOW(), NOW()
+                    %(data)s, %(uid)s, NOW(), NOW()
                 )
                 ON CONFLICT (id) DO UPDATE SET
                     name              = EXCLUDED.name,
@@ -336,7 +575,7 @@ def upsert_run():
                     findings_high     = EXCLUDED.findings_high,
                     data              = EXCLUDED.data,
                     updated_at        = NOW()
-            """, {**fields, "data": json.dumps(snapshot)})
+            """, {**fields, "data": json.dumps(snapshot), "uid": uid})
         conn.commit()
         conn.close()
         return jsonify({"ok": True, "id": fields["id"]}), 200
@@ -345,6 +584,7 @@ def upsert_run():
 
 
 @app.route("/api/runs/<run_id>", methods=["PUT"])
+@login_required
 def rename_run(run_id: str):
     """Rename a run — updates the name column and the name inside the JSONB blob."""
     try:
@@ -373,6 +613,7 @@ def rename_run(run_id: str):
 
 
 @app.route("/api/runs/<run_id>", methods=["DELETE"])
+@login_required
 def delete_run(run_id: str):
     """Delete one run by id."""
     try:
@@ -390,6 +631,7 @@ def delete_run(run_id: str):
 
 
 @app.route("/api/runs", methods=["DELETE"])
+@login_required
 def delete_all_runs():
     """Delete all runs (used by 'Clear all' UI button)."""
     try:
@@ -409,6 +651,7 @@ def delete_all_runs():
 # ---------------------------------------------------------------------------
 
 @app.route("/api/analytics/mfn-consistency")
+@login_required
 def mfn_consistency():
     """
     Cross-entry MFN rate consistency check.
