@@ -669,12 +669,6 @@
   }
   .btn-dashboard-open:hover { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.8); }
   .topbar-right { display: flex; align-items: center; gap: 10px; }
-  .user-badge { display:flex; align-items:center; gap:7px; padding:4px 10px 4px 4px; border-radius:99px; background:rgba(255,255,255,.12); cursor:default; }
-  .user-avatar { width:26px; height:26px; border-radius:50%; background:var(--marigold-500); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; flex-shrink:0; }
-  .user-name { font-size:12px; color:#fff; font-weight:600; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .user-badge .dev-tag { font-size:10px; background:var(--marigold-500); color:#fff; border-radius:4px; padding:1px 5px; font-weight:700; text-transform:uppercase; }
-  .btn-logout { font-size:11px; color:rgba(255,255,255,.7); background:none; border:1px solid rgba(255,255,255,.25); border-radius:4px; padding:2px 8px; cursor:pointer; }
-  .btn-logout:hover { background:rgba(255,255,255,.15); color:#fff; }
 
   /* ── Dashboard full-page overlay ── */
   .dash-overlay {
@@ -794,12 +788,6 @@
     <span id="activeRunBadge" class="active-run-badge" style="display:none;"><span class="dot"></span><span id="activeRunName"></span></span>
     <button class="btn-dashboard-open" id="dashboardBtn" title="Open runs dashboard">Dashboard <span class="pill" id="pillDash" style="background:rgba(255,255,255,.2);color:#fff;">0</span></button>
     <button class="btn-new-run" id="newRunBtn" title="Clear all results and start a new audit">+ New Run</button>
-    <div class="user-badge" id="userBadge" style="display:none;">
-      <div class="user-avatar" id="userAvatar">?</div>
-      <span class="user-name" id="userName"></span>
-      <span class="dev-tag" id="devTag" style="display:none;">DEV</span>
-      <button class="btn-logout" onclick="window.location='/logout'">Sign out</button>
-    </div>
   </div>
 </header>
 
@@ -1175,31 +1163,6 @@
 // ============================================================
 //  KlearNow — Inditex Broker Audit (client-side)
 // ============================================================
-
-// ── Auth — populate user badge from server session ──────────────────────────
-(function initAuth() {
-  fetch("/api/auth/me")
-    .then(function(r) {
-      if (r.status === 401) { window.location = "/login"; return null; }
-      return r.json();
-    })
-    .then(function(data) {
-      if (!data) return;
-      const u = data.user || {};
-      const badge  = document.getElementById("userBadge");
-      const avatar = document.getElementById("userAvatar");
-      const name   = document.getElementById("userName");
-      const devTag = document.getElementById("devTag");
-      if (!badge) return;
-      const initials = (u.display_name || u.email || "?")
-        .split(" ").map(function(w) { return w[0]; }).join("").slice(0,2).toUpperCase();
-      avatar.textContent = initials;
-      name.textContent   = u.display_name || u.email || "Unknown";
-      if (data.dev_mode) devTag.style.display = "";
-      badge.style.display = "";
-    })
-    .catch(function() {});  // silently ignore network errors (e.g. first load)
-})();
 
 // Each rule carries: COO, HTS, rate %, category, basis, legal authority, effective window, notes.
 // "category" drives column grouping and color in the CH99 Stack view.
