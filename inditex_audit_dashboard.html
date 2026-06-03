@@ -2632,7 +2632,20 @@ let _rdFilter = "all";
 let _rdSelectedId = null;
 let _rdSearch = "";
 let _rdActFilter = "all";
-let _mfnCache = null;   // cached result from /api/analytics/mfn-consistency
+let _mfnCache = null;       // cached result from /api/analytics/mfn-consistency
+let _mfnSort = "spread";    // "coo"|"hts"|"rate_count"|"spread"
+let _mfnSortDir = -1;       // -1 desc, 1 asc
+let _mfnSearch = "";
+let _mfnElTable = null, _mfnElMsg = null, _mfnElPill = null;
+let _rdMidSort = "entries"; // "mid"|"entries"|"lines"|"coo"|"value"|"entered"
+let _rdMidSortDir = -1;
+let _rdMidSearch = "";
+
+// Strip punctuation and normalise whitespace so "ZARA USA INC." and
+// "ZARA USA, INC." both key to "ZARA USA INC".
+function normalizeImporterKey(s) {
+  return (s || "").toUpperCase().replace(/[.,]/g, " ").replace(/\s+/g, " ").trim();
+}
 
 // Simple in-memory activity log; entries are { type, name, entry, importer, sev, ts }
 const _actLog = [];
@@ -2783,9 +2796,9 @@ function renderDashboard() {
     else if (rh > 0) highOnlyCount++;
     else cleanCount++;
 
-    // Importer map
-    const imp = (ctx.importer || "Unknown").trim();
-    if (ctx.importer) importerSet.add(imp.toLowerCase());
+    // Importer map — normalise key so "ZARA USA INC." and "ZARA USA, INC." merge
+    const imp = normalizeImporterKey(ctx.importer || "Unknown");
+    if (ctx.importer) importerSet.add(imp);
     if (!importerMap.has(imp)) {
       importerMap.set(imp, { runs:0, lines:0, entered:0, duty:0, ch99:0, crit:0, high:0, findings:0 });
     }
@@ -2840,12 +2853,20 @@ function renderDashboard() {
     .sort((a, b) => b[1].duty - a[1].duty)
     .slice(0, 8);
 
-  // Top MIDs by entry count (then lines), cap at 20
-  const midRows = [...midMap.entries()]
-    .map(([mid, g]) => ({ mid, entries: g.entries.size, lines: g.lines, coo: [...g.cooSet].sort().join(", "), value: g.value, entered: g.entered }))
-    .sort((a, b) => b.entries - a.entries || b.lines - a.lines)
-    .slice(0, 20);
-  const totalUniqueMids = midMap.size;
+  // All MIDs — sort and search applied below before rendering
+  const allMidRows = [...midMap.entries()]
+    .map(([mid, g]) => ({ mid, entries: g.entries.size, lines: g.lines, coo: [...g.cooSet].sort().join(", "), value: g.value, entered: g.entered }));
+  const totalUniqueMids = allMidRows.length;
+  let midRows = allMidRows;
+  if (_rdMidSearch.trim()) {
+    const mq = _rdMidSearch.trim().toLowerCase();
+    midRows = midRows.filter(m => m.mid.toLowerCase().includes(mq) || m.coo.toLowerCase().includes(mq));
+  }
+  midRows = [...midRows].sort((a, b) => {
+    if (_rdMidSort === "mid" || _rdMidSort === "coo") return _rdMidSortDir * String(a[_rdMidSort]).localeCompare(String(b[_rdMidSort]));
+    return _rdMidSortDir * ((b[_rdMidSort] || 0) - (a[_rdMidSort] || 0));
+  });
+  if (!_rdMidSearch.trim()) midRows = midRows.slice(0, 50);
 
   // ── Filter + search for runs table ────────────────────────────────
   let filtered = runs;
@@ -3128,20 +3149,28 @@ function renderDashboard() {
     </div>` : ""}
 
     <!-- ── By Manufacturer ── -->
-    ${midRows.length > 0 ? `
-    <div class="dash-sec"><span class="dash-sec-lbl">By Manufacturer (MID)</span><div class="dash-sec-line"></div><span style="font-size:11px;color:var(--gray-400);margin-left:10px;">${totalUniqueMids} unique MIDs · top ${midRows.length} by entries</span></div>
+    ${allMidRows.length > 0 ? (() => {
+      const si = col => _rdMidSort === col ? (_rdMidSortDir < 0 ? " ▼" : " ▲") : "";
+      const th = (col, label, cls) => `<th class="${cls||""}" data-mid-sort="${col}" style="cursor:pointer;white-space:nowrap;">${label}${si(col)}</th>`;
+      return `
+    <div class="dash-sec"><span class="dash-sec-lbl">By Manufacturer (MID)</span><div class="dash-sec-line"></div><span style="font-size:11px;color:var(--gray-400);margin-left:10px;">${totalUniqueMids} unique MIDs${_rdMidSearch.trim() ? " · " + midRows.length + " match" : " · top " + midRows.length}</span></div>
+    <div style="margin-bottom:6px;">
+      <input id="rdMidSearch" placeholder="Search MID or country…" class="rd-runs-search" style="max-width:240px;" value="${escapeHtml(_rdMidSearch)}" />
+    </div>
     <div class="imp-tbl-wrap">
       <table class="imp-tbl">
         <thead><tr>
-          <th>Manufacturer ID (MID)</th>
-          <th class="r">Entries</th>
-          <th class="r">Agg Lines</th>
-          <th>Countries of Origin</th>
-          <th class="r">Invoice Value</th>
-          <th class="r">Entered Value</th>
+          ${th("mid","Manufacturer ID (MID)","")}
+          ${th("entries","Entries","r")}
+          ${th("lines","Agg Lines","r")}
+          ${th("coo","Countries of Origin","")}
+          ${th("value","Invoice Value","r")}
+          ${th("entered","Entered Value","r")}
         </tr></thead>
         <tbody>
-          ${midRows.map(m => `<tr>
+          ${midRows.length === 0
+            ? `<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--gray-400);font-size:12px;">No MIDs match "${escapeHtml(_rdMidSearch)}".</td></tr>`
+            : midRows.map(m => `<tr>
             <td style="font-family:var(--font-mono);font-weight:600;font-size:12px;color:var(--gray-900);">${escapeHtml(m.mid)}</td>
             <td class="r"><strong>${m.entries}</strong></td>
             <td class="r">${m.lines.toLocaleString()}</td>
@@ -3151,7 +3180,8 @@ function renderDashboard() {
           </tr>`).join("")}
         </tbody>
       </table>
-    </div>` : ""}
+    </div>`;
+    })() : ""}
 
     <!-- ── MFN Rate Consistency ── -->
     <div class="dash-sec"><span class="dash-sec-lbl">MFN Rate Consistency</span><div class="dash-sec-line"></div><span id="dashMfnPill" style="margin-left:10px;display:inline-block;padding:1px 7px;border-radius:99px;background:#EBF8F2;color:#047857;font-size:11px;font-weight:700;">—</span></div>
@@ -3268,6 +3298,22 @@ function renderDashboard() {
   dashList.querySelectorAll(".rdp-delete-btn").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();deleteRunById(b.dataset.rdId);}));
   dashList.querySelectorAll(".rdp-close-btn").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();_rdSelectedId=null;renderDashboard();}));
 
+  // MID sort + search
+  const midSearchEl = dashList.querySelector("#rdMidSearch");
+  if (midSearchEl) {
+    midSearchEl.addEventListener("input", e => { _rdMidSearch = e.target.value; renderDashboard(); });
+    midSearchEl.addEventListener("click", e => e.stopPropagation());
+  }
+  dashList.querySelectorAll("[data-mid-sort]").forEach(th => {
+    th.addEventListener("click", e => {
+      e.stopPropagation();
+      const col = th.dataset.midSort;
+      if (_rdMidSort === col) _rdMidSortDir *= -1;
+      else { _rdMidSort = col; _rdMidSortDir = -1; }
+      renderDashboard();
+    });
+  });
+
   // MFN rate consistency section lives in the dashboard overlay — refresh on every open.
   renderMfnDbLayer({ tableId: "dashMfnTable", msgId: "dashMfnMsg", pillId: "dashMfnPill" });
 }
@@ -3358,7 +3404,7 @@ function renderRuns() {
     totalDutyAll  += mfn + ch99 + mpf + cot;
     totalCh99All  += ch99;
     totalLinesAll += (r.state?.agg?.length || ctx.aggLines || 0);
-    if (ctx.importer) importerSet.add(ctx.importer.trim().toLowerCase());
+    if (ctx.importer) importerSet.add(normalizeImporterKey(ctx.importer));
     const rc = r.findingsCritical ?? 0, rh = r.findingsHigh ?? 0;
     if (rc > 0) critRunCount++;
     else if (rh > 0) highOnlyCount++;
@@ -5065,56 +5111,107 @@ function renderMfnDbLayer(target) {
 function invalidateMfnCache() { _mfnCache = null; }
 
 function _applyMfnRows(rows, dbEl, dbMsg, dbPill) {
-  dbPill.textContent = rows.length;
-  if (rows.length === 0) {
-    dbMsg.textContent = "No COO + HTS combinations with conflicting MFN rates across the database. ✓";
-    dbEl.innerHTML = "";
-    return;
-  }
-  const runIds = new Set();
-  rows.forEach(function(r) { (r.occurrences || []).forEach(function(o) { runIds.add(o.run_id); }); });
-  dbMsg.textContent = rows.length + " COO HTS combination" + (rows.length !== 1 ? "s" : "") +
-    " with conflicting rates across " + runIds.size + " run" + (runIds.size !== 1 ? "s" : "") +
-    ". Sorted by largest rate spread first.";
+  // Remember target elements so event handlers can re-render without arguments.
+  _mfnElTable = dbEl; _mfnElMsg = dbMsg; _mfnElPill = dbPill;
 
-  var tbody = "";
-  rows.forEach(function(r) {
-    var occs = r.occurrences || [];
-    occs.forEach(function(o, i) {
-      var isFirst = i === 0;
-      var dt = o.saved_at ? new Date(o.saved_at).toLocaleDateString() : "—";
-      var groupCells = "";
-      if (isFirst) {
-        var ratesHtml = r.rates.map(function(x) {
-          return "<span style=\"display:block;\">" + fmtPct(parseFloat(x)) + "</span>";
-        }).join("");
-        groupCells =
-          "<td class=\"mono\" rowspan=\"" + occs.length + "\" style=\"vertical-align:top;background:#FFF8E8;font-weight:600;\">" + escapeHtml(r.coo) + "</td>" +
-          "<td class=\"mono\" rowspan=\"" + occs.length + "\" style=\"vertical-align:top;background:#FFF8E8;font-weight:600;\">" +
-            escapeHtml(htsFormat(r.hts)) +
-            "<div style=\"font-size:11px;color:#854F0B;font-weight:400;margin-top:2px;\">" + r.rate_count + " rates · spread " + fmtPct(r.rate_spread) + "</div>" +
-          "</td>" +
-          "<td class=\"mono\" rowspan=\"" + occs.length + "\" style=\"vertical-align:top;font-size:12px;color:var(--gray-700);\">" + ratesHtml + "</td>";
-      }
-      tbody +=
-        "<tr style=\"" + (isFirst ? "border-top:2px solid #F69000;" : "") + "\">" +
-        groupCells +
-        "<td class=\"mono\" style=\"font-size:12px;\">" + escapeHtml(o.entry_num || "—") + "</td>" +
-        "<td style=\"font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\" title=\"" + escapeHtml(o.run_name || "") + "\">" + escapeHtml(o.run_name || "—") + "</td>" +
-        "<td class=\"num\"><strong>" + fmtPct(parseFloat(o.rate)) + "</strong></td>" +
-        "<td class=\"mono\" style=\"font-size:11px;color:var(--gray-600);\">" + escapeHtml(o.rate_str || "—") + "</td>" +
-        "<td style=\"font-size:12px;color:var(--gray-600);\">" + dt + "</td>" +
-        "</tr>";
+  // Apply search filter
+  var display = rows;
+  if (_mfnSearch.trim()) {
+    var mq = _mfnSearch.trim().toLowerCase();
+    display = display.filter(function(r) {
+      return r.coo.toLowerCase().includes(mq) || r.hts.toLowerCase().includes(mq);
+    });
+  }
+
+  // Sort
+  display = display.slice().sort(function(a, b) {
+    if (_mfnSort === "coo")  return _mfnSortDir * a.coo.localeCompare(b.coo);
+    if (_mfnSort === "hts")  return _mfnSortDir * a.hts.localeCompare(b.hts);
+    if (_mfnSort === "rate_count") return _mfnSortDir * (b.rate_count - a.rate_count);
+    return _mfnSortDir * (b.rate_spread - a.rate_spread);  // default: spread
+  });
+
+  dbPill.textContent = display.length + (display.length !== rows.length ? "/" + rows.length : "");
+
+  // Summary + search input rendered into dbMsg
+  var runIds = new Set();
+  rows.forEach(function(r) { (r.occurrences || []).forEach(function(o) { runIds.add(o.run_id); }); });
+  var summary = display.length === rows.length
+    ? rows.length + " pair" + (rows.length !== 1 ? "s" : "") + " · " + runIds.size + " run" + (runIds.size !== 1 ? "s" : "")
+    : display.length + " of " + rows.length + " pairs";
+  dbMsg.innerHTML =
+    "<div style=\"display:flex;align-items:center;gap:10px;margin-bottom:6px;\">" +
+    "<input id=\"mfnSearchInput\" placeholder=\"Search COO or HTS…\" style=\"padding:4px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:12px;width:200px;\" value=\"" + escapeHtml(_mfnSearch) + "\" />" +
+    "<span style=\"font-size:12px;color:var(--gray-500);\">" + summary + "</span>" +
+    "</div>";
+
+  if (display.length === 0) {
+    dbEl.innerHTML = "<tbody><tr><td colspan=\"8\" style=\"text-align:center;padding:16px;color:var(--gray-400);font-size:12px;\">No pairs match this search.</td></tr></tbody>";
+  } else {
+    var si = function(col) { return _mfnSort === col ? (_mfnSortDir < 0 ? " ▼" : " ▲") : ""; };
+    var thS = function(col, lbl, cls) {
+      return "<th" + (cls ? " class=\"" + cls + "\"" : "") + " data-mfn-sort=\"" + col + "\" style=\"cursor:pointer;white-space:nowrap;\">" + lbl + si(col) + "</th>";
+    };
+
+    var tbody = "";
+    display.forEach(function(r) {
+      var occs = r.occurrences || [];
+      occs.forEach(function(o, i) {
+        var isFirst = i === 0;
+        var dt = o.saved_at ? new Date(o.saved_at).toLocaleDateString() : "—";
+        var groupCells = "";
+        if (isFirst) {
+          var ratesHtml = r.rates.map(function(x) {
+            return "<span style=\"display:block;\">" + fmtPct(parseFloat(x)) + "</span>";
+          }).join("");
+          groupCells =
+            "<td class=\"mono\" rowspan=\"" + occs.length + "\" style=\"vertical-align:top;background:#FFF8E8;font-weight:600;\">" + escapeHtml(r.coo) + "</td>" +
+            "<td class=\"mono\" rowspan=\"" + occs.length + "\" style=\"vertical-align:top;background:#FFF8E8;font-weight:600;\">" +
+              escapeHtml(htsFormat(r.hts)) +
+              "<div style=\"font-size:11px;color:#854F0B;font-weight:400;margin-top:2px;\">" + r.rate_count + " rates · spread " + fmtPct(r.rate_spread) + "</div>" +
+            "</td>" +
+            "<td class=\"mono\" rowspan=\"" + occs.length + "\" style=\"vertical-align:top;font-size:12px;color:var(--gray-700);\">" + ratesHtml + "</td>";
+        }
+        tbody +=
+          "<tr style=\"" + (isFirst ? "border-top:2px solid #F69000;" : "") + "\">" +
+          groupCells +
+          "<td class=\"mono\" style=\"font-size:12px;\">" + escapeHtml(o.entry_num || "—") + "</td>" +
+          "<td style=\"font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\" title=\"" + escapeHtml(o.run_name || "") + "\">" + escapeHtml(o.run_name || "—") + "</td>" +
+          "<td class=\"num\"><strong>" + fmtPct(parseFloat(o.rate)) + "</strong></td>" +
+          "<td class=\"mono\" style=\"font-size:11px;color:var(--gray-600);\">" + escapeHtml(o.rate_str || "—") + "</td>" +
+          "<td style=\"font-size:12px;color:var(--gray-600);\">" + dt + "</td>" +
+          "</tr>";
+      });
+    });
+
+    dbEl.innerHTML =
+      "<thead><tr>" +
+        thS("coo","COO","") + thS("hts","HTS","") + "<th>Rates observed</th>" +
+        "<th>Entry #</th><th>Run name</th>" +
+        thS("spread","MFN rate","num") + "<th>Rate string</th><th>Saved</th>" +
+      "</tr></thead><tbody>" + tbody + "</tbody>";
+  }
+
+  // Wire sort headers
+  dbEl.querySelectorAll("[data-mfn-sort]").forEach(function(th) {
+    th.addEventListener("click", function() {
+      var col = th.dataset.mfnSort;
+      if (_mfnSort === col) _mfnSortDir *= -1;
+      else { _mfnSort = col; _mfnSortDir = -1; }
+      if (_mfnCache && _mfnElTable) _applyMfnRows(_mfnCache, _mfnElTable, _mfnElMsg, _mfnElPill);
     });
   });
 
-  dbEl.innerHTML =
-    "<thead><tr>" +
-      "<th>COO</th><th>HTS</th><th>Rates observed</th>" +
-      "<th>Entry #</th><th>Run name</th>" +
-      "<th class=\"num\">MFN rate</th><th>Rate string</th><th>Saved</th>" +
-    "</tr></thead><tbody>" + tbody + "</tbody>";
+  // Wire search input
+  var searchEl = document.getElementById("mfnSearchInput");
+  if (searchEl) {
+    searchEl.addEventListener("input", function() {
+      _mfnSearch = searchEl.value;
+      if (_mfnCache && _mfnElTable) _applyMfnRows(_mfnCache, _mfnElTable, _mfnElMsg, _mfnElPill);
+    });
+  }
 }
+
 
 
 
