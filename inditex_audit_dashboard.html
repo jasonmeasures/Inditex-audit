@@ -1046,7 +1046,7 @@
         <div style="padding: 16px 24px 8px 24px;">
           <div style="font-size:13px;color:var(--gray-700);max-width:900px;line-height:1.6;">
             <strong style="color:var(--primary-700);">What's on this tab.</strong>
-            Three layers of HTS-rate consistency checks: (1) <strong>within this entry</strong> &mdash; same HTS used twice with different MFN rates; (2) <strong>across saved runs</strong> &mdash; same HTS filed at different MFN rates on different entries; (3) <strong>vs. the rules engine baseline</strong> &mdash; filed MFN rate doesn't match the engine's expected rate for that HTS.
+            Four layers of HTS-rate consistency checks: (1) <strong>within this entry</strong> &mdash; same HTS used twice with different MFN rates; (2) <strong>across saved runs</strong> &mdash; same HTS filed at different MFN rates on different entries (client-side); (3) <strong>vs. the rules engine baseline</strong> &mdash; filed MFN rate doesn't match the engine's expected rate for that HTS; (4) <strong>COO + HTS rate across the full database</strong> &mdash; server-side SQL query over all saved runs, grouped by country of origin (Postgres backend required).
           </div>
         </div>
 
@@ -1077,6 +1077,15 @@
             <table class="data" id="htsTableBaseline"></table>
           </div>
           <div id="htsEmptyBaseline" style="display:none;padding:14px 0;color:var(--gray-600);font-size:13px;">All filed MFN rates align with the engine baseline. &check;</div>
+
+          <h4 style="font-size:14px;color:var(--primary-700);margin:28px 0 8px 0;text-transform:uppercase;letter-spacing:0.04em;">
+            4. COO + HTS MFN rate — full database
+            <span class="pill" id="htsCountDb" style="margin-left:8px;">—</span>
+          </h4>
+          <div id="htsDbMsg" style="font-size:13px;color:var(--gray-600);padding:4px 0 8px 0;"></div>
+          <div class="table-wrap">
+            <table class="data" id="htsTableDb"></table>
+          </div>
           <div style="height:32px;"></div>
         </div>
       </div>
@@ -1119,10 +1128,15 @@
           <h3 class="subsection-title" style="margin-top: 22px;">China Stack — Why CN Has Three Layers</h3>
           <div class="ver-card">
             <div class="ver-grid">
-              <span class="lbl">Layer 1</span><span class="val"><span class="mono-inline">9903.88.15</span> — Section 301 List 4A (+7.5%). USTR action under Trade Act of 1974 § 301. Apparel/textiles included in List 4A since Sep 1, 2019. <strong>Not affected by SCOTUS ruling</strong> — Section 301 is independently authorized.</span>
+              <span class="lbl">Layer 1 (Section 301)</span><span class="val">One of four mutually exclusive codes — <strong>each HTS is on exactly one list</strong>. <strong>Not affected by SCOTUS ruling</strong> — Section 301 is independently authorized under Trade Act of 1974 § 301.<br>
+                &nbsp;• <span class="mono-inline">9903.88.01</span> List 1 +25% (machinery, electronics) · eff. Jul 6, 2018<br>
+                &nbsp;• <span class="mono-inline">9903.88.02</span> List 2 +25% (semiconductors, chemicals) · eff. Aug 23, 2018<br>
+                &nbsp;• <span class="mono-inline">9903.88.03</span> List 3 +25% (furniture, auto parts, <em>many Ch 50–65 textile codes</em>) · eff. Sep 24, 2018<br>
+                &nbsp;• <span class="mono-inline">9903.88.15</span> List 4A +7.5% (consumer goods, most apparel/footwear) · eff. Sep 1, 2019<br>
+                Engine displays 9903.88.15 as the default; accepts any 9903.88.* as satisfying coverage.</span>
               <span class="lbl">Layer 2</span><span class="val"><span class="mono-inline">9903.01.24</span> — IEEPA China/HK fentanyl (+10%). EO 14195 as amended Nov 10, 2025 (reduced from 20% to 10%).</span>
               <span class="lbl">Layer 3</span><span class="val"><span class="mono-inline">9903.01.25</span> — IEEPA Universal baseline (+10%). EO 14257.</span>
-              <span class="lbl">Stack rule</span><span class="val">All three apply <strong>additively to the same entered value base</strong> — no compounding. Effective China rate = MFN + 7.5% + 10% + 10% = MFN + 27.5%.</span>
+              <span class="lbl">Stack rule</span><span class="val">All three layers apply <strong>additively to the same entered value base</strong> — no compounding. Effective China rate (List 4A example) = MFN + 7.5% + 10% + 10% = MFN + 27.5%. For List 3 HTS codes the Section 301 component is +25% instead of +7.5%.</span>
             </div>
           </div>
 
@@ -1284,15 +1298,30 @@ const DEFAULT_CH99_RULES = [
     notes: "10% universal reciprocal — applies to countries not listed in Annex I" },
 
   // ── China stack: Section 301 + IEEPA China/HK + IEEPA Universal ───────────
-  // NOTE: Section 301 List 3 (9903.88.03, +25%) applies only to specific HTS chapters
-  // (mostly Chapters 39, 40, 73, 84, 85, 90 — chemicals/plastics/machinery/electronics).
-  // Apparel and textiles (Chapters 61/62) are on List 4A (9903.88.15 at 7.5%).
-  // We list only the broadly-applicable layers here; specific List 3 HTS would need
-  // a more granular rule keyed on HTS prefix, not COO.
-  { coo: "CN", ch99: "9903.88.15", rate:  7.5, category: "Section-301",    basis: "Section 301 List 4A",
+  // Section 301 lists are MUTUALLY EXCLUSIVE — each Chinese HTS appears on AT MOST ONE list.
+  // The engine stores all four for reference; expectedChapter99() collapses them into a single
+  // fuzzy marker (9903.88.15 as display default). The comparison accepts any 9903.88.* as
+  // satisfying Section 301 coverage — broker HTS-level classification is authoritative.
+  //   List 1:  9903.88.01  +25%  eff. Jul  6, 2018 (machinery, electronics)
+  //   List 2:  9903.88.02  +25%  eff. Aug 23, 2018 (semiconductors, chemicals)
+  //   List 3:  9903.88.03  +25%  eff. Sep 24, 2018 (furniture, auto parts, many Ch 50–65 textile codes)
+  //   List 4A: 9903.88.15  +7.5% eff. Sep  1, 2019 (consumer goods, most apparel/footwear)
+  { coo: "CN", ch99: "9903.88.01", rate: 25.0, category: "Section-301",
+    authority: "USTR Section 301 (Trade Act of 1974)", effective: "Jul 6, 2018 → present (List 1)",
+    effective_from: "2018-07-06", effective_to: null,
+    notes: "Section 301 List 1 (+25%) — industrial machinery, electronics, aerospace components" },
+  { coo: "CN", ch99: "9903.88.02", rate: 25.0, category: "Section-301",
+    authority: "USTR Section 301 (Trade Act of 1974)", effective: "Aug 23, 2018 → present (List 2)",
+    effective_from: "2018-08-23", effective_to: null,
+    notes: "Section 301 List 2 (+25%) — semiconductors, plastics, chemicals" },
+  { coo: "CN", ch99: "9903.88.03", rate: 25.0, category: "Section-301",
+    authority: "USTR Section 301 (Trade Act of 1974)", effective: "Sep 24, 2018 → present (List 3)",
+    effective_from: "2018-09-24", effective_to: null,
+    notes: "Section 301 List 3 (+25%) — furniture, auto parts, building materials; includes many Ch 50–65 textile/apparel codes (e.g. 6505.00.1540 knit wool headgear)" },
+  { coo: "CN", ch99: "9903.88.15", rate:  7.5, category: "Section-301",
     authority: "USTR Section 301 (Trade Act of 1974)", effective: "Sep 1, 2019 → present (List 4A)",
     effective_from: "2019-09-01", effective_to: null,
-    notes: "China Section 301 List 4A — apparel/textiles 7.5%" },
+    notes: "Section 301 List 4A (+7.5%) — consumer goods, most apparel/footwear; default display entry for the engine" },
   { coo: "CN", ch99: "9903.01.24", rate: 10.0, category: "IEEPA-China",    basis: "IEEPA China/HK fentanyl",
     authority: "EO 14195 (Feb 1, 2025) as amended Nov 10, 2025", effective: "Nov 10, 2025 → Feb 24, 2026",
     effective_from: "2025-11-10", effective_to: "2026-02-24",
@@ -1649,6 +1678,27 @@ function expectedChapter99(country, hts, mfnPct, rules) {
                  authority: r.authority || "—", effective: r.effective || "—" });
     }
   }
+  // Section 301 lists are mutually exclusive — each HTS is on at most one list.
+  // The engine doesn't know HTS-level list membership, so collapse all four
+  // 9903.88.* entries into a single fuzzy marker. The comparison layer accepts
+  // any 9903.88.01/02/03/15 filed by the broker as satisfying coverage.
+  // 9903.88.15 (List 4A) is kept as the display code since it's the most common
+  // for apparel/footwear and is the default for the Ch99 Stack visualization.
+  const sec301Entries = out.filter(e => e.category === "Section-301");
+  if (sec301Entries.length > 0) {
+    const nonSec301 = out.filter(e => e.category !== "Section-301");
+    nonSec301.push({
+      ch99: "9903.88.15",
+      rate_pct: 7.5,
+      category: "Section-301",
+      section301_fuzzy: true,
+      basis: "Section 301 (List 1/2/3/4A — code varies by HTS)",
+      notes: "Engine cannot determine HTS-level list membership. Any 9903.88.01/02/03/15 satisfies coverage; broker classification is authoritative.",
+      authority: "USTR Section 301 (Trade Act of 1974)",
+      effective: "2018–2019 → present",
+    });
+    return nonSec301;
+  }
   return out;
 }
 
@@ -1781,26 +1831,38 @@ function makeCompareRow(a, f, matchType, rules) {
   else row.MID_CHECK = "—";
 
   // CH99 check
-  // Section 301 (9903.88.*) coverage in the engine is COO-keyed, not HTS-keyed.
-  // The engine doesn't know which specific HTS subheadings are on List 4A — it
-  // assumes any CN apparel/textile is on the list. Brokers actually classify
-  // line-by-line against USTR's HTS annex. When the ONLY difference between
-  // expected and filed is the Section 301 layer, downgrade to PARTIAL (Info)
-  // rather than flagging Critical — surface as advisory, not a reconciliation gap.
+  // Section 301 lists (9903.88.01/02/03/15) are mutually exclusive — each HTS is on
+  // at most one list. The engine cannot determine which list applies to a given HTS,
+  // so it uses a fuzzy marker: ANY 9903.88.* filed by the broker satisfies coverage.
+  // PARTIAL fires only when the engine expects a Section 301 layer but none was filed.
   const isSection301 = (code) => /^99038[78]/.test(htsNormalize(code));
   const expSet = new Set(row.CH99_EXPECTED.map(e => htsNormalize(e.ch99)));
   const filSet = new Set(row.CH99_FILED.map(s => htsNormalize(s)));
-  if (expSet.size === 0 && filSet.size === 0) row.CH99_CHECK = "—";
-  else if (setsEqual(expSet, filSet)) row.CH99_CHECK = "MATCH";
-  else {
-    // Compute symmetric difference, ignoring Section 301 codes
-    const onlyExp = [...expSet].filter(c => !filSet.has(c));
-    const onlyFil = [...filSet].filter(c => !expSet.has(c));
-    const nonSection301Diff = onlyExp.filter(c => !isSection301(c)).length
-                            + onlyFil.filter(c => !isSection301(c)).length;
-    if (nonSection301Diff === 0) {
-      // The only delta is Section 301 — engine and broker disagree on List 4A coverage.
-      row.CH99_CHECK = "PARTIAL";
+  if (expSet.size === 0 && filSet.size === 0) {
+    row.CH99_CHECK = "—";
+  } else if (setsEqual(expSet, filSet)) {
+    row.CH99_CHECK = "MATCH";
+  } else {
+    // Separate Section 301 codes from the rest for independent evaluation.
+    const expNon301 = new Set([...expSet].filter(c => !isSection301(c)));
+    const filNon301 = new Set([...filSet].filter(c => !isSection301(c)));
+    const expHas301 = row.CH99_EXPECTED.some(e => e.section301_fuzzy || isSection301(htsNormalize(e.ch99)));
+    const filHas301 = [...filSet].some(c => isSection301(c));
+
+    if (setsEqual(expNon301, filNon301)) {
+      // Non-301 layers match — now evaluate Section 301 coverage independently.
+      if (expHas301 && filHas301) {
+        // Broker filed some 9903.88.* code — any list satisfies coverage.
+        row.CH99_CHECK = "MATCH";
+      } else if (expHas301 && !filHas301) {
+        // Engine expects Section 301 but broker filed none.
+        row.CH99_CHECK = "PARTIAL";
+      } else if (!expHas301 && filHas301) {
+        // Broker filed a Section 301 code the engine doesn't expect (non-CN item, or rule gap).
+        row.CH99_CHECK = "MISMATCH";
+      } else {
+        row.CH99_CHECK = "MATCH";
+      }
     } else if (filSet.size === 0) {
       row.CH99_CHECK = "MISSING";
     } else {
@@ -1872,30 +1934,82 @@ function buildFindings(cmp, ctx) {
   }
 
   // ── Section 301 coverage advisory (PARTIAL Ch99 check) ──────────────────
-  // The engine treats Section 301 (9903.88.*) as COO-blanket — but USTR
-  // List 4A is keyed on specific HTS subheadings. When the only Ch99 delta
-  // is the Section 301 layer, surface as Info: the broker likely knows whether
-  // the HTS is on List 4A; the engine doesn't.
+  // PARTIAL fires when the engine expects a Section 301 layer for a China item
+  // but the broker filed NO 9903.88.* code at all. A different 9903.88.* code
+  // than the engine's display default (9903.88.15) is NOT a gap — it just means
+  // the broker correctly classified the HTS to a different Section 301 list.
   const partial = cmp.filter(r => r.CH99_CHECK === "PARTIAL" && r.MATCH && !r.MATCH.startsWith("NO MATCH"));
   partial.slice(0, CAP).forEach(r => out.push({
     sev: "Info", cat: "Chapter 99 application",
     loc: `Item #${r.ITEM} (Agg #${r.AGG_LINE}) · ${r.COO} · ${r.HTS}`,
-    desc: `Section 301 coverage differs from engine: expected [${r.CH99_EXPECTED.map(e => e.ch99).join(", ") || "—"}], filed [${r.CH99_FILED.join(", ") || "—"}].`,
-    rec: "Engine treats all China apparel as List 4A — broker may have correctly excluded this HTS based on USTR's published annex. Verify against the List 4A HTS list before treating as a real gap.",
+    desc: `Engine couldn't verify Section 301 coverage — the broker filed no Section 301 layer (9903.88.01/02/03/15). Filed: [${r.CH99_FILED.join(", ") || "—"}].`,
+    rec: "Confirm against USTR's Section 301 HTS annex whether this HTS is subject to any Section 301 action. If it is, the broker should file the applicable 9903.88.0X code.",
   }));
   if (partial.length > CAP) {
     out.push({
       sev: "Info", cat: "Chapter 99 application",
       loc: `${partial.length} total occurrences`,
       desc: `+${partial.length - CAP} more Section 301 coverage advisories (showing top ${CAP}).`,
-      rec: "Look for a pattern: if a specific HTS family consistently lacks 9903.88.15 across multiple entries, that's likely the broker's standing classification, not a one-off error.",
+      rec: "If a specific HTS family consistently omits a 9903.88.* layer, verify against USTR's published Section 301 HTS annexes for Lists 1–4A.",
       isRollup: true,
     });
   }
 
   // ── No-match (unmatched on either side) ────────────────────────────────
   const noMatch = cmp.filter(r => r.MATCH && r.MATCH.startsWith("NO MATCH"));
-  noMatch.slice(0, CAP).forEach(r => {
+
+  // ── COO mismatch detection ───────────────────────────────────────────────
+  // When TXT and 7501 have the same HTS+MID but different COO, the strict and
+  // loose passes both fail (both key on COO) and the line surfaces as two orphans.
+  // Re-pair orphans on HTS+MID alone; when COO differs those are COO errors,
+  // not genuinely missing lines. Surface them as a specific "Country of origin"
+  // finding and exclude them from the generic Reconciliation loop below.
+  const txtOnlyRows   = noMatch.filter(r => r.MATCH === "NO MATCH (TXT only)");
+  const filedOnlyRows = noMatch.filter(r => r.MATCH === "NO MATCH (7501 only)");
+  const cooMismatchPaired = new Set();
+  const cooMismatches = [];
+  const _filedByHtsMid = new Map();
+  filedOnlyRows.forEach(f => {
+    const key = `${htsNormalize(f.HTS)}|${f.MID_75}`;
+    if (!_filedByHtsMid.has(key)) _filedByHtsMid.set(key, []);
+    _filedByHtsMid.get(key).push(f);
+  });
+  txtOnlyRows.forEach(t => {
+    const key = `${htsNormalize(t.HTS)}|${t.MID_TXT}`;
+    const candidates = _filedByHtsMid.get(key) || [];
+    const f = candidates.find(c => !cooMismatchPaired.has(c) && c.COO !== t.COO);
+    if (!f) return;
+    cooMismatchPaired.add(t);
+    cooMismatchPaired.add(f);
+    cooMismatches.push({ t, f });
+  });
+  cooMismatches.slice(0, CAP).forEach(({ t, f }) => {
+    const midPrefix = (t.MID_TXT || "").slice(0, 2).toUpperCase();
+    const midHint = midPrefix === t.COO
+      ? ` MID prefix '${midPrefix}' confirms ${t.COO} as the correct origin.`
+      : midPrefix === f.COO
+      ? ` MID prefix '${midPrefix}' matches the broker's filed COO (${f.COO}) — verify which is correct.`
+      : "";
+    out.push({
+      sev: "Critical", cat: "Country of origin",
+      loc: `Agg #${t.AGG_LINE} / Item #${f.ITEM} · ${t.HTS}`,
+      desc: `COO mismatch: TXT shows ${t.COO} but broker filed ${f.COO}. Same HTS (${t.HTS}) and MID (${t.MID_TXT}) — this is the same goods line entered with the wrong country of origin on the 7501.${midHint}`,
+      rec: `Broker should correct COO on Item #${f.ITEM} from ${f.COO} → ${t.COO}. This affects the Chapter 99 tariff stack — ${t.COO} and ${f.COO} carry different reciprocal duty rates.`,
+    });
+  });
+  if (cooMismatches.length > CAP) {
+    out.push({
+      sev: "Critical", cat: "Country of origin",
+      loc: `${cooMismatches.length} total COO mismatches`,
+      desc: `+${cooMismatches.length - CAP} more COO mismatches (showing top ${CAP}).`,
+      rec: "Pattern suggests a systematic COO entry error. Review the 7501 extract for fill-down or template errors.",
+      isRollup: true,
+    });
+  }
+
+  // Generic Reconciliation findings — excludes rows already diagnosed as COO mismatches.
+  const noMatchFiltered = noMatch.filter(r => !cooMismatchPaired.has(r));
+  noMatchFiltered.slice(0, CAP).forEach(r => {
     const isTxtOnly = r.MATCH === "NO MATCH (TXT only)";
     return out.push({
       sev: "Critical", cat: "Reconciliation",
@@ -1910,13 +2024,13 @@ function buildFindings(cmp, ctx) {
         : "Either the source TXT is missing this line, or the broker filed an item not present in the importer data.",
     });
   });
-  if (noMatch.length > CAP) {
-    const txtOnly = noMatch.filter(r => r.MATCH === "NO MATCH (TXT only)").length;
-    const filedOnly = noMatch.filter(r => r.MATCH === "NO MATCH (7501 only)").length;
+  if (noMatchFiltered.length > CAP) {
+    const txtOnly = noMatchFiltered.filter(r => r.MATCH === "NO MATCH (TXT only)").length;
+    const filedOnly = noMatchFiltered.filter(r => r.MATCH === "NO MATCH (7501 only)").length;
     out.push({
       sev: "Critical", cat: "Reconciliation",
-      loc: `${noMatch.length} total unmatched lines`,
-      desc: `+${noMatch.length - CAP} more unmatched (showing top ${CAP}). Breakdown: ${txtOnly} TXT-only aggregated lines, ${filedOnly} 7501-only filed items.`,
+      loc: `${noMatchFiltered.length} total unmatched lines`,
+      desc: `+${noMatchFiltered.length - CAP} more unmatched (showing top ${CAP}). Breakdown: ${txtOnly} TXT-only aggregated lines, ${filedOnly} 7501-only filed items.`,
       rec: txtOnly > filedOnly
         ? "TXT-only lines suggest the importer source has items the 7501 didn't capture. Confirm the filed entry covered the full invoice."
         : "7501-only items suggest the broker filed lines that aren't in the importer's commercial data. Possible split-shipment or supplemental filing.",
@@ -2201,6 +2315,7 @@ function loadRunsFromStorage() {
 }
 
 function saveRunsToStorage(runs) {
+  invalidateMfnCache();
   const result = runStore.set(JSON.stringify(runs));
   if (result.pruned > 0 && result.ok) {
     toast(`Storage was full — auto-removed ${result.pruned} oldest run${result.pruned === 1 ? "" : "s"} to make room for this one. Use Export to JSON before they're lost again.`, "error");
@@ -2410,6 +2525,7 @@ async function deleteRunById(id) {
   const runs = loadRunsFromStorage();
   const r = runs.find(x => x.id === id);
   if (r) _logActivity("deleted", r);
+  invalidateMfnCache();
   await runStore.deleteRun(id);
   if (state.activeRunId === id) {
     state.activeRunId = null;
@@ -2516,6 +2632,7 @@ let _rdFilter = "all";
 let _rdSelectedId = null;
 let _rdSearch = "";
 let _rdActFilter = "all";
+let _mfnCache = null;   // cached result from /api/analytics/mfn-consistency
 
 // Simple in-memory activity log; entries are { type, name, entry, importer, sev, ts }
 const _actLog = [];
@@ -3036,8 +3153,14 @@ function renderDashboard() {
       </table>
     </div>` : ""}
 
+    <!-- ── MFN Rate Consistency ── -->
+    <div class="dash-sec"><span class="dash-sec-lbl">MFN Rate Consistency</span><div class="dash-sec-line"></div><span id="dashMfnPill" style="margin-left:10px;display:inline-block;padding:1px 7px;border-radius:99px;background:#EBF8F2;color:#047857;font-size:11px;font-weight:700;">—</span></div>
+    <div style="font-size:12px;color:var(--gray-500);margin-bottom:6px;">COO + HTS pairs where the MFN rate differs across entries in the database.</div>
+    <div id="dashMfnMsg" style="font-size:13px;color:var(--gray-600);padding:2px 0 4px;"></div>
+    <div class="imp-tbl-wrap"><table class="data" id="dashMfnTable"></table></div>
+
     <!-- ── Detailed Runs ── -->
-    <div class="dash-sec"><span class="dash-sec-lbl">All Audit Runs (${runs.length})</span><div class="dash-sec-line"></div></div>
+    <div class="dash-sec" style="margin-top:20px;"><span class="dash-sec-lbl">All Audit Runs (${runs.length})</span><div class="dash-sec-line"></div></div>
     <div class="rd-body">
 
       <!-- Left: Recent Activity -->
@@ -3144,6 +3267,9 @@ function renderDashboard() {
   }));
   dashList.querySelectorAll(".rdp-delete-btn").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();deleteRunById(b.dataset.rdId);}));
   dashList.querySelectorAll(".rdp-close-btn").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();_rdSelectedId=null;renderDashboard();}));
+
+  // MFN rate consistency section lives in the dashboard overlay — refresh on every open.
+  renderMfnDbLayer({ tableId: "dashMfnTable", msgId: "dashMfnMsg", pillId: "dashMfnPill" });
 }
 
 
@@ -4177,19 +4303,25 @@ function renderStack() {
 
 // ---- Verification: cards summarizing each unique rule actually used ----
 function renderVerify() {
-  // Group rules by category, deduplicate by ch99 code
+  // Group rules by category, deduplicate by ch99 code.
+  // Always include all four Section 301 codes (88.01/02/03/15) regardless of
+  // whether they appear in this entry's expected stack — the mutual-exclusivity
+  // note below only makes sense if all four are visible together.
   const usedCh99 = new Set();
   for (const c of state.cmp) {
     (c.CH99_EXPECTED || []).forEach(e => usedCh99.add(htsNormalize(e.ch99)));
     (c.CH99_FILED || []).forEach(c2 => usedCh99.add(htsNormalize(c2)));
   }
+  // Always show all Section 301 entries from state.rules so the four lists appear together.
+  state.rules.filter(r => r.category === "Section-301").forEach(r => usedCh99.add(htsNormalize(r.ch99)));
+
   const seen = new Set();
   const cards = state.rules
     .filter(r => usedCh99.has(htsNormalize(r.ch99)))
     .filter(r => { const k = r.ch99; if (seen.has(k)) return false; seen.add(k); return true; })
     .sort((a,b) => a.ch99.localeCompare(b.ch99));
 
-  document.getElementById("verifyCards").innerHTML = cards.map(r => {
+  const renderCard = (r) => {
     const cat = CH99_CATEGORIES[r.category] || CH99_CATEGORIES["Reciprocal"];
     return `
       <div class="ver-card cat-${r.category}">
@@ -4205,7 +4337,22 @@ function renderVerify() {
           <span class="lbl">Notes</span><span class="val">${r.notes}</span>
         </div>
       </div>`;
-  }).join("");
+  };
+
+  const nonSec301Cards = cards.filter(r => r.category !== "Section-301");
+  const sec301Cards    = cards.filter(r => r.category === "Section-301");
+
+  const sec301Note = sec301Cards.length > 0 ? `
+    <p style="font-size:12px; color:var(--gray-600); margin:10px 0 8px; padding:0 2px; line-height:1.5;">
+      <strong>Section 301 lists are mutually exclusive</strong> — each Chinese HTS appears on at most one list.
+      The engine cannot determine HTS-level list membership; broker classification is authoritative.
+      The comparison accepts any <span class="mono-inline">9903.88.01/02/03/15</span> as satisfying Section 301 coverage.
+    </p>` : "";
+
+  document.getElementById("verifyCards").innerHTML =
+    nonSec301Cards.map(renderCard).join("") +
+    sec301Note +
+    sec301Cards.map(renderCard).join("");
 }
 
 // ---- Comparison table ----
@@ -4258,11 +4405,16 @@ function renderComparison() {
                           r.CH99_CHECK === "—" ? "badge-neutral" : "badge-danger";
         // Build rich chips with rate + $
         const filedSet = new Set(r.CH99_FILED.map(c => htsNormalize(c)));
+        const filHas301 = r.CH99_FILED.some(c => /^99038[78]/.test(htsNormalize(c)));
         const expChips = r.CH99_EXPECTED.map(e => {
           const amt = (r.ENTERED_VALUE_75 != null) ? r.ENTERED_VALUE_75 * (e.rate_pct||0)/100 : null;
-          const inFiled = filedSet.has(htsNormalize(e.ch99));
+          // For the fuzzy Section 301 marker, any 9903.88.* filed satisfies coverage.
+          const inFiled = e.section301_fuzzy ? filHas301 : filedSet.has(htsNormalize(e.ch99));
+          const chipTitle = e.section301_fuzzy
+            ? `${e.basis} · ${e.authority} — any 9903.88.01/02/03/15 satisfies`
+            : `${e.basis} · ${e.authority}`;
           const cls = `ch99-chip cat-${e.category || "Reciprocal"}${inFiled ? "" : " missing"}`;
-          return `<span class="${cls}" title="${e.basis} · ${e.authority}"><span class="code">${e.ch99}</span> <span class="rate">+${(e.rate_pct||0).toFixed(1)}%</span>${amt != null ? ` <span class="amt">${fmtUSD(amt)}</span>` : ""}</span>`;
+          return `<span class="${cls}" title="${chipTitle}"><span class="code">${e.ch99}</span> <span class="rate">+${(e.rate_pct||0).toFixed(1)}%</span>${amt != null ? ` <span class="amt">${fmtUSD(amt)}</span>` : ""}</span>`;
         }).join("");
         const expectedSet = new Set(r.CH99_EXPECTED.map(e => htsNormalize(e.ch99)));
         const filedChips = r.CH99_FILED.map(c => {
@@ -4861,7 +5013,109 @@ function renderHtsConsistency() {
         `).join("")}
       </tbody>`;
   }
+
+  renderMfnDbLayer();
 }
+
+// MFN consistency — renders into either the HTS tab or the dashboard overlay.
+// Results are cached for the session so re-renders of renderDashboard() don't
+// flash "Querying…" on every filter change or row expand.
+// Pass target = { tableId, msgId, pillId } to use dashboard element IDs;
+// omit for the HTS Consistency tab defaults.
+// Call invalidateMfnCache() after saving or deleting a run to force a re-fetch.
+function renderMfnDbLayer(target) {
+  var tableId = (target && target.tableId) || "htsTableDb";
+  var msgId   = (target && target.msgId)   || "htsDbMsg";
+  var pillId  = (target && target.pillId)  || "htsCountDb";
+  const dbEl   = document.getElementById(tableId);
+  const dbMsg  = document.getElementById(msgId);
+  const dbPill = document.getElementById(pillId);
+  if (!dbEl) return;
+
+  if (runStore.backend !== "postgres") {
+    dbMsg.textContent = "Requires Postgres backend (currently: " + runStore.backend + "). Connect the Flask server to enable cross-DB queries.";
+    dbEl.innerHTML = "";
+    dbPill.textContent = "—";
+    return;
+  }
+
+  // If we already have data, render from cache instantly — no network round-trip.
+  if (_mfnCache !== null) {
+    _applyMfnRows(_mfnCache, dbEl, dbMsg, dbPill);
+    return;
+  }
+
+  dbMsg.innerHTML = "<span style=\"color:var(--gray-400)\">Querying database…</span>";
+  dbEl.innerHTML = "";
+  dbPill.textContent = "…";
+
+  fetch("/api/analytics/mfn-consistency")
+    .then(function(r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function(rows) {
+      _mfnCache = rows;
+      _applyMfnRows(rows, dbEl, dbMsg, dbPill);
+    })
+    .catch(function(err) {
+      dbMsg.innerHTML = "<span style=\"color:#B42B23;\">Error: " + escapeHtml(err.message) + "</span>";
+      dbEl.innerHTML = "";
+      dbPill.textContent = "!";
+    });
+}
+
+function invalidateMfnCache() { _mfnCache = null; }
+
+function _applyMfnRows(rows, dbEl, dbMsg, dbPill) {
+  dbPill.textContent = rows.length;
+  if (rows.length === 0) {
+    dbMsg.textContent = "No COO + HTS combinations with conflicting MFN rates across the database. ✓";
+    dbEl.innerHTML = "";
+    return;
+  }
+  const runIds = new Set();
+  rows.forEach(function(r) { (r.occurrences || []).forEach(function(o) { runIds.add(o.run_id); }); });
+  dbMsg.textContent = rows.length + " COO HTS combination" + (rows.length !== 1 ? "s" : "") +
+    " with conflicting rates across " + runIds.size + " run" + (runIds.size !== 1 ? "s" : "") +
+    ". Sorted by largest rate spread first.";
+
+  var tbody = "";
+  rows.forEach(function(r) {
+    var occs = r.occurrences || [];
+    occs.forEach(function(o, i) {
+      var isFirst = i === 0;
+      var dt = o.saved_at ? new Date(o.saved_at).toLocaleDateString() : "—";
+      var groupCells = "";
+      if (isFirst) {
+        var ratesHtml = r.rates.map(function(x) {
+          return "<span style=\"display:block;\">" + fmtPct(parseFloat(x)) + "</span>";
+        }).join("");
+        groupCells =
+          "<td class=\"mono\" rowspan=\"" + occs.length + "\" style=\"vertical-align:top;background:#FFF8E8;font-weight:600;\">" + escapeHtml(r.coo) + "</td>" +
+          "<td class=\"mono\" rowspan=\"" + occs.length + "\" style=\"vertical-align:top;background:#FFF8E8;font-weight:600;\">" +
+            escapeHtml(htsFormat(r.hts)) +
+            "<div style=\"font-size:11px;color:#854F0B;font-weight:400;margin-top:2px;\">" + r.rate_count + " rates · spread " + fmtPct(r.rate_spread) + "</div>" +
+          "</td>" +
+          "<td class=\"mono\" rowspan=\"" + occs.length + "\" style=\"vertical-align:top;font-size:12px;color:var(--gray-700);\">" + ratesHtml + "</td>";
+      }
+      tbody +=
+        "<tr style=\"" + (isFirst ? "border-top:2px solid #F69000;" : "") + "\">" +
+        groupCells +
+        "<td class=\"mono\" style=\"font-size:12px;\">" + escapeHtml(o.entry_num || "—") + "</td>" +
+        "<td style=\"font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\" title=\"" + escapeHtml(o.run_name || "") + "\">" + escapeHtml(o.run_name || "—") + "</td>" +
+        "<td class=\"num\"><strong>" + fmtPct(parseFloat(o.rate)) + "</strong></td>" +
+        "<td class=\"mono\" style=\"font-size:11px;color:var(--gray-600);\">" + escapeHtml(o.rate_str || "—") + "</td>" +
+        "<td style=\"font-size:12px;color:var(--gray-600);\">" + dt + "</td>" +
+        "</tr>";
+    });
+  });
+
+  dbEl.innerHTML =
+    "<thead><tr>" +
+      "<th>COO</th><th>HTS</th><th>Rates observed</th>" +
+      "<th>Entry #</th><th>Run name</th>" +
+      "<th class=\"num\">MFN rate</th><th>Rate string</th><th>Saved</th>" +
+    "</tr></thead><tbody>" + tbody + "</tbody>";
+}
+
 
 
 function renderRules() {
@@ -4908,6 +5162,7 @@ document.querySelectorAll(".tab").forEach(btn => {
     document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b === btn));
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + target));
     // dashboard is now a standalone overlay, not a tab
+    if (target === "hts") renderMfnDbLayer();
   });
 });
 

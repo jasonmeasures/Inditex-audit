@@ -386,7 +386,20 @@ Each rule carries `effective_from` and `effective_to` ISO dates. The audit selec
 
 ### 8.5 Section 301 PARTIAL status
 
-`CH99_CHECK` has four states: MATCH, MISMATCH, MISSING, PARTIAL. PARTIAL fires when the *only* difference between expected and filed is the Section 301 layer (`9903.88.*`) — the engine doesn't know HTS-specific List 4A coverage, so this gets surfaced as Info advisory, not a Critical reconciliation gap.
+`CH99_CHECK` has four states: MATCH, MISMATCH, MISSING, PARTIAL.
+
+Section 301 lists are **mutually exclusive** — each Chinese HTS appears on at most one list:
+
+| Code | List | Rate | Effective |
+|---|---|---|---|
+| `9903.88.01` | List 1 | +25% | Jul 6, 2018 |
+| `9903.88.02` | List 2 | +25% | Aug 23, 2018 |
+| `9903.88.03` | List 3 | +25% | Sep 24, 2018 |
+| `9903.88.15` | List 4A | +7.5% | Sep 1, 2019 |
+
+The engine cannot determine HTS-level list membership, so it uses a **fuzzy marker**: any `9903.88.*` code filed by the broker satisfies Section 301 coverage — a broker filing `9903.88.03` (List 3) instead of `9903.88.15` (List 4A) is **not** a mismatch.
+
+**PARTIAL** fires only when the engine expects a Section 301 layer for a China-origin item but the broker filed **no** `9903.88.*` code at all. It surfaces as an Info advisory so the user can verify against USTR's annex whether the HTS is actually exempt from all Section 301 lists.
 
 ### 8.6 Findings rollup cap
 

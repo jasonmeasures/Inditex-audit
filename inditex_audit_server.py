@@ -405,6 +405,100 @@ def delete_all_runs():
 
 
 # ---------------------------------------------------------------------------
+# Analytics
+# ---------------------------------------------------------------------------
+
+@app.route("/api/analytics/mfn-consistency")
+def mfn_consistency():
+    """
+    Cross-entry MFN rate consistency check.
+
+    For every (COO, HTS) pair that appears in more than one saved run with
+    different MFN rates, return the full list of occurrences sorted by rate
+    spread (largest discrepancy first).  Useful for spotting broker
+    classification drift or reclassifications over time.
+    """
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                WITH filed_items AS (
+                    -- One row per filed item; cast MFN_RATE_PCT to numeric.
+                    SELECT
+                        r.id                                                AS run_id,
+                        r.name                                              AS run_name,
+                        r.entry_num,
+                        r.saved_at,
+                        (item->>'COO')                                      AS coo,
+                        (item->>'HTS')                                      AS hts,
+                        (item->>'MFN_RATE_STR')                             AS mfn_rate_str,
+                        ROUND((item->>'MFN_RATE_PCT')::numeric, 4)          AS mfn_rate_pct
+                    FROM  audit_runs r,
+                          jsonb_array_elements(r.data->'state'->'filed') AS item
+                    WHERE (item->>'MFN_RATE_PCT') IS NOT NULL
+                      AND (item->>'HTS')          IS NOT NULL
+                      AND (item->>'COO')          IS NOT NULL
+                ),
+                deduped AS (
+                    -- One representative row per (run, COO, HTS, rate) so that
+                    -- a single entry with 10 items at the same rate doesn't create
+                    -- 10 occurrence rows in the output.
+                    SELECT DISTINCT ON (run_id, coo, hts, mfn_rate_pct)
+                        run_id, run_name, entry_num, saved_at,
+                        coo, hts, mfn_rate_str, mfn_rate_pct
+                    FROM  filed_items
+                    ORDER BY run_id, coo, hts, mfn_rate_pct, mfn_rate_str NULLS LAST
+                ),
+                discrepancies AS (
+                    SELECT
+                        coo,
+                        hts,
+                        count(DISTINCT mfn_rate_pct)                              AS rate_count,
+                        array_agg(DISTINCT mfn_rate_pct ORDER BY mfn_rate_pct)    AS rates,
+                        max(mfn_rate_pct) - min(mfn_rate_pct)                     AS rate_spread
+                    FROM  deduped
+                    GROUP BY coo, hts
+                    HAVING count(DISTINCT mfn_rate_pct) > 1
+                )
+                SELECT
+                    d.coo,
+                    d.hts,
+                    d.rate_count,
+                    d.rates,
+                    ROUND(d.rate_spread, 4)                                        AS rate_spread,
+                    json_agg(
+                        json_build_object(
+                            'run_id',    f.run_id,
+                            'run_name',  f.run_name,
+                            'entry_num', f.entry_num,
+                            'rate',      f.mfn_rate_pct,
+                            'rate_str',  f.mfn_rate_str,
+                            'saved_at',  f.saved_at
+                        )
+                        ORDER BY f.mfn_rate_pct, f.saved_at DESC
+                    )                                                              AS occurrences
+                FROM  discrepancies d
+                JOIN  deduped f ON f.coo = d.coo AND f.hts = d.hts
+                GROUP BY d.coo, d.hts, d.rate_count, d.rates, d.rate_spread
+                ORDER BY d.rate_spread DESC, d.coo, d.hts
+            """)
+            rows = cur.fetchall()
+        conn.close()
+        result = []
+        for row in rows:
+            r = dict(row)
+            r["rates"]       = [float(x) for x in (r["rates"] or [])]
+            r["rate_spread"] = float(r["rate_spread"]) if r["rate_spread"] is not None else None
+            for occ in (r.get("occurrences") or []):
+                if occ.get("rate") is not None:
+                    occ["rate"] = float(occ["rate"])
+            result.append(r)
+        return Response(json.dumps(result, default=str), mimetype="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
