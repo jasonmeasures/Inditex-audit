@@ -510,7 +510,9 @@
   .imp-tbl td.sm { font-size: 12px; color: var(--gray-600); }
   /* COO mini grid */
   .coo-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 14px; }
-  .coo-card { background: white; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); padding: 10px 12px; }
+  .coo-card { background: white; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); padding: 10px 12px; transition: border-color .15s; }
+  .coo-card:hover { border-color: var(--primary-300); }
+  .coo-card.active { border-color: var(--primary-500); background: #EEF6FB; }
   .coo-name { font-size: 13px; font-weight: 700; color: var(--primary-500); margin-bottom: 3px; }
   .coo-row  { display: flex; justify-content: space-between; font-size: 11px; color: var(--gray-500); }
   .coo-val  { font-weight: 600; color: var(--gray-700); }
@@ -2641,6 +2643,7 @@ let _rdMidSort = "entries"; // "mid"|"entries"|"lines"|"coo"|"value"|"entered"
 let _rdMidSortDir = -1;
 let _rdMidSearch = "";
 let _rdMidShowAll = false;
+let _rdCooFilter = "";   // country code to filter runs table, e.g. "TH"
 
 // Strip punctuation and normalise whitespace so "ZARA USA INC." and
 // "ZARA USA, INC." both key to "ZARA USA INC".
@@ -2875,6 +2878,11 @@ function renderDashboard() {
   if (_rdFilter === "crit")   filtered = filtered.filter(r => (r.findingsCritical??0) > 0);
   if (_rdFilter === "high")   filtered = filtered.filter(r => (r.findingsCritical??0) === 0 && (r.findingsHigh??0) > 0);
   if (_rdFilter === "recent") filtered = filtered.filter(r => new Date(r.savedAt).getTime() > sevenDaysAgo);
+  if (_rdCooFilter) {
+    filtered = filtered.filter(r =>
+      (r.state?.filed || []).some(f => f.COO === _rdCooFilter)
+    );
+  }
   if (_rdSearch.trim()) {
     const q = _rdSearch.trim().toLowerCase();
     filtered = filtered.filter(r => {
@@ -3139,7 +3147,7 @@ function renderDashboard() {
     <div class="coo-grid">
       ${cooRows.map(([coo, s]) => {
         const ch99Pct = s.duty>0 ? Math.round((s.ch99/s.duty)*100) : 0;
-        return `<div class="coo-card">
+        return `<div class="coo-card${_rdCooFilter===coo?" active":""}" data-rd-coo="${escapeHtml(coo)}" style="cursor:pointer;">
           <div class="coo-name">${escapeHtml(coo)}</div>
           <div class="coo-row"><span>Filed lines</span><span class="coo-val">${s.lines.toLocaleString()}</span></div>
           <div class="coo-row"><span>Total duty</span><span class="coo-val">${fmtUSD(s.duty)}</span></div>
@@ -3194,7 +3202,7 @@ function renderDashboard() {
     <div class="imp-tbl-wrap"><table class="data" id="dashMfnTable"></table></div>
 
     <!-- ── Detailed Runs ── -->
-    <div class="dash-sec" style="margin-top:20px;"><span class="dash-sec-lbl">All Audit Runs (${runs.length})</span><div class="dash-sec-line"></div></div>
+    <div class="dash-sec" style="margin-top:20px;"><span class="dash-sec-lbl">All Audit Runs (${filtered.length}${_rdCooFilter?" of "+runs.length:""})</span><div class="dash-sec-line"></div>${_rdCooFilter?`<span style="margin-left:10px;background:var(--primary-100);color:var(--primary-700);font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;">COO: ${escapeHtml(_rdCooFilter)} <span data-clear-coo style="cursor:pointer;margin-left:4px;">✕</span></span>`:""}</div>
     <div class="rd-body">
 
       <!-- Left: Recent Activity -->
@@ -3276,6 +3284,19 @@ function renderDashboard() {
   </div>`;
 
   // ── Wire all events ────────────────────────────────────────────────
+  dashList.querySelectorAll("[data-rd-coo]").forEach(el => {
+    el.addEventListener("click", e => {
+      e.stopPropagation();
+      const coo = el.dataset.rdCoo;
+      _rdCooFilter = (_rdCooFilter === coo) ? "" : coo;  // toggle
+      _rdSelectedId = null;
+      renderDashboard();
+    });
+  });
+  const clearCooEl = dashList.querySelector("[data-clear-coo]");
+  if (clearCooEl) {
+    clearCooEl.addEventListener("click", e => { e.stopPropagation(); _rdCooFilter = ""; renderDashboard(); });
+  }
   dashList.querySelectorAll("[data-rd-filter]").forEach(el => {
     el.addEventListener("click", e => { e.stopPropagation(); _rdFilter=el.dataset.rdFilter; _rdSelectedId=null; renderDashboard(); });
   });
@@ -3427,6 +3448,11 @@ function renderRuns() {
   if (_rdFilter === "crit")   filtered = filtered.filter(r => (r.findingsCritical ?? 0) > 0);
   if (_rdFilter === "high")   filtered = filtered.filter(r => (r.findingsCritical ?? 0) === 0 && (r.findingsHigh ?? 0) > 0);
   if (_rdFilter === "recent") filtered = filtered.filter(r => new Date(r.savedAt).getTime() > sevenDaysAgo);
+  if (_rdCooFilter) {
+    filtered = filtered.filter(r =>
+      (r.state?.filed || []).some(f => f.COO === _rdCooFilter)
+    );
+  }
   if (_rdSearch.trim()) {
     const q = _rdSearch.trim().toLowerCase();
     filtered = filtered.filter(r => {
