@@ -5131,6 +5131,14 @@ function _applyMfnRows(rows, dbEl, dbMsg, dbPill) {
     return _mfnSortDir * (b.rate_spread - a.rate_spread);  // default: spread
   });
 
+  // Zero results from the API — no point rendering the search UI.
+  if (rows.length === 0) {
+    dbMsg.textContent = "No COO + HTS combinations with conflicting MFN rates across the database. ✓";
+    dbPill.textContent = "0";
+    dbEl.innerHTML = "";
+    return;
+  }
+
   dbPill.textContent = display.length + (display.length !== rows.length ? "/" + rows.length : "");
 
   // Summary + search input rendered into dbMsg
@@ -5146,7 +5154,9 @@ function _applyMfnRows(rows, dbEl, dbMsg, dbPill) {
     "</div>";
 
   if (display.length === 0) {
-    dbEl.innerHTML = "<tbody><tr><td colspan=\"8\" style=\"text-align:center;padding:16px;color:var(--gray-400);font-size:12px;\">No pairs match this search.</td></tr></tbody>";
+    // Search filtered everything out (rows.length > 0 is guaranteed above).
+    dbEl.innerHTML = “<tbody><tr><td colspan=\”8\” style=\”text-align:center;padding:16px;color:var(--gray-400);font-size:12px;\”>No pairs match “” + escapeHtml(_mfnSearch) + “”.</td></tr></tbody>”;
+    return;
   } else {
     var si = function(col) { return _mfnSort === col ? (_mfnSortDir < 0 ? " ▼" : " ▲") : ""; };
     var thS = function(col, lbl, cls) {
