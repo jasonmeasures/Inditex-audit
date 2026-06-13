@@ -1,0 +1,47 @@
+# Copy this file to terraform.tfvars and fill in your values.
+# NEVER commit terraform.tfvars — it contains secrets.
+
+# ── Core ──────────────────────────────────────────────────────────────────
+project_name = "inditex-audit"
+environment  = "dev"
+aws_region   = "us-west-2"
+
+# ── Networking — reuse the shared kn-playground-dev-vpc ───────────────────
+# Get vpc_id from:
+#   cd applications/shared-infra/terraform/envs/dev
+#   terraform output -raw shared_vpc_id
+vpc_id = "REPLACE_WITH_SHARED_VPC_ID"
+
+# Get subnet_ids from:
+#   cd applications/shared-infra/terraform/envs/dev
+#   terraform output -json public_subnet_ids
+# NOTE: public subnets are created when you apply shared-infra (they
+# didn't exist before — run terraform apply there first).
+subnet_ids = ["REPLACE_WITH_PUBLIC_SUBNET_ID"]
+
+# ── Backend — Elastic Beanstalk ───────────────────────────────────────────
+backend_instance_type = "t3.small"
+
+# Find the latest Python 3.11 stack:
+#   aws elasticbeanstalk list-available-solution-stacks | grep 'Python 3.11'
+backend_solution_stack = "64bit Amazon Linux 2023 v4.9.3 running Python 3.11"
+
+# ── Database (shared RDS — same VPC, direct connection) ───────────────────
+# Get pg_host from:
+#   cd applications/shared-infra/terraform/envs/dev
+#   terraform output -raw rds_endpoint
+pg_host = "REPLACE_WITH_RDS_ENDPOINT"
+
+pg_port     = 5432
+pg_user     = "kn_admin"
+pg_database = "inditex_audit"
+
+# Get pg_password from:
+#   cd applications/shared-infra/terraform/envs/dev
+#   terraform output -raw rds_master_password
+pg_password = "REPLACE_WITH_RDS_PASSWORD"
+
+# ── Tags ──────────────────────────────────────────────────────────────────
+common_tags = {
+  Team = "KlearNow"
+}

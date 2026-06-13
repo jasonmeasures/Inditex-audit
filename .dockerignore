@@ -1,0 +1,12 @@
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.log
+.env
+.env.local
+.DS_Store
+.cursor/
+*.swp
+*.swo
