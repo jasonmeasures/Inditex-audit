@@ -143,6 +143,25 @@ def _ensure_users_schema(conn: psycopg2.extensions.connection) -> None:
     print("  • Schema ready (table: users)")
 
 
+def _ensure_reference_schema(conn: psycopg2.extensions.connection) -> None:
+    """Global reference data (HTS table, Ch99 rules) shared across all audit runs."""
+    ddl = """
+    CREATE TABLE IF NOT EXISTS reference_config (
+        id                  TEXT PRIMARY KEY,
+        filename            TEXT,
+        payload             BYTEA,
+        code_count          INTEGER,
+        json_data           JSONB,
+        updated_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_by          TEXT
+    );
+    """
+    with conn.cursor() as cur:
+        cur.execute(ddl)
+    conn.commit()
+    print("  • Schema ready (table: reference_config)")
+
+
 def _ensure_activity_schema(conn: psycopg2.extensions.connection) -> None:
     ddl = """
     CREATE TABLE IF NOT EXISTS user_activity_log (
@@ -787,12 +806,14 @@ def mfn_consistency():
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 WITH filed_items AS (
-                    -- One row per filed item; cast MFN_RATE_PCT to numeric.
+                    -- One row per 7501 filed line item.
                     SELECT
                         r.id                                                AS run_id,
                         r.name                                              AS run_name,
                         r.entry_num,
                         r.saved_at,
+                        (item->>'ITEM')                                     AS item_no,
+                        (item->>'MID')                                      AS mid,
                         (item->>'COO')                                      AS coo,
                         (item->>'HTS')                                      AS hts,
                         (item->>'MFN_RATE_STR')                             AS mfn_rate_str,
@@ -803,16 +824,6 @@ def mfn_consistency():
                       AND (item->>'HTS')          IS NOT NULL
                       AND (item->>'COO')          IS NOT NULL
                 ),
-                deduped AS (
-                    -- One representative row per (run, COO, HTS, rate) so that
-                    -- a single entry with 10 items at the same rate doesn't create
-                    -- 10 occurrence rows in the output.
-                    SELECT DISTINCT ON (run_id, coo, hts, mfn_rate_pct)
-                        run_id, run_name, entry_num, saved_at,
-                        coo, hts, mfn_rate_str, mfn_rate_pct
-                    FROM  filed_items
-                    ORDER BY run_id, coo, hts, mfn_rate_pct, mfn_rate_str NULLS LAST
-                ),
                 discrepancies AS (
                     SELECT
                         coo,
@@ -820,7 +831,7 @@ def mfn_consistency():
                         count(DISTINCT mfn_rate_pct)                              AS rate_count,
                         array_agg(DISTINCT mfn_rate_pct ORDER BY mfn_rate_pct)    AS rates,
                         max(mfn_rate_pct) - min(mfn_rate_pct)                     AS rate_spread
-                    FROM  deduped
+                    FROM  filed_items
                     GROUP BY coo, hts
                     HAVING count(DISTINCT mfn_rate_pct) > 1
                 )
@@ -835,14 +846,18 @@ def mfn_consistency():
                             'run_id',    f.run_id,
                             'run_name',  f.run_name,
                             'entry_num', f.entry_num,
+                            'item',      f.item_no,
+                            'mid',       f.mid,
                             'rate',      f.mfn_rate_pct,
                             'rate_str',  f.mfn_rate_str,
                             'saved_at',  f.saved_at
                         )
-                        ORDER BY f.mfn_rate_pct, f.saved_at DESC
+                        ORDER BY f.mfn_rate_pct,
+                                 NULLIF(regexp_replace(f.item_no, '[^0-9]', '', 'g'), '')::int NULLS LAST,
+                                 f.saved_at DESC
                     )                                                              AS occurrences
                 FROM  discrepancies d
-                JOIN  deduped f ON f.coo = d.coo AND f.hts = d.hts
+                JOIN  filed_items f ON f.coo = d.coo AND f.hts = d.hts
                 GROUP BY d.coo, d.hts, d.rate_count, d.rates, d.rate_spread
                 ORDER BY d.rate_spread DESC, d.coo, d.hts
             """)
@@ -970,6 +985,154 @@ def activity_summary():
 
 
 # ---------------------------------------------------------------------------
+# Routes — global reference data (admin write, all users read)
+# ---------------------------------------------------------------------------
+
+@app.route("/api/reference", methods=["GET"])
+@require_auth
+def get_reference():
+    """Metadata + Ch99 rules. HTS binary is fetched via GET /api/reference/hts."""
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM reference_config WHERE id IN ('hts_table', 'ch99_rules')")
+            rows = {r["id"]: dict(r) for r in cur.fetchall()}
+        conn.close()
+
+        hts_row = rows.get("hts_table")
+        rules_row = rows.get("ch99_rules")
+        hts_meta = None
+        if hts_row and hts_row.get("payload"):
+            hts_meta = {
+                "filename": hts_row.get("filename"),
+                "codeCount": hts_row.get("code_count"),
+                "updatedAt": hts_row.get("updated_at"),
+                "updatedBy": hts_row.get("updated_by"),
+            }
+        rules = rules_row.get("json_data") if rules_row else None
+        rules_meta = None
+        if rules_row and rules:
+            rules_meta = {
+                "count": len(rules) if isinstance(rules, list) else 0,
+                "updatedAt": rules_row.get("updated_at"),
+                "updatedBy": rules_row.get("updated_by"),
+            }
+        return Response(
+            json.dumps({
+                "hts": hts_meta,
+                "ch99Rules": rules,
+                "ch99RulesMeta": rules_meta,
+            }, default=str),
+            mimetype="application/json",
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/reference/hts", methods=["GET"])
+@require_auth
+def get_reference_hts():
+    """Download the stored HTS classification table (XLSX bytes)."""
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT filename, payload FROM reference_config WHERE id = 'hts_table'"
+            )
+            row = cur.fetchone()
+        conn.close()
+        if not row or not row.get("payload"):
+            return jsonify({"error": "HTS table not uploaded"}), 404
+        filename = row.get("filename") or "hts_classification_table.xlsx"
+        return Response(
+            row["payload"],
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/reference/hts", methods=["PUT"])
+@require_admin
+def put_reference_hts():
+    """Upload or replace the global HTS classification table."""
+    try:
+        upload = request.files.get("file")
+        if not upload:
+            return jsonify({"error": "multipart file field 'file' is required"}), 400
+        data = upload.read()
+        if not data:
+            return jsonify({"error": "empty file"}), 400
+        filename = upload.filename or "hts_table.xlsx"
+        code_count = request.form.get("codeCount")
+        try:
+            code_count = int(code_count) if code_count else None
+        except ValueError:
+            code_count = None
+        username = request.current_user.get("sub")
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO reference_config (id, filename, payload, code_count, updated_at, updated_by)
+                VALUES ('hts_table', %s, %s, %s, NOW(), %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    filename   = EXCLUDED.filename,
+                    payload    = EXCLUDED.payload,
+                    code_count = EXCLUDED.code_count,
+                    updated_at = NOW(),
+                    updated_by = EXCLUDED.updated_by
+            """, (filename, psycopg2.Binary(data), code_count, username))
+        conn.commit()
+        conn.close()
+        _log_activity(
+            username,
+            "upload_hts_table",
+            "reference",
+            "hts_table",
+            {"filename": filename, "code_count": code_count},
+        )
+        return jsonify({"ok": True, "filename": filename, "codeCount": code_count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/reference/ch99-rules", methods=["PUT"])
+@require_admin
+def put_reference_ch99_rules():
+    """Save the global Chapter 99 rules table."""
+    try:
+        body = request.get_json(force=True) or {}
+        rules = body.get("rules")
+        if not isinstance(rules, list):
+            return jsonify({"error": "body.rules must be an array"}), 400
+        username = request.current_user.get("sub")
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO reference_config (id, json_data, code_count, updated_at, updated_by)
+                VALUES ('ch99_rules', %s, %s, NOW(), %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    json_data  = EXCLUDED.json_data,
+                    code_count = EXCLUDED.code_count,
+                    updated_at = NOW(),
+                    updated_by = EXCLUDED.updated_by
+            """, (json.dumps(rules), len(rules), username))
+        conn.commit()
+        conn.close()
+        _log_activity(
+            username,
+            "save_ch99_rules",
+            "reference",
+            "ch99_rules",
+            {"rule_count": len(rules)},
+        )
+        return jsonify({"ok": True, "count": len(rules)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -985,6 +1148,7 @@ if __name__ == "__main__":
     _ensure_schema(conn)
     _ensure_users_schema(conn)
     _ensure_activity_schema(conn)
+    _ensure_reference_schema(conn)
     _seed_initial_admin(conn)
     conn.close()
 

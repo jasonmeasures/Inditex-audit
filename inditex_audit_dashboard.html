@@ -83,10 +83,11 @@
     padding: 18px 28px;
     display: flex; align-items: center; justify-content: space-between;
     box-shadow: var(--shadow-md);
-    position: sticky; top: 0; z-index: 50;
+    position: sticky; top: 0; z-index: 1100;
   }
   .topbar .brand {
     display: flex; align-items: center; gap: 14px;
+    cursor: pointer;
   }
   .topbar .logo {
     width: 36px; height: 36px;
@@ -128,6 +129,29 @@
     background: var(--gray-50);
   }
   .card .card-body { padding: 0; }
+
+  /* ---------- Reference data card ---------- */
+  .refdata-card {
+    background: var(--gray-50); border: 1px solid var(--gray-200);
+    border-radius: var(--radius); padding: 12px 20px;
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .refdata-card .rd-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--gray-500); white-space: nowrap;
+  }
+  .refdata-card .rd-zone {
+    flex: 1; min-width: 260px; max-width: 480px;
+    border: 1.5px dashed var(--gray-300); border-radius: var(--radius-sm);
+    padding: 8px 14px; background: #fff; cursor: pointer;
+    display: flex; align-items: center; gap: 10px; transition: all 0.15s;
+  }
+  .refdata-card .rd-zone:hover { border-color: var(--primary-500); background: var(--primary-50); }
+  .refdata-card .rd-zone.has-file { border-style: solid; border-color: var(--green-500); background: var(--green-50); }
+  .refdata-card .rd-zone input[type="file"] { display: none; }
+  .refdata-card .rd-fname { font-weight: 600; font-size: 12px; color: var(--gray-800); }
+  .refdata-card .rd-fmeta { font-size: 11px; color: var(--gray-500); margin-left: auto; white-space: nowrap; }
 
   /* ---------- Inputs panel ---------- */
   .inputs-grid {
@@ -171,6 +195,7 @@
   .file-zone .fname { font-weight: 600; color: var(--gray-800); font-size: 13px; word-break: break-all; }
   .file-zone .fmeta { font-size: 11px; color: var(--gray-500); }
   .file-zone input[type="file"] { display: none; }
+  .mfn-table-badge { font-size: 10px; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; border-radius: 3px; padding: 1px 4px; margin-left: 4px; white-space: nowrap; }
 
   .btn {
     padding: 11px 22px; border-radius: var(--radius-sm); border: none;
@@ -765,11 +790,19 @@
     font-family: var(--font-sans);
   }
   .btn-dashboard-open:hover { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.8); }
+  .btn-dashboard-open.active {
+    background: rgba(255,255,255,0.28);
+    border-color: rgba(255,255,255,0.95);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
+  }
   .topbar-right { display: flex; align-items: center; gap: 10px; }
 
-  /* ── Dashboard full-page overlay ── */
+  /* ── Full-page views (below topbar; topbar is the nav) ── */
   .dash-overlay {
-    position: fixed; inset: 0; z-index: 1000;
+    position: fixed;
+    top: var(--topbar-h, 72px);
+    left: 0; right: 0; bottom: 0;
+    z-index: 1000;
     background: var(--gray-100);
     overflow-y: auto;
     display: none;
@@ -781,30 +814,35 @@
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
   }
-  .dash-ov-header {
-    background: var(--primary-500); color: white;
-    padding: 0 24px;
-    height: 56px;
-    display: flex; align-items: center; justify-content: space-between;
+  .view-header {
+    padding: 20px 28px 0;
+    max-width: 1480px;
+    width: 100%;
+    margin: 0 auto;
     flex-shrink: 0;
-    position: sticky; top: 0; z-index: 10;
-    box-shadow: 0 2px 8px rgba(0,0,0,.15);
   }
-  .dash-ov-brand { display: flex; align-items: center; gap: 12px; }
-  .dash-ov-title { font-size: 15px; font-weight: 700; color: white; }
-  .dash-ov-sub   { font-size: 12px; color: var(--primary-100); }
-  .dash-ov-close {
-    display: flex; align-items: center; gap: 6px;
-    padding: 7px 14px;
-    background: rgba(255,255,255,0.12); color: white;
-    border: 1.5px solid rgba(255,255,255,0.35);
-    border-radius: var(--radius-sm);
-    font-size: 12px; font-weight: 600; cursor: pointer;
-    font-family: var(--font-sans); letter-spacing: 0.03em;
-    transition: background .15s;
+  .view-header h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--gray-900);
+    letter-spacing: -0.01em;
   }
-  .dash-ov-close:hover { background: rgba(255,255,255,0.22); }
-  .dash-ov-body { flex: 1; max-width: 1400px; width: 100%; margin: 0 auto; padding: 0 4px 32px; }
+  .view-header .view-sub {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--gray-500);
+  }
+  .dash-ov-body {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 28px;
+    max-width: 1480px;
+    width: 100%;
+    margin: 0 auto;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
 
   /* ---------- Findings ---------- */
   .findings { display: grid; gap: 12px; padding: 18px; }
@@ -1059,9 +1097,10 @@
   <div class="topbar-right">
     <div class="meta" id="metaInfo">No audit run</div>
     <span id="activeRunBadge" class="active-run-badge" style="display:none;"><span class="dot"></span><span id="activeRunName"></span></span>
-    <button class="btn-dashboard-open" id="dashboardBtn" title="Open runs dashboard">Dashboard <span class="pill" id="pillDash" style="background:rgba(255,255,255,.2);color:#fff;">0</span></button>
-    <button class="btn-dashboard-open" id="usersBtn" title="Manage users" style="display:none;">Users</button>
-    <button class="btn-dashboard-open" id="activityBtn" title="User activity log" style="display:none;">Activity</button>
+    <button class="btn-dashboard-open" id="dashboardBtn" data-nav="dashboard" title="Runs dashboard">Dashboard <span class="pill" id="pillDash" style="background:rgba(255,255,255,.2);color:#fff;">0</span></button>
+    <button class="btn-dashboard-open" id="usersBtn" data-nav="users" title="Manage users" style="display:none;">Users</button>
+    <button class="btn-dashboard-open" id="referenceBtn" data-nav="reference" title="Reference data (HTS table, Ch99 rules)" style="display:none;">Reference</button>
+    <button class="btn-dashboard-open" id="activityBtn" data-nav="activity" title="User activity log" style="display:none;">Activity</button>
     <button class="btn-new-run" id="newRunBtn" title="Clear all results and start a new audit">+ New Run</button>
     <div class="topbar-user" id="topbarUser" style="display:none;">
       <div class="user-pill">
@@ -1074,17 +1113,11 @@
   </div>
 </header>
 
-<!-- ── Dashboard overlay ── -->
+<!-- ── Dashboard view ── -->
 <div class="dash-overlay" id="dashOverlay">
-  <div class="dash-ov-header">
-    <div class="dash-ov-brand">
-      <div class="logo" style="width:32px;height:32px;font-size:14px;">7</div>
-      <div>
-        <div class="dash-ov-title">7501 Audit — Dashboard</div>
-        <div class="dash-ov-sub">Totals and activity across all saved audit runs</div>
-      </div>
-    </div>
-    <button class="dash-ov-close" id="dashCloseBtn">← Back to Audit</button>
+  <div class="view-header">
+    <h1>Runs Dashboard</h1>
+    <p class="view-sub">Totals and activity across all saved audit runs</p>
   </div>
   <div class="dash-ov-body">
     <div id="runsDashList"></div>
@@ -1092,15 +1125,9 @@
 </div>
 
 <div class="dash-overlay" id="usersOverlay">
-  <div class="dash-ov-header">
-    <div class="dash-ov-brand">
-      <div class="logo" style="width:32px;height:32px;font-size:14px;">7</div>
-      <div>
-        <div class="dash-ov-title">User Management</div>
-        <div class="dash-ov-sub">Create and manage users (admin only)</div>
-      </div>
-    </div>
-    <button class="dash-ov-close" id="usersCloseBtn">← Back to Audit</button>
+  <div class="view-header">
+    <h1>User Management</h1>
+    <p class="view-sub">Create and manage users (admin only)</p>
   </div>
   <div class="dash-ov-body">
     <div style="background:white;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;margin-top:8px;">
@@ -1129,15 +1156,9 @@
 </div>
 
 <div class="dash-overlay" id="activityOverlay">
-  <div class="dash-ov-header">
-    <div class="dash-ov-brand">
-      <div class="logo" style="width:32px;height:32px;font-size:14px;">7</div>
-      <div>
-        <div class="dash-ov-title">User Activity</div>
-        <div class="dash-ov-sub">Who accessed the tool and what they did</div>
-      </div>
-    </div>
-    <button class="dash-ov-close" id="activityCloseBtn">← Back to Audit</button>
+  <div class="view-header">
+    <h1>User Activity</h1>
+    <p class="view-sub">Who accessed the tool and what they did</p>
   </div>
   <div class="dash-ov-body">
     <div id="activitySummary" style="margin-top:8px;"></div>
@@ -1166,6 +1187,9 @@
             <option value="create_user">create_user</option>
             <option value="delete_user">delete_user</option>
             <option value="change_password">change_password</option>
+            <option value="upload_hts_table">upload_hts_table</option>
+            <option value="save_ch99_rules">save_ch99_rules</option>
+            <option value="rerun_all_audits">rerun_all_audits</option>
           </select>
           <button class="btn btn-primary" id="activityRefreshBtn" style="padding:7px 14px;font-size:13px;">Refresh</button>
         </div>
@@ -1189,9 +1213,82 @@
   </div>
 </div>
 
+<div class="dash-overlay" id="referenceOverlay">
+  <div class="view-header">
+    <h1>Reference Data</h1>
+    <p class="view-sub">Global HTS table and Chapter 99 rules applied to every audit run</p>
+  </div>
+  <div class="dash-ov-body">
+    <div class="rd-info tip" style="margin-top:8px;">
+      HTS and Chapter 99 rules are shared across all audits. Upload or edit here — not on individual runs. After changes, re-run saved audits so comparison results reflect the new reference data.
+    </div>
+
+    <div style="background:white;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:20px 24px;margin-bottom:16px;">
+      <h3 style="font-size:14px;font-weight:700;color:var(--primary-700);margin:0 0 12px 0;text-transform:uppercase;letter-spacing:.04em;">HTS Classification Table</h3>
+      <div class="ref-admin-only refdata-card" style="margin-bottom:12px;">
+        <label class="rd-zone" id="adminHtsZone">
+          <span class="rd-fname" id="adminHtsNameEl">HTS Classification Table</span>
+          <span class="rd-fmeta" id="adminHtsCount">not loaded</span>
+          <input type="file" id="adminHtsFile" accept=".xlsx,.xls" />
+        </label>
+        <span id="adminHtsMeta" style="font-size:11px;color:var(--gray-400);max-width:480px;line-height:1.45;"></span>
+      </div>
+      <p class="ref-admin-only" style="font-size:12px;color:var(--gray-500);margin:0 0 16px 0;line-height:1.5;">
+        MFN rates from this table override broker-filed 7501 rates and drive EU cap logic (9903.02.19 vs 9903.02.20).
+      </p>
+      <div class="users-toolbar" style="padding:0 0 10px 0;border:none;background:transparent;">
+        <div>
+          <h4 style="margin:0;font-size:13px;font-weight:700;color:var(--gray-800);">HTS codes</h4>
+          <div id="adminHtsBrowseMeta" style="font-size:11px;color:var(--gray-400);margin-top:3px;">Search and browse loaded codes</div>
+        </div>
+        <input type="text" id="adminHtsSearch" class="rd-runs-search" placeholder="Search HTS or description…" style="max-width:280px;" />
+      </div>
+      <div id="adminHtsBrowseEmpty" style="display:none;padding:16px 0;color:var(--gray-500);font-size:13px;"></div>
+      <div class="table-wrap" style="max-height:50vh;overflow:auto;">
+        <table class="data" id="adminHtsTable"></table>
+      </div>
+    </div>
+
+    <div style="background:white;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;margin-bottom:16px;">
+      <div class="users-toolbar">
+        <div>
+          <h3 style="margin:0;font-size:14px;">Chapter 99 Rules</h3>
+          <div id="adminRulesMeta" style="font-size:11px;color:var(--gray-400);margin-top:4px;"></div>
+        </div>
+        <div class="ref-admin-only" style="display:flex;gap:8px;">
+          <button class="btn btn-secondary" id="resetRulesBtn" style="padding:7px 14px;font-size:13px;">Reset to defaults</button>
+          <button class="btn btn-primary" id="saveRulesBtn" style="padding:7px 14px;font-size:13px;">Save rules</button>
+        </div>
+      </div>
+      <div class="table-wrap" style="max-height:50vh;overflow:auto;">
+        <table class="data" id="adminRulesTable"></table>
+      </div>
+    </div>
+
+    <div class="ref-admin-only" style="background:white;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:20px 24px;">
+      <h3 style="font-size:14px;font-weight:700;color:var(--gray-800);margin:0 0 8px 0;">Re-run saved audits</h3>
+      <p style="font-size:13px;color:var(--gray-600);margin:0 0 14px 0;line-height:1.5;">
+        Recomputes every saved run using the current HTS table and Chapter 99 rules. Original TXT/XLSX files are not required — results are rebuilt from stored aggregation and 7501 data.
+      </p>
+      <button class="btn btn-primary" id="rerunAllBtn" style="padding:8px 16px;font-size:13px;">Re-run all saved audits</button>
+      <span id="rerunAllStatus" style="font-size:12px;color:var(--gray-500);margin-left:12px;"></span>
+    </div>
+  </div>
+</div>
+
 <main class="page">
 
   <!-- ============== INPUTS PANEL ============== -->
+  <section class="section" id="htsRefStatusSection" style="display:none;">
+    <div class="refdata-card" id="htsRefStatusCard">
+      <span class="rd-label">HTS Reference</span>
+      <div style="flex:1;min-width:200px;">
+        <div id="htsRefStatusText" style="font-size:13px;color:var(--gray-700);">No HTS Classification Table loaded.</div>
+        <div id="htsRefStatusMeta" style="font-size:11px;color:var(--gray-400);margin-top:2px;"></div>
+      </div>
+      <button type="button" class="btn btn-secondary" id="openRefHtsBtn" style="padding:7px 14px;font-size:12px;white-space:nowrap;">Open Reference</button>
+    </div>
+  </section>
   <section class="section">
     <div class="card">
       <h2 class="section-title">1. Inputs</h2>
@@ -1271,7 +1368,7 @@
     <section class="section">
       <h2 class="section-title">Review &amp; Runs</h2>
       <div class="tabs" id="tabs">
-        <button class="tab active" data-tab="runs">Dashboard <span class="pill" id="pillRuns">0</span></button>
+        <button class="tab active" data-tab="runs">Saved Runs <span class="pill" id="pillRuns">0</span></button>
         <button class="tab" data-tab="comparison">Comparison <span class="pill" id="pillCmp">0</span></button>
         <button class="tab" data-tab="stack">Ch99 Stack <span class="pill" id="pillStack">0</span></button>
         <button class="tab" data-tab="raw">Raw Lines <span class="pill" id="pillRaw">0</span></button>
@@ -1280,7 +1377,6 @@
         <button class="tab" data-tab="findings">Findings <span class="pill" id="pillFindings">0</span></button>
         <button class="tab" data-tab="mfr">Manufacturer <span class="pill" id="pillMfr">0</span></button>
         <button class="tab" data-tab="hts">HTS Consistency <span class="pill" id="pillHts">0</span></button>
-        <button class="tab" data-tab="rules">Chapter 99 Rules <span class="pill" id="pillRulesTab">0</span></button>
         <button class="tab" data-tab="verify">Sources &amp; Verification</button>
       </div>
 
@@ -1342,7 +1438,9 @@
           <table class="data" id="stackTable"></table>
         </div>
         <div style="padding: 14px 18px; border-top: 1px solid var(--gray-200); background: var(--gray-50); font-size: 12px; color: var(--gray-600); line-height: 1.6;">
-          <strong>How to read this:</strong> each row is one filed line item. The four colored columns show every Chapter 99 layer that <em>should</em> apply per the rules engine, with the code, rate %, and computed $ amount. MFN is shown for context. The <strong>Δ vs Filed</strong> column compares the engine's expected total Ch99 duty to what the broker actually filed — green means within $1, amber within $5, red beyond.
+          <strong>How to read this:</strong> each row is one filed line item. The four colored columns show every Chapter 99 layer that <em>should</em> apply per the rules engine, with the code, rate %, and computed $ amount.
+          <strong>MFN %</strong> drives EU cap logic (9903.02.19 vs 9903.02.20): it uses the <strong>HTS Classification Table</strong> when loaded, otherwise the rate from the <strong>7501 extract</strong> (column 33).
+          The <strong>Δ vs Filed</strong> column compares expected total Ch99 duty to what was filed on the 7501 — green within $1, amber within $5, red beyond.
         </div>
       </div>
 
@@ -1427,7 +1525,8 @@
         <div style="padding: 16px 24px 8px 24px;">
           <div style="font-size:13px;color:var(--gray-700);max-width:900px;line-height:1.6;">
             <strong style="color:var(--primary-700);">What's on this tab.</strong>
-            Four layers of HTS-rate consistency checks: (1) <strong>within this entry</strong> &mdash; same HTS used twice with different MFN rates; (2) <strong>across saved runs</strong> &mdash; same HTS filed at different MFN rates on different entries (client-side); (3) <strong>vs. the rules engine baseline</strong> &mdash; filed MFN rate doesn't match the engine's expected rate for that HTS; (4) <strong>COO + HTS rate across the full database</strong> &mdash; server-side SQL query over all saved runs, grouped by country of origin (Postgres backend required).
+            HTS-rate checks for <strong>this audit only</strong>: (1) <strong>within this entry</strong> &mdash; same HTS used twice with different filed MFN rates; (2) <strong>vs. the tariff baseline</strong> &mdash; filed MFN rate doesn't match the HTS table or engine expectation for that line.
+            Cross-run HTS discrepancies are on the <strong>Dashboard</strong>.
           </div>
         </div>
 
@@ -1442,43 +1541,14 @@
           <div id="htsEmptyIntra" style="display:none;padding:14px 0;color:var(--gray-600);font-size:13px;">No HTS appears with conflicting MFN rates inside this entry. &check;</div>
 
           <h4 style="font-size:14px;color:var(--primary-700);margin:28px 0 8px 0;text-transform:uppercase;letter-spacing:0.04em;">
-            2. Across saved runs
-            <span class="pill" id="htsCountCross" style="margin-left:8px;">0</span>
-          </h4>
-          <div class="table-wrap">
-            <table class="data" id="htsTableCross"></table>
-          </div>
-          <div id="htsEmptyCross" style="display:none;padding:14px 0;color:var(--gray-600);font-size:13px;">Need at least 2 saved runs to compare HTS rates across entries.</div>
-
-          <h4 style="font-size:14px;color:var(--primary-700);margin:28px 0 8px 0;text-transform:uppercase;letter-spacing:0.04em;">
-            3. vs. rules engine baseline
+            2. vs. tariff baseline
             <span class="pill" id="htsCountBaseline" style="margin-left:8px;">0</span>
           </h4>
           <div class="table-wrap">
             <table class="data" id="htsTableBaseline"></table>
           </div>
-          <div id="htsEmptyBaseline" style="display:none;padding:14px 0;color:var(--gray-600);font-size:13px;">All filed MFN rates align with the engine baseline. &check;</div>
-
-          <h4 style="font-size:14px;color:var(--primary-700);margin:28px 0 8px 0;text-transform:uppercase;letter-spacing:0.04em;">
-            4. COO + HTS MFN rate — full database
-            <span class="pill" id="htsCountDb" style="margin-left:8px;">—</span>
-          </h4>
-          <div id="htsDbMsg" style="font-size:13px;color:var(--gray-600);padding:4px 0 8px 0;"></div>
-          <div class="table-wrap">
-            <table class="data" id="htsTableDb"></table>
-          </div>
+          <div id="htsEmptyBaseline" style="display:none;padding:14px 0;color:var(--gray-600);font-size:13px;">All filed MFN rates align with the tariff baseline for this entry. &check;</div>
           <div style="height:32px;"></div>
-        </div>
-      </div>
-
-      <!-- Rules Panel -->
-      <div class="tab-panel" id="panel-rules">
-        <div class="filter-bar">
-          <span class="muted" style="font-size:12px;">Reference rules used by the audit engine. Edit values inline to re-run with a different policy mix.</span>
-          <button class="btn btn-secondary" id="reRunBtn" style="margin-left:auto; padding: 6px 14px; font-size: 12px;">Re-run audit with edits</button>
-        </div>
-        <div class="table-wrap">
-          <table class="data" id="rulesTable"></table>
         </div>
       </div>
 
@@ -1486,7 +1556,7 @@
       <div class="tab-panel" id="panel-verify">
         <div style="padding: 22px 24px;">
           <div class="ver-callout">
-            <strong>How to trust this audit.</strong> The Chapter 99 stack the engine expects is derived from the rules in the <em>Chapter 99 Rules</em> tab. Each rule cites the executive order, the HTS code in the official tariff schedule, and its effective date window. The cards below explain every layer used in this entry, including how the EU cap logic resolves between 9903.02.19 and 9903.02.20. If a rule is wrong or stale, edit it in the Rules tab and re-run — the math is purely a function of those rules + filed MFN rates.
+            <strong>How to trust this audit.</strong> The Chapter 99 stack the engine expects is derived from the global rules in <em>Reference → Chapter 99 Rules</em> (admin). Each rule cites the executive order, the HTS code in the official tariff schedule, and its effective date window. The cards below explain every layer used in this entry, including how the EU cap logic resolves between 9903.02.19 and 9903.02.20. If a rule is wrong or stale, edit it under Reference and re-run saved audits — the math is purely a function of those rules + filed MFN rates.
           </div>
 
           <div class="ver-callout" style="background: var(--red-50); border-color: var(--red-100); border-left-color: var(--red-500);">
@@ -1524,14 +1594,17 @@
           <h3 class="subsection-title" style="margin-top: 22px;">Data Provenance</h3>
           <div class="ver-card">
             <div class="ver-grid">
-              <span class="lbl">MFN rates</span><span class="val">Taken from the broker-filed 7501 extract column <span class="mono-inline">33. CD HTS US Rate</span> per item. Engine parses "16.5%", "Free", etc. and uses the resulting % for both per-line raw calc and EU cap logic.</span>
+              <span class="lbl">MFN rates</span><span class="val" id="verifyMfnSource">Taken from the broker-filed 7501 extract column <span class="mono-inline">33. CD HTS US Rate</span> per item. Engine parses "16.5%", "Free", etc. and uses the resulting % for both per-line raw calc and EU cap logic.</span>
               <span class="lbl">Entered value</span><span class="val">TXT-side: AMOUNT − pro-rata freight − pro-rata insurance per Method B aggregation. 7501-side: filed value from column <span class="mono-inline">32. CM Item Entered Value</span>. Δ &lt; $1 is rounding; larger differences are flagged.</span>
               <span class="lbl">MID / COO match</span><span class="val">First pass: strict on COO + HTS-normalized + MID. Second pass: loose on COO + HTS only (flags MID as MISMATCH). Third pass: any unmatched rows surface as NO MATCH findings.</span>
-              <span class="lbl">Ch99 detection</span><span class="val">7501-side: any HTS starting with <span class="mono-inline">9903</span>. TXT-side: derived from Rules tab + COO. The Comparison tab flags MATCH / MISMATCH / MISSING per line.</span>
+              <span class="lbl">Ch99 detection</span><span class="val">7501-side: any HTS starting with <span class="mono-inline">9903</span>. TXT-side: derived from global Ch99 rules + COO. The Comparison tab flags MATCH / MISMATCH / MISSING per line.</span>
               <span class="lbl">MPF</span><span class="val">0.3464% of entered value per 19 CFR 24.23(b)(1). Not capped per line in this audit — apply caps at entry-summary level if needed.</span>
               <span class="lbl">Cotton fee</span><span class="val">Cents-per-kg lookup by HTS-6 prefix (Section 22 / Cotton Research & Promotion Act). Hardcoded for common Inditex prefixes — extend the table if a finding appears for an unmapped HTS.</span>
             </div>
           </div>
+
+          <h3 class="subsection-title" style="margin-top: 22px;">HTS Classification Table</h3>
+          <div id="verifyHtsCard"></div>
         </div>
       </div>
 
@@ -1827,6 +1900,57 @@ function parseRatePct(s) {
   return m ? parseFloat(m[1]) : null;
 }
 
+// Build a Map from 10-digit HTS → { rate_pct, has_specific, description }
+// Expects the Inditex HTS Classification Table XLSX export.
+// Header row is auto-detected (preamble rows vary by export date).
+// For duplicate HTS entries, the row with the latest "Updated" date wins.
+function parseHtsTable(buffer) {
+  const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+  let HEADER_ROW = rawRows.findIndex(row =>
+    Array.isArray(row) && row.some(cell => String(cell || "").trim() === "HTS No.")
+  );
+  if (HEADER_ROW < 0) HEADER_ROW = 5; // legacy fallback
+  if (rawRows.length <= HEADER_ROW) return new Map();
+  const headers = rawRows[HEADER_ROW];
+  const HTS_COL   = headers.indexOf("HTS No.");
+  const C1_FORM   = headers.indexOf("C1 Ad Valorem formula");
+  const C1_STR    = headers.indexOf("C1 Ad Valorem");
+  const SPEC_FORM = headers.indexOf("C1 Rate Specific formula");
+  const DESC_COL  = headers.indexOf("Description");
+  const UPD_COL   = headers.indexOf("Updated");
+  const lookup = new Map();
+  for (let i = HEADER_ROW + 1; i < rawRows.length; i++) {
+    const row = rawRows[i];
+    if (!row[HTS_COL]) continue;
+    const hts = htsNormalize(String(row[HTS_COL]));
+    if (hts.length !== 10) continue;
+    const formula = row[C1_FORM];
+    const rate_pct = (typeof formula === "number" && !isNaN(formula))
+      ? formula * 100
+      : parseFloat(String(row[C1_STR] || "0"));
+    const has_specific = typeof row[SPEC_FORM] === "number" && row[SPEC_FORM] > 0;
+    const description = String(row[DESC_COL] || "");
+    const updRaw = row[UPD_COL];
+    const updMs = updRaw instanceof Date ? updRaw.getTime() : new Date(String(updRaw || 0)).getTime();
+    const existing = lookup.get(hts);
+    if (!existing || updMs > existing._updMs) {
+      lookup.set(hts, { rate_pct, has_specific, description, _updMs: updMs });
+    }
+  }
+  return lookup;
+}
+
+// Return the authoritative MFN rate: table wins over broker rate when table is loaded.
+function getMfnRate(hts, brokerRate) {
+  if (htsLookup) {
+    const entry = htsLookup.get(htsNormalize(hts));
+    if (entry != null) return entry.rate_pct;
+  }
+  return brokerRate;
+}
+
 // ---------- Money helpers ----------
 const fmtUSD = (n) => (n == null || isNaN(n)) ? "—" :
   n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1852,8 +1976,285 @@ const state = {
   txtBuffer: null, txtName: null,
   xlsxBuffer: null, xlsxName: null,
   raw: null, agg: null, filed: null, cmp: null, findings: null, ctx: null,
-  rules: JSON.parse(JSON.stringify(DEFAULT_CH99_RULES)),
+  rules: JSON.parse(JSON.stringify(DEFAULT_CH99_RULES)),  // global reference — synced from server
 };
+
+const REFERENCE_LS_KEY = "inditex_reference_v1";
+const referenceMeta = {
+  htsUpdatedAt: null, htsUpdatedBy: null,
+  rulesUpdatedAt: null, rulesUpdatedBy: null,
+  rulesDirty: false,
+};
+
+let htsBuffer = null;
+let htsName = null;
+let htsLookup = null;
+let _adminHtsSearch = "";
+
+function updateHtsRefStatus() {
+  const section = document.getElementById("htsRefStatusSection");
+  const textEl = document.getElementById("htsRefStatusText");
+  const metaEl = document.getElementById("htsRefStatusMeta");
+  if (!section || !textEl) return;
+  if (!auth.token) {
+    section.style.display = "none";
+    return;
+  }
+  section.style.display = "";
+  if (htsLookup && htsLookup.size > 0) {
+    textEl.innerHTML = `<strong>${escapeHtml(htsName || "HTS Classification Table")}</strong> — ${htsLookup.size.toLocaleString()} codes loaded`;
+    if (metaEl) {
+      metaEl.textContent = referenceMeta.htsUpdatedAt
+        ? `Updated ${new Date(referenceMeta.htsUpdatedAt).toLocaleString()} · Open Reference to browse${auth.isAdmin ? " or upload a new file" : ""}`
+        : "Global MFN rates applied to all audits";
+    }
+  } else {
+    textEl.textContent = auth.isAdmin
+      ? "No HTS Classification Table loaded — upload under Reference."
+      : "No HTS Classification Table loaded — ask an admin to upload under Reference.";
+    if (metaEl) metaEl.textContent = "MFN rates use the 7501 extract until a table is loaded.";
+  }
+}
+
+function applyReferencePermissions() {
+  const isAdmin = auth.isAdmin;
+  document.querySelectorAll(".ref-admin-only").forEach(el => {
+    if (isAdmin) {
+      el.style.display = el.classList.contains("refdata-card") ? "flex" : "";
+    } else {
+      el.style.display = "none";
+    }
+  });
+  document.querySelectorAll("#adminRulesTable .rule-input").forEach(inp => {
+    inp.readOnly = !isAdmin;
+  });
+  const uploadInput = document.getElementById("adminHtsFile");
+  if (uploadInput) uploadInput.disabled = !isAdmin;
+}
+
+function renderAdminHtsTable() {
+  const tbl = document.getElementById("adminHtsTable");
+  const emptyEl = document.getElementById("adminHtsBrowseEmpty");
+  const metaEl = document.getElementById("adminHtsBrowseMeta");
+  if (!tbl) return;
+  if (!htsLookup || htsLookup.size === 0) {
+    tbl.innerHTML = "";
+    if (emptyEl) {
+      emptyEl.style.display = "";
+      emptyEl.textContent = auth.isAdmin
+        ? "No table loaded. Upload an XLSX file above."
+        : "No table loaded. An admin must upload the HTS Classification Table.";
+    }
+    if (metaEl) metaEl.textContent = "No codes to display";
+    return;
+  }
+  if (emptyEl) emptyEl.style.display = "none";
+  const q = _adminHtsSearch.trim().toLowerCase();
+  const rows = [];
+  for (const [hts, entry] of htsLookup) {
+    const formatted = htsFormat(hts);
+    const desc = entry.description || "";
+    if (q && !formatted.toLowerCase().includes(q) && !desc.toLowerCase().includes(q)) continue;
+    rows.push({
+      hts: formatted,
+      rate_pct: entry.rate_pct,
+      has_specific: entry.has_specific,
+      description: desc,
+    });
+  }
+  rows.sort((a, b) => a.hts.localeCompare(b.hts));
+  const total = rows.length;
+  const shown = rows.slice(0, 250);
+  if (metaEl) {
+    metaEl.textContent = q
+      ? `${total.toLocaleString()} match${total === 1 ? "" : "es"}${total > 250 ? " · showing first 250" : ""}`
+      : `${htsLookup.size.toLocaleString()} codes${total > 250 ? " · showing first 250 — search to narrow" : ""}`;
+  }
+  tbl.innerHTML = `
+    <thead><tr>
+      <th>HTS</th><th class="num">MFN %</th><th>Specific</th><th>Description</th>
+    </tr></thead>
+    <tbody>
+      ${shown.length === 0
+        ? `<tr><td colspan="4" style="color:var(--gray-500);padding:16px;">No codes match "${escapeHtml(_adminHtsSearch)}".</td></tr>`
+        : shown.map(r => `
+        <tr>
+          <td class="mono">${r.hts}</td>
+          <td class="num">${fmtPct(r.rate_pct)}</td>
+          <td>${r.has_specific ? "Yes" : "—"}</td>
+          <td style="font-size:12px;color:var(--gray-700);max-width:480px;">${escapeHtml(r.description)}</td>
+        </tr>`).join("")}
+    </tbody>`;
+}
+
+function updateHtsUi() {
+  const nameEl = document.getElementById("adminHtsNameEl");
+  const countEl = document.getElementById("adminHtsCount");
+  const zoneEl = document.getElementById("adminHtsZone");
+  const metaEl = document.getElementById("adminHtsMeta");
+  if (!nameEl) return;
+  nameEl.textContent = htsName || "HTS Classification Table";
+  if (htsLookup && htsLookup.size > 0) {
+    countEl.textContent = `${htsLookup.size.toLocaleString()} codes loaded`;
+    zoneEl?.classList.add("has-file");
+  } else {
+    countEl.textContent = "not loaded";
+    zoneEl?.classList.remove("has-file");
+  }
+  if (metaEl) {
+    metaEl.textContent = referenceMeta.htsUpdatedAt
+      ? `Last updated ${new Date(referenceMeta.htsUpdatedAt).toLocaleString()}${referenceMeta.htsUpdatedBy ? " by " + referenceMeta.htsUpdatedBy : ""}`
+      : "";
+  }
+  updateHtsRefStatus();
+  renderAdminHtsTable();
+}
+
+function applyHtsBuffer(buf, filename, persist = true) {
+  htsBuffer = buf;
+  htsName = filename || "HTS Classification Table";
+  htsLookup = parseHtsTable(new Uint8Array(buf));
+  updateHtsUi();
+  renderHtsVerification();
+  if (state.cmp) render();
+  if (persist) persistReferenceLocal();
+  return htsLookup.size;
+}
+
+function persistReferenceLocal() {
+  try {
+    let htsB64 = null;
+    if (htsBuffer) {
+      const bytes = new Uint8Array(htsBuffer);
+      let bin = "";
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+      }
+      htsB64 = btoa(bin);
+    }
+    localStorage.setItem(REFERENCE_LS_KEY, JSON.stringify({
+      htsName,
+      htsB64,
+      htsCodeCount: htsLookup?.size || 0,
+      htsUpdatedAt: referenceMeta.htsUpdatedAt,
+      htsUpdatedBy: referenceMeta.htsUpdatedBy,
+      rules: state.rules,
+      rulesUpdatedAt: referenceMeta.rulesUpdatedAt,
+      rulesUpdatedBy: referenceMeta.rulesUpdatedBy,
+    }));
+  } catch (e) {
+    console.warn("Could not persist reference data locally:", e.message);
+  }
+}
+
+function loadReferenceLocal() {
+  try {
+    const raw = localStorage.getItem(REFERENCE_LS_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (Array.isArray(data.rules) && data.rules.length) state.rules = data.rules;
+    referenceMeta.rulesUpdatedAt = data.rulesUpdatedAt || null;
+    referenceMeta.rulesUpdatedBy = data.rulesUpdatedBy || null;
+    referenceMeta.htsUpdatedAt = data.htsUpdatedAt || null;
+    referenceMeta.htsUpdatedBy = data.htsUpdatedBy || null;
+    if (data.htsB64) {
+      const bin = atob(data.htsB64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      htsBuffer = bytes.buffer;
+      htsName = data.htsName || "HTS Classification Table";
+      htsLookup = parseHtsTable(bytes);
+    }
+    updateHtsUi();
+  } catch (e) {
+    console.warn("Could not load local reference data:", e.message);
+  }
+}
+
+async function loadReferenceFromServer() {
+  if (!auth.token) {
+    loadReferenceLocal();
+    return;
+  }
+  try {
+    const res = await authFetch("/api/reference");
+    if (!res.ok) {
+      loadReferenceLocal();
+      return;
+    }
+    const data = await res.json();
+    if (Array.isArray(data.ch99Rules) && data.ch99Rules.length) {
+      state.rules = data.ch99Rules;
+      referenceMeta.rulesUpdatedAt = data.ch99RulesMeta?.updatedAt || null;
+      referenceMeta.rulesUpdatedBy = data.ch99RulesMeta?.updatedBy || null;
+    }
+    if (data.hts?.filename) {
+      referenceMeta.htsUpdatedAt = data.hts.updatedAt || null;
+      referenceMeta.htsUpdatedBy = data.hts.updatedBy || null;
+      const hres = await authFetch("/api/reference/hts");
+      if (hres.ok) {
+        const buf = await hres.arrayBuffer();
+        htsBuffer = buf;
+        htsName = data.hts.filename;
+        htsLookup = parseHtsTable(new Uint8Array(buf));
+      }
+    }
+    updateHtsUi();
+    persistReferenceLocal();
+  } catch (e) {
+    console.warn("Reference load failed, using local cache:", e.message);
+    loadReferenceLocal();
+  }
+}
+
+async function uploadHtsToServer(file) {
+  const count = applyHtsBuffer(await file.arrayBuffer(), file.name, false);
+  referenceMeta.htsUpdatedAt = new Date().toISOString();
+  referenceMeta.htsUpdatedBy = auth.username;
+  persistReferenceLocal();
+  if (auth.token && runStore.backend === "postgres") {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("codeCount", String(count));
+    const res = await authFetch("/api/reference/hts", { method: "PUT", body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Upload failed");
+    trackActivity("upload_hts_table", { filename: file.name, code_count: count }, "reference");
+  }
+  toast(`HTS table saved — ${count.toLocaleString()} codes`, "success");
+  return count;
+}
+
+async function saveCh99RulesToServer() {
+  if (auth.token && runStore.backend === "postgres") {
+    const res = await authFetch("/api/reference/ch99-rules", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rules: state.rules }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Save failed");
+    trackActivity("save_ch99_rules", { rule_count: state.rules.length }, "reference");
+  }
+  referenceMeta.rulesUpdatedAt = new Date().toISOString();
+  referenceMeta.rulesUpdatedBy = auth.username;
+  referenceMeta.rulesDirty = false;
+  persistReferenceLocal();
+  updateAdminRulesMeta();
+}
+
+function updateAdminRulesMeta() {
+  const el = document.getElementById("adminRulesMeta");
+  if (!el) return;
+  const parts = [`${state.rules.length} rules`];
+  if (referenceMeta.rulesUpdatedAt) {
+    parts.push(`saved ${new Date(referenceMeta.rulesUpdatedAt).toLocaleString()}`);
+    if (referenceMeta.rulesUpdatedBy) parts.push(`by ${referenceMeta.rulesUpdatedBy}`);
+  }
+  if (referenceMeta.rulesDirty) parts.push("(unsaved changes)");
+  el.textContent = parts.join(" · ");
+}
 
 function wireFileZone(zoneId, inputId, nameId, key) {
   const zone = document.getElementById(zoneId);
@@ -1872,6 +2273,24 @@ function wireFileZone(zoneId, inputId, nameId, key) {
 }
 wireFileZone("txtZone",  "txtFile",  "txtName",  "txt");
 wireFileZone("xlsxZone", "xlsxFile", "xlsxName", "xlsx");
+
+document.getElementById("adminHtsFile").addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    await uploadHtsToServer(f);
+    renderAdminHtsTable();
+  } catch (err) {
+    htsLookup = null;
+    updateHtsUi();
+    toast("HTS table error: " + err.message, "error");
+    console.error("HTS table error:", err);
+  }
+});
+document.getElementById("adminHtsSearch")?.addEventListener("input", (e) => {
+  _adminHtsSearch = e.target.value;
+  renderAdminHtsTable();
+});
 
 function updateRunBtn() {
   const btn = document.getElementById("runBtn");
@@ -2199,6 +2618,10 @@ function compareAggToFiled(agg, filed, rules) {
 
 function makeCompareRow(a, f, matchType, rules) {
   const ev_txt = a ? a.INVOICE_VALUE - (a._allocFreight||0) - (a._allocInsurance||0) : null;
+  const htsForLookup = a ? a.DESTINATION_HS : (f ? f.HTS : "");
+  const tableEntry = htsLookup ? htsLookup.get(htsNormalize(htsForLookup)) : null;
+  const MFN_RATE_TABLE = tableEntry ? tableEntry.rate_pct : null;
+  const mfnForCh99 = MFN_RATE_TABLE !== null ? MFN_RATE_TABLE : (f ? f.MFN_RATE_PCT : null);
   const row = {
     MATCH: matchType,
     AGG_LINE: a ? a.AGG_LINE : null,
@@ -2211,8 +2634,9 @@ function makeCompareRow(a, f, matchType, rules) {
     ENTERED_VALUE_TXT: a ? a.ENTERED_VALUE : null,
     ENTERED_VALUE_75: f ? Number(f.ENTERED_VALUE) || null : null,
     MFN_RATE_PCT: f ? f.MFN_RATE_PCT : null,
+    MFN_RATE_TABLE,
     CH99_FILED: f ? (f.CH99_HTS || "").split(",").map(s => htsFormat(s.trim())).filter(Boolean) : [],
-    CH99_EXPECTED: a ? expectedChapter99(a.ORIGIN, a.DESTINATION_HS, f ? f.MFN_RATE_PCT : null, rules) : [],
+    CH99_EXPECTED: a ? expectedChapter99(a.ORIGIN, a.DESTINATION_HS, mfnForCh99, rules) : [],
   };
 
   // MID check
@@ -2520,13 +2944,23 @@ const auth = (() => {
       document.getElementById("userRoleBadge").textContent = _state.role;
       const usersBtn = document.getElementById("usersBtn");
       if (usersBtn) usersBtn.style.display = _state.role === "admin" ? "" : "none";
+      const referenceBtn = document.getElementById("referenceBtn");
+      if (referenceBtn) referenceBtn.style.display = "";
       const activityBtn = document.getElementById("activityBtn");
       if (activityBtn) activityBtn.style.display = _state.role === "admin" ? "" : "none";
+      const htsRefSection = document.getElementById("htsRefStatusSection");
+      if (htsRefSection) htsRefSection.style.display = "";
+      updateHtsRefStatus();
+      applyReferencePermissions();
     } else {
       const usersBtn = document.getElementById("usersBtn");
       if (usersBtn) usersBtn.style.display = "none";
+      const referenceBtn = document.getElementById("referenceBtn");
+      if (referenceBtn) referenceBtn.style.display = "none";
       const activityBtn = document.getElementById("activityBtn");
       if (activityBtn) activityBtn.style.display = "none";
+      const htsRefSection = document.getElementById("htsRefStatusSection");
+      if (htsRefSection) htsRefSection.style.display = "none";
     }
   }
 
@@ -2591,7 +3025,10 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
   try {
     await auth.login(username, password);
     document.getElementById("loginPassword").value = "";
-    runStore.init().then(() => { loadRunsFromStorage(); renderStorageBanner(); });
+    await runStore.init();
+    await loadReferenceFromServer();
+    loadRunsFromStorage();
+    renderStorageBanner();
   } catch (e) {
     errEl.style.display = "block";
   } finally {
@@ -2608,32 +3045,32 @@ document.getElementById("loginUsername").addEventListener("keydown", e => {
 document.getElementById("logoutBtn").addEventListener("click", async () => {
   try { await authFetch("/api/auth/logout", { method: "POST" }); } catch (e) { /* ignore */ }
   auth.logout();
-  document.getElementById("usersOverlay").classList.remove("open");
-  document.getElementById("activityOverlay").classList.remove("open");
+  if (typeof closeAllViews === "function") closeAllViews();
 });
 
-document.getElementById("usersBtn").addEventListener("click", () => {
-  document.getElementById("usersOverlay").classList.add("open");
-  document.body.style.overflow = "hidden";
-  loadUsers();
-});
-document.getElementById("usersCloseBtn").addEventListener("click", () => {
-  document.getElementById("usersOverlay").classList.remove("open");
-  document.body.style.overflow = "";
-});
-
-document.getElementById("activityBtn").addEventListener("click", () => {
-  document.getElementById("activityOverlay").classList.add("open");
-  document.body.style.overflow = "hidden";
-  loadActivity();
-});
-document.getElementById("activityCloseBtn").addEventListener("click", () => {
-  document.getElementById("activityOverlay").classList.remove("open");
-  document.body.style.overflow = "";
-});
-document.getElementById("activityRefreshBtn").addEventListener("click", () => loadActivity());
 document.getElementById("activityUserFilter").addEventListener("change", () => loadActivityLog());
 document.getElementById("activityActionFilter").addEventListener("change", () => loadActivityLog());
+document.getElementById("saveRulesBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("saveRulesBtn");
+  btn.disabled = true;
+  try {
+    await saveCh99RulesToServer();
+    toast("Chapter 99 rules saved", "success");
+  } catch (e) {
+    toast("Save failed: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+  }
+});
+document.getElementById("resetRulesBtn").addEventListener("click", () => {
+  if (!confirm("Reset Chapter 99 rules to built-in defaults?")) return;
+  state.rules = JSON.parse(JSON.stringify(DEFAULT_CH99_RULES));
+  referenceMeta.rulesDirty = true;
+  renderAdminRules();
+  updateAdminRulesMeta();
+});
+document.getElementById("rerunAllBtn").addEventListener("click", () => rerunAllSavedAudits());
+document.getElementById("activityRefreshBtn").addEventListener("click", () => loadActivity());
 
 // ============================================================
 //  Users management (admin only)
@@ -3157,14 +3594,13 @@ function snapshotCurrentRun(name) {
       agg: state.agg,
       filed: slimFiled,
       ctx: state.ctx,
-      rules: state.rules,
     },
   };
 }
 
 // Re-inflate a slimmed snapshot back to full state.
 function rehydrateRun(r) {
-  const rules = r.state.rules || DEFAULT_CH99_RULES;
+  const rules = state.rules;
   const ctx = r.state.ctx || {};
   // Use the applicable date stored in the snapshot to filter rules. Falls back
   // to using all rules if no date was captured (older snapshots).
@@ -3196,7 +3632,86 @@ function rehydrateRun(r) {
   if (!findings) {
     findings = buildFindings(cmp, ctx);
   }
-  return { ...r.state, raw, cmp, findings, rules };
+  return { ...r.state, raw, cmp, findings };
+}
+
+function recomputeRawDuties(raw, filed, effectiveRules) {
+  const mfnLookup = new Map();
+  for (const f of filed) {
+    if (f.MFN_RATE_PCT != null && f.COO && f.HTS) {
+      mfnLookup.set(`${f.COO.toUpperCase()}|${htsNormalize(f.HTS)}`, f.MFN_RATE_PCT);
+    }
+  }
+  return raw.map(r => {
+    const coo = (r.ORIGIN || "").toUpperCase();
+    const hts = r.DESTINATION_HS || "";
+    const mfn = getMfnRate(hts, mfnLookup.get(`${coo}|${htsNormalize(hts)}`) ?? 16.0);
+    const exp = expectedChapter99(coo, hts, mfn, effectiveRules);
+    const mfnDuty = r.ENTERED_VALUE * (mfn || 0) / 100;
+    const ch99Duty = exp.reduce((s, a) => s + r.ENTERED_VALUE * (a.rate_pct || 0) / 100, 0);
+    const cotton = (r.TOT_NET_WEIGHT || 0) * cottonFeePerKg(hts);
+    const mpf = r.ENTERED_VALUE * MPF_RATE;
+    return {
+      ...r,
+      MFN_RATE_PCT: mfn,
+      MFN_DUTY_EXP: mfnDuty,
+      CH99_EXP: exp.map(e => e.ch99).join(", "),
+      CH99_DUTY_EXP: ch99Duty,
+      MPF_EXP: mpf,
+      COTTON_FEE_EXP: cotton,
+      TOTAL_DUTY_FEES_EXP: mfnDuty + ch99Duty + mpf + cotton,
+    };
+  });
+}
+
+function recomputeSavedRun(r) {
+  const ctx = { ...(r.state?.ctx || {}) };
+  const effectiveRules = ctx.applicableDate ? rulesInEffectOn(state.rules, ctx.applicableDate) : state.rules;
+  let raw = r.state?.raw || [];
+  const filed = r.state?.filed || [];
+  const agg = r.state?.agg || [];
+  if (raw.length && filed.length) {
+    raw = recomputeRawDuties(raw, filed, effectiveRules);
+  }
+  const cmp = compareAggToFiled(agg, filed, effectiveRules);
+  const findings = buildFindings(cmp, ctx);
+  ctx.strictMatched = cmp.filter(x => x.MATCH === "STRICT").length;
+  ctx.looseMatched = cmp.filter(x => x.MATCH && x.MATCH.startsWith("LOOSE")).length;
+  ctx.noMatch = cmp.filter(x => x.MATCH && x.MATCH.startsWith("NO MATCH")).length;
+  ctx.midMismatch = cmp.filter(x => x.MID_CHECK === "MISMATCH").length;
+  ctx.ch99Mismatch = cmp.filter(x => x.CH99_CHECK === "MISMATCH" || x.CH99_CHECK === "MISSING").length;
+  ctx.effectiveRulesCount = effectiveRules.length;
+  ctx.totalRulesCount = state.rules.length;
+  return {
+    ...r,
+    savedAt: new Date().toISOString(),
+    findingsCount: findings.length,
+    findingsCritical: findings.filter(f => f.sev === "Critical").length,
+    findingsHigh: findings.filter(f => f.sev === "High").length,
+    state: { raw, agg, filed, ctx },
+  };
+}
+
+async function rerunAllSavedAudits() {
+  const runs = loadRunsFromStorage();
+  if (!runs.length) {
+    toast("No saved runs to re-run.", "error");
+    return;
+  }
+  if (!confirm(`Re-run ${runs.length} saved audit(s) with the current HTS table and Chapter 99 rules?`)) return;
+  const statusEl = document.getElementById("rerunAllStatus");
+  if (statusEl) statusEl.textContent = "Recomputing…";
+  const updated = runs.map(recomputeSavedRun);
+  saveRunsToStorage(updated);
+  const activeId = state.activeRunId;
+  if (activeId && updated.some(r => r.id === activeId)) {
+    loadRunById(activeId);
+  }
+  renderRuns();
+  _syncDashPill();
+  if (statusEl) statusEl.textContent = `Updated ${updated.length} run(s) at ${new Date().toLocaleTimeString()}`;
+  trackActivity("rerun_all_audits", { run_count: updated.length }, "reference");
+  toast(`Re-ran ${updated.length} saved audit(s)`, "success");
 }
 
 function defaultRunName() {
@@ -3230,6 +3745,85 @@ function saveCurrentRun(customName) {
   return result.ok;
 }
 
+function closeDashOverlay() {
+  closeAllViews();
+}
+
+const APP_VIEWS = {
+  dashboard: {
+    overlayId: "dashOverlay",
+    navId: "dashboardBtn",
+    onOpen: async () => {
+      await renderDashboard();
+      trackActivity("view_dashboard", {}, "analytics");
+    },
+  },
+  users: {
+    overlayId: "usersOverlay",
+    navId: "usersBtn",
+    onOpen: () => loadUsers(),
+  },
+  reference: {
+    overlayId: "referenceOverlay",
+    navId: "referenceBtn",
+    onOpen: () => {
+      updateHtsUi();
+      updateAdminRulesMeta();
+      renderAdminRules();
+      applyReferencePermissions();
+      renderAdminHtsTable();
+    },
+  },
+  activity: {
+    overlayId: "activityOverlay",
+    navId: "activityBtn",
+    onOpen: () => loadActivity(),
+  },
+};
+let _activeView = "audit";
+
+function setTopbarHeight() {
+  const tb = document.querySelector(".topbar");
+  if (tb) document.documentElement.style.setProperty("--topbar-h", `${tb.offsetHeight}px`);
+}
+
+function setActiveNav(view) {
+  _activeView = view;
+  document.querySelectorAll("[data-nav]").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.nav === view);
+  });
+  const page = document.querySelector(".page");
+  if (page) page.style.display = view === "audit" ? "" : "none";
+}
+
+function closeAllViews() {
+  Object.values(APP_VIEWS).forEach(v => {
+    document.getElementById(v.overlayId)?.classList.remove("open");
+  });
+  document.body.style.overflow = "";
+  setActiveNav("audit");
+}
+
+async function openView(name) {
+  const cfg = APP_VIEWS[name];
+  if (!cfg) return;
+  Object.values(APP_VIEWS).forEach(v => {
+    document.getElementById(v.overlayId)?.classList.remove("open");
+  });
+  if (cfg.onOpen) await cfg.onOpen();
+  document.getElementById(cfg.overlayId)?.classList.add("open");
+  document.body.style.overflow = "hidden";
+  setActiveNav(name);
+}
+
+async function toggleView(name) {
+  if (_activeView === name) {
+    closeAllViews();
+    return;
+  }
+  await openView(name);
+}
+
 function loadRunById(id) {
   const runs = loadRunsFromStorage();
   const r = runs.find(x => x.id === id);
@@ -3242,7 +3836,6 @@ function loadRunById(id) {
   state.cmp = fullState.cmp;
   state.findings = fullState.findings;
   state.ctx = fullState.ctx;
-  state.rules = fullState.rules;
   state.activeRunId = r.id;
   state.isLoadedRun = true;   // flag so renderRaw can show "raw not in saved run"
   state.rawDropped = !!r.rawDropped;       // saved snapshot dropped raw to fit budget
@@ -3260,8 +3853,9 @@ function loadRunById(id) {
   });
   setActiveBadge(r.name);
   _logActivity("loaded", r);
+  closeDashOverlay();
   render();
-  toast("Loaded: " + r.name, "success");
+  toast("Audit loaded: " + r.name, "success");
   // Switch to Comparison tab
   document.querySelector('.tab[data-tab="comparison"]').click();
 }
@@ -3386,7 +3980,7 @@ let _mfnElTable = null, _mfnElMsg = null, _mfnElPill = null;
 let _rdMidSort = "entries"; // "mid"|"entries"|"lines"|"coo"|"value"|"entered"
 let _rdMidSortDir = -1;
 let _rdMidSearch = "";
-let _dashSections = { mid: false, mfr: true, activity: true, runs: true };
+let _dashSections = { mid: false, mfr: true, mfn: true, htsCross: true, activity: true, runs: true };
 
 function renderDashPanel(key, title, subtitle, badgeHtml, bodyHtml) {
   const open = _dashSections[key];
@@ -3654,7 +4248,7 @@ function rdDetailPanel(r) {
           </div>
         </div>
         <div class="rdp-acts">
-          <button class="btn btn-primary rdp-load-btn" data-rd-id="${escapeHtml(r.id)}">Load in Dashboard</button>
+          <button class="btn btn-primary rdp-load-btn" data-rd-id="${escapeHtml(r.id)}">Load Audit</button>
           <button class="btn btn-secondary rdp-rename-btn" data-rd-id="${escapeHtml(r.id)}">Rename</button>
           <button class="btn btn-danger rdp-delete-btn" data-rd-id="${escapeHtml(r.id)}">Delete</button>
         </div>
@@ -4094,11 +4688,25 @@ async function renderDashboard() {
       );
     })() : ""}
 
-    <!-- ── MFN Rate Consistency ── -->
-    <div class="dash-sec"><span class="dash-sec-lbl">MFN Rate Consistency</span><div class="dash-sec-line"></div><span id="dashMfnPill" style="margin-left:10px;display:inline-block;padding:1px 7px;border-radius:99px;background:#EBF8F2;color:#047857;font-size:11px;font-weight:700;">—</span></div>
-    <div style="font-size:12px;color:var(--gray-500);margin-bottom:6px;">COO + HTS pairs where the MFN rate differs across entries in the database.</div>
-    <div id="dashMfnMsg" style="font-size:13px;color:var(--gray-600);padding:2px 0 4px;"></div>
-    <div class="imp-tbl-wrap"><table class="data" id="dashMfnTable"></table></div>
+    ${renderDashPanel(
+      "mfn",
+      "MFN Rate Discrepancies (Database)",
+      "COO + HTS pairs where the filed MFN rate differs across all saved runs — server-side query over every saved entry",
+      `<span class="dash-panel-badge" id="dashMfnPill">—</span>`,
+      `
+      <div id="dashMfnMsg" style="font-size:13px;color:var(--gray-600);padding:0 0 8px;"></div>
+      <div class="imp-tbl-wrap dash-panel-scroll" style="max-height:480px;"><table class="data" id="dashMfnTable"></table></div>`
+    )}
+
+    ${renderDashPanel(
+      "htsCross",
+      "HTS Discrepancies Across Runs",
+      "Same HTS filed at different MFN rates on different saved entries",
+      `<span class="dash-panel-badge" id="dashHtsCrossPill">—</span>`,
+      `
+      <div id="dashHtsCrossEmpty" style="display:none;padding:14px 0;color:var(--gray-600);font-size:13px;"></div>
+      <div class="imp-tbl-wrap dash-panel-scroll" style="max-height:480px;"><table class="data" id="dashHtsCrossTable"></table></div>`
+    )}
 
     <!-- ── Runs + Activity ── -->
     <div class="dash-sec dash-sec-runs-act" style="margin-top:20px;"><span class="dash-sec-lbl">Runs &amp; Activity</span><div class="dash-sec-line"></div></div>
@@ -4238,8 +4846,9 @@ async function renderDashboard() {
   });
   wireDashPanels(dashList);
 
-  // MFN rate consistency section lives in the dashboard overlay — refresh on every open.
+  // Cross-run HTS / MFN analytics — dashboard only
   renderMfnDbLayer({ tableId: "dashMfnTable", msgId: "dashMfnMsg", pillId: "dashMfnPill" });
+  renderHtsCrossRunsLayer({ tableId: "dashHtsCrossTable", emptyId: "dashHtsCrossEmpty", pillId: "dashHtsCrossPill" });
 }
 
 
@@ -4844,8 +5453,10 @@ document.getElementById("importRunsFile").addEventListener("change", async (e) =
   if (!auth.token) return;   // show login overlay, wait for user to sign in
   trackActivity("session_start", { source: "page_load" }, "session");
   await runStore.init();
+  await loadReferenceFromServer();
   renderStorageBanner();
   renderRuns();
+  renderHtsVerification();
   _syncDashPill();
 })();
 
@@ -4892,7 +5503,7 @@ function runAudit() {
     raw = raw.map(r => {
       const coo = (r.ORIGIN||"").toUpperCase();
       const hts = r.DESTINATION_HS || "";
-      const mfn = mfnLookup.get(`${coo}|${htsNormalize(hts)}`) ?? 16.0;
+      const mfn = getMfnRate(hts, mfnLookup.get(`${coo}|${htsNormalize(hts)}`) ?? 16.0);
       const exp = expectedChapter99(coo, hts, mfn, effectiveRules);
       const mfnDuty = r.ENTERED_VALUE * (mfn || 0) / 100;
       const ch99Duty = exp.reduce((s, a) => s + r.ENTERED_VALUE * (a.rate_pct || 0) / 100, 0);
@@ -5022,7 +5633,6 @@ function render() {
   renderFindings();
   renderMfrRollup();
   renderHtsConsistency();
-  renderRules();
   renderVerify();
 
   document.getElementById("pillCmp").textContent     = state.cmp.length;
@@ -5034,12 +5644,10 @@ function render() {
   // Manufacturer pill = distinct MID count
   const mfrSet = new Set(state.cmp.map(r => r.MID_TXT || r.MID_75 || "(blank)"));
   document.getElementById("pillMfr").textContent = mfrSet.size;
-  // HTS pill = total conflicts found across all three layers
+  // HTS pill = conflicts within this audit only
   const htsIntra = Number(document.getElementById("htsCountIntra")?.textContent || 0);
-  const htsCross = Number(document.getElementById("htsCountCross")?.textContent || 0);
   const htsBase = Number(document.getElementById("htsCountBaseline")?.textContent || 0);
-  document.getElementById("pillHts").textContent = htsIntra + htsCross + htsBase;
-  document.getElementById("pillRulesTab").textContent   = state.rules.length;
+  document.getElementById("pillHts").textContent = htsIntra + htsBase;
 }
 
 function renderKpis() {
@@ -5165,7 +5773,7 @@ function renderStack() {
   const stackRows = state.filed.map(f => {
     const c = cmpById.get(f.ITEM) || {};
     const ev = Number(f.ENTERED_VALUE) || 0;
-    const mfn = f.MFN_RATE_PCT;
+    const mfn = getMfnRate(f.HTS, f.MFN_RATE_PCT);
     // Use the applicable date from ctx to filter rules — Ch99 stack expectations
     // must reflect the tariff regime in force on the entry/import date.
     const dateRules = state.ctx?.applicableDate
@@ -5187,7 +5795,7 @@ function renderStack() {
     const diff = totalExpCh99 - filedCh99;
     return {
       ITEM: f.ITEM, COO: f.COO, HTS: htsFormat(f.HTS), MID: f.MID,
-      ENTERED_VALUE: ev, MFN_RATE: mfn, MFN_AMT: mfnAmt,
+      ENTERED_VALUE: ev, MFN_RATE: mfn, MFN_RATE_FILED: f.MFN_RATE_PCT, MFN_AMT: mfnAmt,
       byCat, totalExpCh99, filedCh99, diff,
       categories: Object.keys(byCat).filter(k => byCat[k].length > 0),
     };
@@ -5254,7 +5862,11 @@ function renderStack() {
           <td class="mono">${r.COO}</td>
           <td class="mono">${r.HTS}</td>
           <td class="num">${fmtUSD(r.ENTERED_VALUE)}</td>
-          <td class="num">${fmtPct(r.MFN_RATE)}</td>
+          <td class="num">${(() => {
+            const used = fmtPct(r.MFN_RATE);
+            if (r.MFN_RATE_FILED == null || Math.abs((r.MFN_RATE ?? 0) - (r.MFN_RATE_FILED ?? 0)) < 0.05) return used;
+            return `${fmtPct(r.MFN_RATE_FILED)}<span class="mfn-table-badge">used: ${used}</span>`;
+          })()}</td>
           <td class="num">${fmtUSD(r.MFN_AMT)}</td>
           <td>${cellFor([...(r.byCat["Reciprocal"]||[]), ...(r.byCat["Reciprocal-EU"]||[])])}</td>
           <td>${cellFor(r.byCat["IEEPA-Universal"])}</td>
@@ -5271,6 +5883,66 @@ function renderStack() {
 }
 
 // ---- Verification: cards summarizing each unique rule actually used ----
+function renderHtsVerification() {
+  const mfnEl = document.getElementById("verifyMfnSource");
+  const htsCardEl = document.getElementById("verifyHtsCard");
+  if (!mfnEl && !htsCardEl) return;
+
+  if (htsLookup && htsLookup.size > 0) {
+    if (mfnEl) {
+      mfnEl.innerHTML = `Authoritative MFN rates from the global <strong>HTS Classification Table</strong> (<span class="mono-inline">${escapeHtml(htsName || "table")}</span>, ${htsLookup.size.toLocaleString()} codes). Broker-filed 7501 rates in column <span class="mono-inline">33. CD HTS US Rate</span> are shown for comparison; where they differ, the table rate drives Ch99 EU-cap logic and raw-line duty projection. Comparison tab marks divergences with a <span class="mfn-table-badge">tbl:</span> badge. Browse the full table under <strong>Reference</strong> in the top bar.`;
+    }
+    const entryHts = new Set();
+    for (const f of state.filed || []) {
+      if (f.HTS) entryHts.add(htsNormalize(f.HTS));
+    }
+    for (const a of state.agg || []) {
+      if (a.DESTINATION_HS) entryHts.add(htsNormalize(a.DESTINATION_HS));
+    }
+    let covered = 0, missing = 0, divergent = 0;
+    const missingList = [];
+    for (const hts of entryHts) {
+      const entry = htsLookup.get(hts);
+      if (!entry) {
+        missing++;
+        if (missingList.length < 8) missingList.push(htsFormat(hts));
+        continue;
+      }
+      covered++;
+      const filed = (state.filed || []).find(f => htsNormalize(f.HTS) === hts && f.MFN_RATE_PCT != null);
+      if (filed && Math.abs((entry.rate_pct ?? 0) - (filed.MFN_RATE_PCT ?? 0)) > 0.05) divergent++;
+    }
+    const total = entryHts.size;
+    const pct = total ? Math.round((covered / total) * 100) : 0;
+    const statusCls = missing === 0 ? "good" : (covered > 0 ? "warn" : "danger");
+    if (htsCardEl) {
+      htsCardEl.innerHTML = total === 0 ? `
+        <div class="ver-card"><div class="ver-grid">
+          <span class="lbl">Status</span><span class="val">Table loaded (${htsLookup.size.toLocaleString()} codes). Run an audit to verify entry-level HTS coverage.</span>
+        </div></div>` : `
+        <div class="ver-card">
+          <div class="ver-grid">
+            <span class="lbl">Table</span><span class="val mono-inline">${escapeHtml(htsName || "HTS Classification Table")}</span>
+            <span class="lbl">Codes loaded</span><span class="val">${htsLookup.size.toLocaleString()}</span>
+            <span class="lbl">Entry coverage</span><span class="val"><span class="badge badge-${statusCls === "good" ? "success" : statusCls === "warn" ? "warn" : "danger"}">${covered} / ${total} HTS (${pct}%)</span>${missing ? ` — ${missing} not in table` : " — full coverage"}</span>
+            <span class="lbl">Rate divergences</span><span class="val">${divergent ? `<strong>${divergent}</strong> line(s) where table MFN ≠ broker-filed rate (>0.05 pp)` : "None — table and 7501 rates align within tolerance"}</span>
+            ${missingList.length ? `<span class="lbl">Missing HTS</span><span class="val mono-inline">${missingList.join(", ")}${missing > missingList.length ? ` +${missing - missingList.length} more` : ""}</span>` : ""}
+          </div>
+        </div>`;
+    }
+  } else {
+    if (mfnEl) {
+      mfnEl.innerHTML = `Taken from the broker-filed 7501 extract column <span class="mono-inline">33. CD HTS US Rate</span> per item. Engine parses "16.5%", "Free", etc. and uses the resulting % for both per-line raw calc and EU cap logic. Upload or browse the <strong>HTS Classification Table</strong> under <strong>Reference</strong> in the top bar.`;
+    }
+    if (htsCardEl) {
+      htsCardEl.innerHTML = `
+        <div class="ver-card"><div class="ver-grid">
+          <span class="lbl">Status</span><span class="val">No HTS table loaded — MFN rates sourced from the 7501 extract only. Open <strong>Reference</strong> in the top bar to upload or browse the classification table.</span>
+        </div></div>`;
+    }
+  }
+}
+
 function renderVerify() {
   // Group rules by category, deduplicate by ch99 code.
   // Always include all four Section 301 codes (88.01/02/03/15) regardless of
@@ -5322,6 +5994,8 @@ function renderVerify() {
     nonSec301Cards.map(renderCard).join("") +
     sec301Note +
     sec301Cards.map(renderCard).join("");
+
+  renderHtsVerification();
 }
 
 // ---- Comparison table ----
@@ -5399,7 +6073,12 @@ function renderComparison() {
           <td class="mono">${r.HTS}</td>
           <td class="mono">${r.MID_TXT || "—"}</td>
           <td class="mono">${r.MID_75 || "—"}</td>
-          <td class="num">${fmtPct(r.MFN_RATE_PCT)}</td>
+          <td class="num">${(() => {
+            const broker = fmtPct(r.MFN_RATE_PCT);
+            if (r.MFN_RATE_TABLE == null) return broker;
+            if (Math.abs((r.MFN_RATE_TABLE ?? 0) - (r.MFN_RATE_PCT ?? 0)) < 0.05) return broker;
+            return `${broker}<span class="mfn-table-badge">tbl: ${fmtPct(r.MFN_RATE_TABLE)}</span>`;
+          })()}</td>
           <td class="num">${fmtUSD(r.ENTERED_VALUE_TXT)}</td>
           <td class="num">${fmtUSD(r.ENTERED_VALUE_75)}</td>
           <td class="num">${r.ENTERED_DIFF == null ? "—" : fmtUSD(r.ENTERED_DIFF)}</td>
@@ -5769,11 +6448,107 @@ function renderMfrRollup() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// HTS Consistency — three layers:
-//   1. Within this entry  — same HTS, different filed MFN rates
-//   2. Across saved runs  — same HTS filed at different rates on different entries
-//   3. vs. rules engine baseline — filed MFN doesn't match what the engine expected
+// HTS Consistency
+//   Audit tab: within this entry + vs. tariff baseline (this run only)
+//   Dashboard: cross-run HTS discrepancies + database MFN analytics
 // ─────────────────────────────────────────────────────────────────────────
+function computeHtsCrossConflicts() {
+  const savedRuns = loadRunsFromStorage();
+  const acrossMap = new Map();
+  for (const r of savedRuns) {
+    const filed = r.state?.filed || [];
+    for (const f of filed) {
+      if (!f.HTS || f.MFN_RATE_PCT == null) continue;
+      const hts = htsFormat(f.HTS);
+      if (!acrossMap.has(hts)) acrossMap.set(hts, []);
+      acrossMap.get(hts).push({
+        runId: r.id,
+        runName: r.name,
+        savedAt: r.savedAt,
+        item: f.ITEM,
+        coo: f.COO,
+        rate: Number(f.MFN_RATE_PCT),
+        entryNum: r.state?.ctx?.entryNum || "—",
+        invoice: r.state?.ctx?.invoice || "—",
+      });
+    }
+  }
+  const crossConflicts = [];
+  if (savedRuns.length >= 2) {
+    for (const [hts, obs] of acrossMap) {
+      const distinctRuns = new Set(obs.map(o => o.runId));
+      if (distinctRuns.size < 2) continue;
+      const ratesPerRun = new Map();
+      for (const o of obs) {
+        const k = Math.round(o.rate * 1000) / 1000;
+        if (!ratesPerRun.has(k)) ratesPerRun.set(k, []);
+        ratesPerRun.get(k).push(o);
+      }
+      if (ratesPerRun.size > 1) crossConflicts.push({ hts, ratesPerRun, obs });
+    }
+  }
+  return { crossConflicts, runCount: savedRuns.length };
+}
+
+function renderHtsCrossRunsLayer(target) {
+  const tableId = target?.tableId || "dashHtsCrossTable";
+  const emptyId = target?.emptyId || "dashHtsCrossEmpty";
+  const pillId  = target?.pillId  || "dashHtsCrossPill";
+  const crossEl = document.getElementById(tableId);
+  const emptyEl = document.getElementById(emptyId);
+  const pillEl  = document.getElementById(pillId);
+  if (!crossEl) return;
+
+  const { crossConflicts, runCount } = computeHtsCrossConflicts();
+  if (pillEl) pillEl.textContent = runCount < 2 ? "—" : String(crossConflicts.length);
+
+  if (runCount < 2) {
+    if (emptyEl) {
+      emptyEl.style.display = "";
+      emptyEl.textContent = "Need at least 2 saved runs to compare HTS rates across entries.";
+    }
+    crossEl.innerHTML = "";
+    return;
+  }
+  if (crossConflicts.length === 0) {
+    if (emptyEl) {
+      emptyEl.style.display = "";
+      emptyEl.textContent = `No HTS discrepancies across ${runCount} saved run(s). Rates are consistent. ✓`;
+    }
+    crossEl.innerHTML = "";
+    return;
+  }
+  if (emptyEl) emptyEl.style.display = "none";
+  crossEl.innerHTML = `
+    <thead><tr>
+      <th>HTS</th><th>Run</th><th>Entry #</th><th>Item</th><th>COO</th>
+      <th class="num">MFN rate filed</th><th>Saved</th>
+    </tr></thead>
+    <tbody>
+      ${crossConflicts.map(c => {
+        let rowIdx = 0;
+        const totalRowsForHts = c.obs.length;
+        return c.obs
+          .sort((a, b) => a.rate - b.rate || a.runName.localeCompare(b.runName))
+          .map((o) => {
+            const isFirst = rowIdx === 0;
+            rowIdx++;
+            const dt = o.savedAt ? new Date(o.savedAt).toLocaleDateString() : "—";
+            return `
+            <tr style="${isFirst ? "border-top: 2px solid var(--marigold);" : ""}">
+              ${isFirst ? `<td class="mono" rowspan="${totalRowsForHts}" style="vertical-align: top; background: var(--marigold-50, #FFF8E8); font-weight: 600;">${c.hts}<div style="font-size:11px;color:var(--marigold-700, #854F0B);font-weight:400;margin-top:2px;">${c.ratesPerRun.size} distinct rates</div></td>` : ""}
+              <td style="font-size:12px;">${escapeHtml(o.runName)}</td>
+              <td class="mono" style="font-size:12px;">${escapeHtml(o.entryNum)}</td>
+              <td class="mono">${o.item}</td>
+              <td class="mono">${o.coo || "—"}</td>
+              <td class="num"><strong>${fmtPct(o.rate)}</strong></td>
+              <td style="font-size:12px;color:var(--gray-600);">${dt}</td>
+            </tr>`;
+          }).join("");
+      }).join("")}
+    </tbody>`;
+}
+
 function renderHtsConsistency() {
   // ── Layer 1: within this entry ──────────────────────────────────────────
   // Walk the filed items, group by HTS, flag any HTS that appears with
@@ -5824,102 +6599,7 @@ function renderHtsConsistency() {
       </tbody>`;
   }
 
-  // ── Layer 2: across saved runs ──────────────────────────────────────────
-  // Load every saved run, build (HTS → [{run, item, coo, rate, entryNum, savedAt}])
-  // Flag any HTS that has filed rates differing across runs.
-  const savedRuns = loadRunsFromStorage();
-  const acrossMap = new Map();   // hts → array of observations
-  // Include the current state as a synthetic "run" entry so it's part of the comparison
-  // even before the user explicitly saves.
-  const allRuns = [
-    {
-      id: state.activeRunId || "__current__",
-      name: state.activeRunId ? (savedRuns.find(r => r.id === state.activeRunId)?.name || "Current") : "Current (unsaved)",
-      savedAt: new Date().toISOString(),
-      state: { filed: state.filed, ctx: state.ctx },
-    },
-    ...savedRuns.filter(r => r.id !== state.activeRunId),
-  ];
-  for (const r of allRuns) {
-    const filed = (r.state?.filed) || [];
-    for (const f of filed) {
-      if (!f.HTS || f.MFN_RATE_PCT == null) continue;
-      const hts = htsFormat(f.HTS);
-      if (!acrossMap.has(hts)) acrossMap.set(hts, []);
-      acrossMap.get(hts).push({
-        runId: r.id,
-        runName: r.name,
-        savedAt: r.savedAt,
-        item: f.ITEM,
-        coo: f.COO,
-        rate: Number(f.MFN_RATE_PCT),
-        entryNum: r.state?.ctx?.entryNum || "—",
-        invoice: r.state?.ctx?.invoice || "—",
-      });
-    }
-  }
-  // Across-runs is only meaningful if we have at least 2 runs total (current + 1 saved, OR 2 saved)
-  const crossConflicts = [];
-  const totalRunCount = (state.cmp ? 1 : 0) + savedRuns.filter(r => r.id !== state.activeRunId).length;
-  if (totalRunCount >= 2) {
-    for (const [hts, obs] of acrossMap) {
-      // Need to see this HTS in ≥2 distinct runs
-      const distinctRuns = new Set(obs.map(o => o.runId));
-      if (distinctRuns.size < 2) continue;
-      // ...with differing rates
-      const ratesPerRun = new Map();
-      for (const o of obs) {
-        const k = Math.round(o.rate * 1000) / 1000;
-        if (!ratesPerRun.has(k)) ratesPerRun.set(k, []);
-        ratesPerRun.get(k).push(o);
-      }
-      if (ratesPerRun.size > 1) {
-        crossConflicts.push({ hts, ratesPerRun, obs });
-      }
-    }
-  }
-  const crossEl = document.getElementById("htsTableCross");
-  document.getElementById("htsCountCross").textContent = crossConflicts.length;
-  document.getElementById("htsEmptyCross").style.display = (totalRunCount < 2 || crossConflicts.length === 0) ? "" : "none";
-  if (totalRunCount < 2) {
-    document.getElementById("htsEmptyCross").textContent = "Need at least 2 runs (current + 1 saved) to compare HTS rates across entries.";
-    crossEl.innerHTML = "";
-  } else if (crossConflicts.length === 0) {
-    document.getElementById("htsEmptyCross").textContent = `No conflicts across ${totalRunCount} run(s). HTS rates are consistent. ✓`;
-    crossEl.innerHTML = "";
-  } else {
-    crossEl.innerHTML = `
-      <thead><tr>
-        <th>HTS</th><th>Run</th><th>Entry #</th><th>Item</th><th>COO</th>
-        <th class="num">MFN rate filed</th><th>Saved</th>
-      </tr></thead>
-      <tbody>
-        ${crossConflicts.map(c => {
-          // Flatten: one row per observation, grouped visually by HTS
-          let rowIdx = 0;
-          const totalRowsForHts = c.obs.length;
-          return c.obs
-            .sort((a, b) => a.rate - b.rate || a.runName.localeCompare(b.runName))
-            .map((o) => {
-              const isFirst = rowIdx === 0;
-              rowIdx++;
-              const dt = o.savedAt ? new Date(o.savedAt).toLocaleDateString() : "—";
-              return `
-              <tr style="${isFirst ? "border-top: 2px solid var(--marigold);" : ""}">
-                ${isFirst ? `<td class="mono" rowspan="${totalRowsForHts}" style="vertical-align: top; background: var(--marigold-50, #FFF8E8); font-weight: 600;">${c.hts}<div style="font-size:11px;color:var(--marigold-700, #854F0B);font-weight:400;margin-top:2px;">${c.ratesPerRun.size} distinct rates</div></td>` : ""}
-                <td style="font-size:12px;">${escapeHtml(o.runName)}</td>
-                <td class="mono" style="font-size:12px;">${escapeHtml(o.entryNum)}</td>
-                <td class="mono">${o.item}</td>
-                <td class="mono">${o.coo || "—"}</td>
-                <td class="num"><strong>${fmtPct(o.rate)}</strong></td>
-                <td style="font-size:12px;color:var(--gray-600);">${dt}</td>
-              </tr>`;
-            }).join("");
-        }).join("")}
-      </tbody>`;
-  }
-
-  // ── Layer 3: vs. rules engine baseline ──────────────────────────────────
+  // ── Layer 2: vs. tariff baseline (this entry only) ────────────────────
   // The audit already computes the expected MFN rate in the raw lines.
   // For each filed item, look at how the expected and filed rates compare.
   // We use the COMPARISON rows (state.cmp) because those carry both.
@@ -5982,20 +6662,14 @@ function renderHtsConsistency() {
         `).join("")}
       </tbody>`;
   }
-
-  renderMfnDbLayer();
 }
 
-// MFN consistency — renders into either the HTS tab or the dashboard overlay.
-// Results are cached for the session so re-renders of renderDashboard() don't
-// flash "Querying…" on every filter change or row expand.
-// Pass target = { tableId, msgId, pillId } to use dashboard element IDs;
-// omit for the HTS Consistency tab defaults.
-// Call invalidateMfnCache() after saving or deleting a run to force a re-fetch.
+// MFN consistency — dashboard only (server-side SQL over all saved runs).
 function renderMfnDbLayer(target) {
-  var tableId = (target && target.tableId) || "htsTableDb";
-  var msgId   = (target && target.msgId)   || "htsDbMsg";
-  var pillId  = (target && target.pillId)  || "htsCountDb";
+  if (!target) return;
+  var tableId = target.tableId;
+  var msgId   = target.msgId;
+  var pillId  = target.pillId;
   const dbEl   = document.getElementById(tableId);
   const dbMsg  = document.getElementById(msgId);
   const dbPill = document.getElementById(pillId);
@@ -6069,7 +6743,7 @@ function _applyMfnRows(rows, dbEl, dbMsg, dbPill) {
     "</div>";
 
   if (display.length === 0) {
-    dbEl.innerHTML = "<tbody><tr><td colspan=\"8\" style=\"text-align:center;padding:16px;color:var(--gray-400);font-size:12px;\">No pairs match this search.</td></tr></tbody>";
+    dbEl.innerHTML = "<tbody><tr><td colspan=\"10\" style=\"text-align:center;padding:16px;color:var(--gray-400);font-size:12px;\">No pairs match this search.</td></tr></tbody>";
   } else {
     var si = function(col) { return _mfnSort === col ? (_mfnSortDir < 0 ? " ▼" : " ▲") : ""; };
     var thS = function(col, lbl, cls) {
@@ -6099,7 +6773,9 @@ function _applyMfnRows(rows, dbEl, dbMsg, dbPill) {
           "<tr style=\"" + (isFirst ? "border-top:2px solid #F69000;" : "") + "\">" +
           groupCells +
           "<td class=\"mono\" style=\"font-size:12px;\">" + escapeHtml(o.entry_num || "—") + "</td>" +
-          "<td style=\"font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\" title=\"" + escapeHtml(o.run_name || "") + "\">" + escapeHtml(o.run_name || "—") + "</td>" +
+          "<td style=\"font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\" title=\"" + escapeHtml(o.run_name || "") + "\">" + escapeHtml(o.run_name || "—") + "</td>" +
+          "<td class=\"num mono\"><strong>" + escapeHtml(String(o.item ?? "—")) + "</strong></td>" +
+          "<td class=\"mono\" style=\"font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\" title=\"" + escapeHtml(o.mid || "") + "\">" + escapeHtml(o.mid || "—") + "</td>" +
           "<td class=\"num\"><strong>" + fmtPct(parseFloat(o.rate)) + "</strong></td>" +
           "<td class=\"mono\" style=\"font-size:11px;color:var(--gray-600);\">" + escapeHtml(o.rate_str || "—") + "</td>" +
           "<td style=\"font-size:12px;color:var(--gray-600);\">" + dt + "</td>" +
@@ -6110,7 +6786,7 @@ function _applyMfnRows(rows, dbEl, dbMsg, dbPill) {
     dbEl.innerHTML =
       "<thead><tr>" +
         thS("coo","COO","") + thS("hts","HTS","") + "<th>Rates observed</th>" +
-        "<th>Entry #</th><th>Run name</th>" +
+        "<th>Entry #</th><th>Run name</th><th>7501 Item</th><th>MID</th>" +
         thS("spread","MFN rate","num") + "<th>Rate string</th><th>Saved</th>" +
       "</tr></thead><tbody>" + tbody + "</tbody>";
   }
@@ -6138,9 +6814,11 @@ function _applyMfnRows(rows, dbEl, dbMsg, dbPill) {
 
 
 
-function renderRules() {
+function renderAdminRules() {
+  const table = document.getElementById("adminRulesTable");
+  if (!table) return;
   const inputStyle = "padding:4px 8px; border:1px solid var(--gray-200); border-radius:4px; font-size:12px;";
-  document.getElementById("rulesTable").innerHTML = `
+  table.innerHTML = `
     <thead><tr>
       <th>Category</th><th>COO</th><th>Chapter 99 HTS</th><th>Rate %</th><th>Basis</th><th>Authority</th><th>Effective</th><th>Notes</th>
     </tr></thead>
@@ -6161,7 +6839,7 @@ function renderRules() {
       }).join("")}
     </tbody>
   `;
-  document.querySelectorAll(".rule-input").forEach(inp => {
+  table.querySelectorAll(".rule-input").forEach(inp => {
     inp.addEventListener("change", (e) => {
       const idx = parseInt(e.target.dataset.idx);
       const k = e.target.dataset.k;
@@ -6169,6 +6847,8 @@ function renderRules() {
       if (k === "rate") v = parseFloat(v) || 0;
       if (k === "coo")  v = String(v).toUpperCase();
       state.rules[idx][k] = v;
+      referenceMeta.rulesDirty = true;
+      updateAdminRulesMeta();
     });
   });
 }
@@ -6181,8 +6861,6 @@ document.querySelectorAll(".tab").forEach(btn => {
     const target = btn.dataset.tab;
     document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b === btn));
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + target));
-    // dashboard is now a standalone overlay, not a tab
-    if (target === "hts") renderMfnDbLayer();
   });
 });
 
@@ -6195,23 +6873,17 @@ document.getElementById("rawSearch").addEventListener("input", renderRaw);
 document.getElementById("rawFilterCOO").addEventListener("change", renderRaw);
 document.getElementById("rawFilterHTS").addEventListener("change", renderRaw);
 
-// ── Dashboard overlay open / close ───────────────────────────────────────
-document.getElementById("dashboardBtn").addEventListener("click", async () => {
-  await renderDashboard();
-  document.getElementById("dashOverlay").classList.add("open");
-  document.body.style.overflow = "hidden";
-  trackActivity("view_dashboard", {}, "analytics");
+// ── App view navigation (topbar toggles; no separate back button) ─────────
+document.querySelector(".topbar .brand")?.addEventListener("click", closeAllViews);
+document.getElementById("openRefHtsBtn")?.addEventListener("click", () => toggleView("reference"));
+Object.keys(APP_VIEWS).forEach(name => {
+  const cfg = APP_VIEWS[name];
+  document.getElementById(cfg.navId)?.addEventListener("click", () => toggleView(name));
 });
-document.getElementById("dashCloseBtn").addEventListener("click", () => {
-  document.getElementById("dashOverlay").classList.remove("open");
-  document.body.style.overflow = "";
-});
-// Close on Escape
+window.addEventListener("resize", setTopbarHeight);
+setTopbarHeight();
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape") {
-    document.getElementById("dashOverlay").classList.remove("open");
-    document.body.style.overflow = "";
-  }
+  if (e.key === "Escape") closeAllViews();
 });
 
 document.getElementById("stackSearch").addEventListener("input", renderStack);
@@ -6228,11 +6900,6 @@ document.getElementById("findingsFilterSev").addEventListener("change", renderFi
 
 document.getElementById("mfrSearch").addEventListener("input", renderMfrRollup);
 document.getElementById("mfrFilterStatus").addEventListener("change", renderMfrRollup);
-
-document.getElementById("reRunBtn").addEventListener("click", () => {
-  if (!state.txtBuffer) { toast("Re-upload required: file kept only in memory.", "error"); return; }
-  runAudit();
-});
 </script>
 </body>
 </html>
