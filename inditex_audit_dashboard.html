@@ -3,11 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="app-build" content="2026.06.18-ref-hts" />
 <title>7501 Audit</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   /* ---------- KlearNow Engine Tokens ---------- */
   :root {
@@ -325,6 +327,25 @@
   .filter-bar .filter-count {
     font-size: 12px; color: var(--gray-500); margin-left: auto;
     white-space: nowrap;
+  }
+  .filter-bar .btn-csv-tab {
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    background: white;
+    color: var(--primary-700);
+    cursor: pointer;
+  }
+  .filter-bar .btn-csv-tab:hover:not(:disabled) {
+    border-color: var(--primary-400);
+    background: var(--primary-50);
+  }
+  .filter-bar .btn-csv-tab:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 
   /* ---------- Tables ---------- */
@@ -671,6 +692,20 @@
   .mid-tbl td { padding: 10px 12px; vertical-align: middle; }
   .mid-tbl td.r { text-align: right; font-variant-numeric: tabular-nums; color: var(--gray-700); }
   .mid-tbl td.r.strong { font-weight: 700; color: var(--gray-900); }
+
+  /* ── MFN discrepancy groups (collapsible rows) ── */
+  .mfn-tog { width: 28px; text-align: center; color: var(--gray-400); font-size: 10px; user-select: none; }
+  tr.mfn-sum-row { cursor: pointer; background: #FFF8E8; border-top: 2px solid #F69000; }
+  tr.mfn-sum-row:hover { background: #FFF3D6; }
+  tr.mfn-sum-row.expanded .mfn-tog { color: var(--primary-600); }
+  tr.mfn-det-row td { background: white; border-bottom: 1px solid var(--gray-100); }
+  tr.mfn-det-row td:first-child { border-left: 3px solid var(--primary-200); }
+  .mfn-sum-meta { font-size: 12px; color: var(--gray-600); font-style: italic; }
+  .mfn-toolbar-btn {
+    font-size: 11px; color: var(--primary-600); background: none; border: none;
+    cursor: pointer; padding: 0; font-family: var(--font-sans); text-decoration: underline;
+  }
+  .mfn-toolbar-btn:hover { color: var(--primary-700); }
   .mid-id-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .mid-prefix {
     flex-shrink: 0; width: 26px; height: 26px; border-radius: 6px;
@@ -795,6 +830,13 @@
     border-color: rgba(255,255,255,0.95);
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
   }
+  .btn-dashboard-open.nav-locked { opacity: .55; }
+  .app-build-banner {
+    background: #FEF3C7; color: #92400E; border-bottom: 1px solid #FDE68A;
+    padding: 8px 16px; font-size: 12px; text-align: center; line-height: 1.45;
+  }
+  .app-build-banner strong { font-weight: 700; }
+  .app-build-banner code { font-family: var(--font-mono); font-size: 11px; }
   .topbar-right { display: flex; align-items: center; gap: 10px; }
 
   /* ── Full-page views (below topbar; topbar is the nav) ── */
@@ -1099,7 +1141,7 @@
     <span id="activeRunBadge" class="active-run-badge" style="display:none;"><span class="dot"></span><span id="activeRunName"></span></span>
     <button class="btn-dashboard-open" id="dashboardBtn" data-nav="dashboard" title="Runs dashboard">Dashboard <span class="pill" id="pillDash" style="background:rgba(255,255,255,.2);color:#fff;">0</span></button>
     <button class="btn-dashboard-open" id="usersBtn" data-nav="users" title="Manage users" style="display:none;">Users</button>
-    <button class="btn-dashboard-open" id="referenceBtn" data-nav="reference" title="Reference data (HTS table, Ch99 rules)" style="display:none;">Reference</button>
+    <button class="btn-dashboard-open" id="referenceBtn" data-nav="reference" title="HTS table and Chapter 99 rules (sign in required)">Reference</button>
     <button class="btn-dashboard-open" id="activityBtn" data-nav="activity" title="User activity log" style="display:none;">Activity</button>
     <button class="btn-new-run" id="newRunBtn" title="Clear all results and start a new audit">+ New Run</button>
     <div class="topbar-user" id="topbarUser" style="display:none;">
@@ -1112,6 +1154,8 @@
     </div>
   </div>
 </header>
+
+<div id="appBuildBanner" class="app-build-banner" style="display:none;"></div>
 
 <!-- ── Dashboard view ── -->
 <div class="dash-overlay" id="dashOverlay">
@@ -1216,7 +1260,7 @@
 <div class="dash-overlay" id="referenceOverlay">
   <div class="view-header">
     <h1>Reference Data</h1>
-    <p class="view-sub">Global HTS table and Chapter 99 rules applied to every audit run</p>
+    <p class="view-sub">Global HTS table, Chapter 99 rules, and sources &amp; verification reference</p>
   </div>
   <div class="dash-ov-body">
     <div class="rd-info tip" style="margin-top:8px;">
@@ -1265,13 +1309,59 @@
       </div>
     </div>
 
-    <div class="ref-admin-only" style="background:white;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:20px 24px;">
+    <div class="ref-admin-only" style="background:white;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:20px 24px;margin-bottom:16px;">
       <h3 style="font-size:14px;font-weight:700;color:var(--gray-800);margin:0 0 8px 0;">Re-run saved audits</h3>
       <p style="font-size:13px;color:var(--gray-600);margin:0 0 14px 0;line-height:1.5;">
         Recomputes every saved run using the current HTS table and Chapter 99 rules. Original TXT/XLSX files are not required — results are rebuilt from stored aggregation and 7501 data.
       </p>
       <button class="btn btn-primary" id="rerunAllBtn" style="padding:8px 16px;font-size:13px;">Re-run all saved audits</button>
       <span id="rerunAllStatus" style="font-size:12px;color:var(--gray-500);margin-left:12px;"></span>
+    </div>
+
+    <div style="background:white;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:22px 24px;margin-bottom:16px;">
+      <h3 style="font-size:14px;font-weight:700;color:var(--primary-700);margin:0 0 14px 0;text-transform:uppercase;letter-spacing:.04em;">Sources &amp; Verification</h3>
+      <div class="ver-callout">
+        <strong>How to trust this audit.</strong> The Chapter 99 stack the engine expects is derived from the global rules in <em>Chapter 99 Rules</em> above. Each rule cites the executive order, the HTS code in the official tariff schedule, and its effective date window. The cards below explain every tariff layer, including how the EU cap logic resolves between 9903.02.19 and 9903.02.20. If a rule is wrong or stale, edit it above and re-run saved audits — the math is purely a function of those rules + filed MFN rates.
+      </div>
+
+      <div class="ver-callout" style="background: var(--red-50); border-color: var(--red-100); border-left-color: var(--red-500);">
+        <strong style="color: var(--red-700);">⚠ IEEPA & Reciprocal post-Feb 24, 2026.</strong> The Supreme Court struck down IEEPA tariffs on Feb 20, 2026 and CBP ceased collection on Feb 24, 2026. Section 122 (10%, codes 9903.03.01–9903.03.11) replaced IEEPA Universal through July 24, 2026. <strong>Entries filed before Feb 24, 2026 were assessed lawfully but are now refundable</strong> via the CBP CAPE tool (opened Apr 20, 2026).
+      </div>
+
+      <h4 class="subsection-title" style="margin-top: 18px;">EU Cap Logic — Why ES/PT Items Resolve to Either 9903.02.19 or 9903.02.20</h4>
+      <div class="ver-card">
+        <div class="ver-grid">
+          <span class="lbl">Authority</span><span class="val">EO 14326 § 2(b) (Aug 5, 2025)</span>
+          <span class="lbl">Mechanism</span><span class="val">For an EU good, if the Column 1 (MFN) rate ≥ 15%, the additional ad valorem duty is <strong>0%</strong> (code 9903.02.19). If MFN &lt; 15%, the additional duty is set so the total reaches 15% — applied as an additive <strong>15%</strong> via code 9903.02.20.</span>
+          <span class="lbl">Effect</span><span class="val">EU shipments pay a flat 15% landed reciprocal rate, never more.</span>
+        </div>
+      </div>
+
+      <h4 class="subsection-title" style="margin-top: 22px;">China Stack — Why CN Has Three Layers</h4>
+      <div class="ver-card">
+        <div class="ver-grid">
+          <span class="lbl">Layer 1 (Section 301)</span><span class="val">One of four mutually exclusive codes — <strong>each HTS is on exactly one list</strong>. <strong>Not affected by SCOTUS ruling</strong> — Section 301 is independently authorized under Trade Act of 1974 § 301.<br>
+            &nbsp;• <span class="mono-inline">9903.88.01</span> List 1 +25% · <span class="mono-inline">9903.88.02</span> List 2 +25% · <span class="mono-inline">9903.88.03</span> List 3 +25% · <span class="mono-inline">9903.88.15</span> List 4A +7.5%</span>
+          <span class="lbl">Layer 2</span><span class="val"><span class="mono-inline">9903.01.24</span> — IEEPA China/HK fentanyl (+10%).</span>
+          <span class="lbl">Layer 3</span><span class="val"><span class="mono-inline">9903.01.25</span> — IEEPA Universal baseline (+10%).</span>
+          <span class="lbl">Stack rule</span><span class="val">All three layers apply <strong>additively to the same entered value base</strong> — no compounding.</span>
+        </div>
+      </div>
+
+      <h4 class="subsection-title" style="margin-top: 22px;">Data Provenance</h4>
+      <div class="ver-card">
+        <div class="ver-grid">
+          <span class="lbl">MFN rates</span><span class="val" id="verifyMfnSource">Taken from the broker-filed 7501 extract column <span class="mono-inline">33. CD HTS US Rate</span> per item when no HTS table is loaded; otherwise the global HTS Classification Table drives EU-cap logic.</span>
+          <span class="lbl">Entered value</span><span class="val">TXT-side: AMOUNT − pro-rata freight − pro-rata insurance per Method B aggregation. 7501-side: filed value from column <span class="mono-inline">32. CM Item Entered Value</span>.</span>
+          <span class="lbl">MID / COO match</span><span class="val">Strict on COO + HTS + MID, then loose on COO + HTS only. Unmatched rows surface as NO MATCH findings.</span>
+          <span class="lbl">Ch99 detection</span><span class="val">7501-side: any HTS starting with <span class="mono-inline">9903</span>. TXT-side: derived from global Ch99 rules + COO.</span>
+          <span class="lbl">MPF</span><span class="val">0.3464% of entered value per 19 CFR 24.23(b)(1).</span>
+          <span class="lbl">Cotton fee</span><span class="val">Cents-per-kg lookup by HTS-6 prefix (Section 22).</span>
+        </div>
+      </div>
+
+      <h4 class="subsection-title" style="margin-top: 22px;">HTS Classification Table</h4>
+      <div id="verifyHtsCard"></div>
     </div>
   </div>
 </div>
@@ -1366,7 +1456,10 @@
 
     <!-- Tabs (always visible - includes Runs tab) -->
     <section class="section">
-      <h2 class="section-title">Review &amp; Runs</h2>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+        <h2 class="section-title" style="margin:0;">Review &amp; Runs</h2>
+        <button type="button" class="btn btn-secondary" id="exportAuditCsvBtn" disabled style="padding:7px 14px;font-size:12px;white-space:nowrap;" title="Download all review grids as a ZIP of CSV files">Export all (ZIP)</button>
+      </div>
       <div class="tabs" id="tabs">
         <button class="tab active" data-tab="runs">Saved Runs <span class="pill" id="pillRuns">0</span></button>
         <button class="tab" data-tab="comparison">Comparison <span class="pill" id="pillCmp">0</span></button>
@@ -1377,7 +1470,6 @@
         <button class="tab" data-tab="findings">Findings <span class="pill" id="pillFindings">0</span></button>
         <button class="tab" data-tab="mfr">Manufacturer <span class="pill" id="pillMfr">0</span></button>
         <button class="tab" data-tab="hts">HTS Consistency <span class="pill" id="pillHts">0</span></button>
-        <button class="tab" data-tab="verify">Sources &amp; Verification</button>
       </div>
 
       <!-- Runs Panel -->
@@ -1412,6 +1504,7 @@
             <option value="MISSING">CH99 missing</option>
             <option value="PARTIAL">CH99 partial (Section 301)</option>
           </select>
+          <button type="button" class="btn-csv-tab" data-csv-export="comparison" disabled title="Download this grid as CSV (respects filters)">↓ CSV</button>
           <span class="filter-count" id="cmpCount">0 of 0</span>
         </div>
         <div class="table-wrap">
@@ -1432,6 +1525,7 @@
             <option value="IEEPA-China">IEEPA CN/HK</option>
             <option value="Section-301">Section 301</option>
           </select>
+          <button type="button" class="btn-csv-tab" data-csv-export="stack" disabled title="Download this grid as CSV (respects filters)">↓ CSV</button>
           <span class="filter-count" id="stackCount">0 of 0</span>
         </div>
         <div class="table-wrap">
@@ -1450,6 +1544,8 @@
           <input type="text" class="search" id="rawSearch" placeholder="Search Customs SKU, HTS, COO, MID, manufacturer…" />
           <select id="rawFilterCOO"><option value="">All countries</option></select>
           <select id="rawFilterHTS"><option value="">All HTS codes</option></select>
+          <button type="button" class="btn-csv-tab" data-csv-export="raw" disabled title="Download this grid as CSV (respects filters)">↓ CSV</button>
+          <button type="button" class="btn-csv-tab" data-csv-export="raw_critical" disabled title="Download critical raw lines only (respects filters)">↓ Critical</button>
           <span class="filter-count" id="rawCount">0 of 0</span>
         </div>
         <div class="table-wrap">
@@ -1462,6 +1558,7 @@
         <div class="filter-bar">
           <input type="text" class="search" id="aggSearch" placeholder="Search HTS, COO, MID…" />
           <select id="aggFilterCOO"><option value="">All countries</option></select>
+          <button type="button" class="btn-csv-tab" data-csv-export="aggregated" disabled title="Download this grid as CSV (respects filters)">↓ CSV</button>
           <span class="filter-count" id="aggCount">0 of 0</span>
         </div>
         <div class="table-wrap">
@@ -1474,6 +1571,7 @@
         <div class="filter-bar">
           <input type="text" class="search" id="filedSearch" placeholder="Search HTS, COO, MID, item #…" />
           <select id="filedFilterCOO"><option value="">All countries</option></select>
+          <button type="button" class="btn-csv-tab" data-csv-export="filed" disabled title="Download this grid as CSV (respects filters)">↓ CSV</button>
           <span class="filter-count" id="filedCount">0 of 0</span>
         </div>
         <div class="table-wrap">
@@ -1492,6 +1590,7 @@
             <option value="Low">Low</option>
             <option value="Info">Info</option>
           </select>
+          <button type="button" class="btn-csv-tab" data-csv-export="findings" disabled title="Download this grid as CSV (respects filters)">↓ CSV</button>
           <span class="filter-count" id="findingsCount">0 findings</span>
         </div>
         <div class="findings" id="findingsList"></div>
@@ -1513,6 +1612,7 @@
             <option value="MISMATCH">Has MID mismatch</option>
             <option value="CH99_ISSUE">Has CH99 issue</option>
           </select>
+          <button type="button" class="btn-csv-tab" data-csv-export="manufacturer" disabled title="Download this grid as CSV (respects filters)">↓ CSV</button>
           <span class="filter-count" id="mfrCount">0 of 0</span>
         </div>
         <div class="table-wrap">
@@ -1549,62 +1649,6 @@
           </div>
           <div id="htsEmptyBaseline" style="display:none;padding:14px 0;color:var(--gray-600);font-size:13px;">All filed MFN rates align with the tariff baseline for this entry. &check;</div>
           <div style="height:32px;"></div>
-        </div>
-      </div>
-
-      <!-- Verification Panel -->
-      <div class="tab-panel" id="panel-verify">
-        <div style="padding: 22px 24px;">
-          <div class="ver-callout">
-            <strong>How to trust this audit.</strong> The Chapter 99 stack the engine expects is derived from the global rules in <em>Reference → Chapter 99 Rules</em> (admin). Each rule cites the executive order, the HTS code in the official tariff schedule, and its effective date window. The cards below explain every layer used in this entry, including how the EU cap logic resolves between 9903.02.19 and 9903.02.20. If a rule is wrong or stale, edit it under Reference and re-run saved audits — the math is purely a function of those rules + filed MFN rates.
-          </div>
-
-          <div class="ver-callout" style="background: var(--red-50); border-color: var(--red-100); border-left-color: var(--red-500);">
-            <strong style="color: var(--red-700);">⚠ IEEPA & Reciprocal post-Feb 24, 2026.</strong> The Supreme Court struck down IEEPA tariffs on Feb 20, 2026 and CBP ceased collection on Feb 24, 2026. Section 122 (10%, codes 9903.03.01–9903.03.11) replaced IEEPA Universal through July 24, 2026. <strong>Entries filed before Feb 24, 2026 were assessed lawfully but are now refundable</strong> via the CBP CAPE tool (opened Apr 20, 2026). This entry is dated Jan 15, 2026, so the rates the engine expects ARE what was collected at filing — and now constitute a refundable amount.
-          </div>
-
-          <h3 class="subsection-title" style="margin-top: 18px;">Active Chapter 99 Rules in This Audit</h3>
-          <div id="verifyCards"></div>
-
-          <h3 class="subsection-title" style="margin-top: 22px;">EU Cap Logic — Why ES/PT Items Resolve to Either 9903.02.19 or 9903.02.20</h3>
-          <div class="ver-card">
-            <div class="ver-grid">
-              <span class="lbl">Authority</span><span class="val">EO 14326 § 2(b) (Aug 5, 2025)</span>
-              <span class="lbl">Mechanism</span><span class="val">For an EU good, if the Column 1 (MFN) rate ≥ 15%, the additional ad valorem duty is <strong>0%</strong> (code 9903.02.19). If MFN &lt; 15%, the additional duty is set so the total reaches 15% — applied as an additive <strong>15%</strong> via code 9903.02.20.</span>
-              <span class="lbl">In this entry</span><span class="val mono">All Spain/Portugal goods are apparel HTS 6203/6204/etc. with MFN rates typically &lt;15%, so 9903.02.20 (+15%) applies. The engine selects per-line based on the filed MFN rate.</span>
-              <span class="lbl">Effect</span><span class="val">EU shipments pay a flat 15% landed reciprocal rate, never more.</span>
-            </div>
-          </div>
-
-          <h3 class="subsection-title" style="margin-top: 22px;">China Stack — Why CN Has Three Layers</h3>
-          <div class="ver-card">
-            <div class="ver-grid">
-              <span class="lbl">Layer 1 (Section 301)</span><span class="val">One of four mutually exclusive codes — <strong>each HTS is on exactly one list</strong>. <strong>Not affected by SCOTUS ruling</strong> — Section 301 is independently authorized under Trade Act of 1974 § 301.<br>
-                &nbsp;• <span class="mono-inline">9903.88.01</span> List 1 +25% (machinery, electronics) · eff. Jul 6, 2018<br>
-                &nbsp;• <span class="mono-inline">9903.88.02</span> List 2 +25% (semiconductors, chemicals) · eff. Aug 23, 2018<br>
-                &nbsp;• <span class="mono-inline">9903.88.03</span> List 3 +25% (furniture, auto parts, <em>many Ch 50–65 textile codes</em>) · eff. Sep 24, 2018<br>
-                &nbsp;• <span class="mono-inline">9903.88.15</span> List 4A +7.5% (consumer goods, most apparel/footwear) · eff. Sep 1, 2019<br>
-                Engine displays 9903.88.15 as the default; accepts any 9903.88.* as satisfying coverage.</span>
-              <span class="lbl">Layer 2</span><span class="val"><span class="mono-inline">9903.01.24</span> — IEEPA China/HK fentanyl (+10%). EO 14195 as amended Nov 10, 2025 (reduced from 20% to 10%).</span>
-              <span class="lbl">Layer 3</span><span class="val"><span class="mono-inline">9903.01.25</span> — IEEPA Universal baseline (+10%). EO 14257.</span>
-              <span class="lbl">Stack rule</span><span class="val">All three layers apply <strong>additively to the same entered value base</strong> — no compounding. Effective China rate (List 4A example) = MFN + 7.5% + 10% + 10% = MFN + 27.5%. For List 3 HTS codes the Section 301 component is +25% instead of +7.5%.</span>
-            </div>
-          </div>
-
-          <h3 class="subsection-title" style="margin-top: 22px;">Data Provenance</h3>
-          <div class="ver-card">
-            <div class="ver-grid">
-              <span class="lbl">MFN rates</span><span class="val" id="verifyMfnSource">Taken from the broker-filed 7501 extract column <span class="mono-inline">33. CD HTS US Rate</span> per item. Engine parses "16.5%", "Free", etc. and uses the resulting % for both per-line raw calc and EU cap logic.</span>
-              <span class="lbl">Entered value</span><span class="val">TXT-side: AMOUNT − pro-rata freight − pro-rata insurance per Method B aggregation. 7501-side: filed value from column <span class="mono-inline">32. CM Item Entered Value</span>. Δ &lt; $1 is rounding; larger differences are flagged.</span>
-              <span class="lbl">MID / COO match</span><span class="val">First pass: strict on COO + HTS-normalized + MID. Second pass: loose on COO + HTS only (flags MID as MISMATCH). Third pass: any unmatched rows surface as NO MATCH findings.</span>
-              <span class="lbl">Ch99 detection</span><span class="val">7501-side: any HTS starting with <span class="mono-inline">9903</span>. TXT-side: derived from global Ch99 rules + COO. The Comparison tab flags MATCH / MISMATCH / MISSING per line.</span>
-              <span class="lbl">MPF</span><span class="val">0.3464% of entered value per 19 CFR 24.23(b)(1). Not capped per line in this audit — apply caps at entry-summary level if needed.</span>
-              <span class="lbl">Cotton fee</span><span class="val">Cents-per-kg lookup by HTS-6 prefix (Section 22 / Cotton Research & Promotion Act). Hardcoded for common Inditex prefixes — extend the table if a finding appears for an unmapped HTS.</span>
-            </div>
-          </div>
-
-          <h3 class="subsection-title" style="margin-top: 22px;">HTS Classification Table</h3>
-          <div id="verifyHtsCard"></div>
         </div>
       </div>
 
@@ -2945,7 +2989,7 @@ const auth = (() => {
       const usersBtn = document.getElementById("usersBtn");
       if (usersBtn) usersBtn.style.display = _state.role === "admin" ? "" : "none";
       const referenceBtn = document.getElementById("referenceBtn");
-      if (referenceBtn) referenceBtn.style.display = "";
+      if (referenceBtn) { referenceBtn.style.display = ""; referenceBtn.classList.remove("nav-locked"); }
       const activityBtn = document.getElementById("activityBtn");
       if (activityBtn) activityBtn.style.display = _state.role === "admin" ? "" : "none";
       const htsRefSection = document.getElementById("htsRefStatusSection");
@@ -2956,7 +3000,7 @@ const auth = (() => {
       const usersBtn = document.getElementById("usersBtn");
       if (usersBtn) usersBtn.style.display = "none";
       const referenceBtn = document.getElementById("referenceBtn");
-      if (referenceBtn) referenceBtn.style.display = "none";
+      if (referenceBtn) { referenceBtn.style.display = ""; referenceBtn.classList.add("nav-locked"); }
       const activityBtn = document.getElementById("activityBtn");
       if (activityBtn) activityBtn.style.display = "none";
       const htsRefSection = document.getElementById("htsRefStatusSection");
@@ -3772,6 +3816,7 @@ const APP_VIEWS = {
       renderAdminRules();
       applyReferencePermissions();
       renderAdminHtsTable();
+      renderHtsVerification();
     },
   },
   activity: {
@@ -3817,6 +3862,11 @@ async function openView(name) {
 }
 
 async function toggleView(name) {
+  if (name !== "dashboard" && !auth.token) {
+    document.getElementById("loginOverlay")?.classList.remove("hidden");
+    toast("Sign in to open " + name.charAt(0).toUpperCase() + name.slice(1) + ".", "info");
+    return;
+  }
   if (_activeView === name) {
     closeAllViews();
     return;
@@ -3977,6 +4027,7 @@ let _mfnSort = "spread";    // "coo"|"hts"|"rate_count"|"spread"
 let _mfnSortDir = -1;       // -1 desc, 1 asc
 let _mfnSearch = "";
 let _mfnElTable = null, _mfnElMsg = null, _mfnElPill = null;
+let _mfnExpanded = new Set(); // COO|HTS keys with expanded 7501 line detail
 let _rdMidSort = "entries"; // "mid"|"entries"|"lines"|"coo"|"value"|"entered"
 let _rdMidSortDir = -1;
 let _rdMidSearch = "";
@@ -5378,6 +5429,509 @@ function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
 }
 
+function csvCell(v) {
+  if (v == null || v === "") return "";
+  const s = String(v);
+  if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function rowsToCsv(headers, rows) {
+  const lines = [headers.map(csvCell).join(",")];
+  for (const row of rows) {
+    lines.push(headers.map(h => csvCell(row[h])).join(","));
+  }
+  return lines.join("\r\n");
+}
+
+function stackLayersText(layers) {
+  if (!layers || !layers.length) return "";
+  return layers.map(l => `${l.ch99} +${(l.rate_pct || 0).toFixed(1)}%`).join(" | ");
+}
+
+function buildStackExportRows(respectFilters) {
+  const dateRules = state.ctx?.applicableDate
+    ? rulesInEffectOn(state.rules, state.ctx.applicableDate)
+    : state.rules;
+  let rows = (state.filed || []).map(f => {
+    const ev = Number(f.ENTERED_VALUE) || 0;
+    const mfn = getMfnRate(f.HTS, f.MFN_RATE_PCT);
+    const exp = expectedChapter99(f.COO, f.HTS, mfn, dateRules);
+    const byCat = { "Reciprocal": [], "Reciprocal-EU": [], "IEEPA-Universal": [], "IEEPA-China": [], "Section-301": [] };
+    let totalExpCh99 = 0;
+    for (const e of exp) {
+      const amt = ev * (e.rate_pct || 0) / 100;
+      const cat = e.category || "Reciprocal";
+      if (!byCat[cat]) byCat[cat] = [];
+      byCat[cat].push({ ...e, amt });
+      totalExpCh99 += amt;
+    }
+    const reciprocal = [...(byCat["Reciprocal"] || []), ...(byCat["Reciprocal-EU"] || [])];
+    const filedCh99 = Number(f.CH99_DUTY_FILED) || 0;
+    const categories = Object.keys(byCat).filter(k => byCat[k].length > 0);
+    return {
+      item: f.ITEM,
+      coo: f.COO,
+      hts: htsFormat(f.HTS),
+      mid: f.MID,
+      entered_value: ev,
+      mfn_rate_used: mfn,
+      mfn_rate_filed: f.MFN_RATE_PCT,
+      mfn_duty: ev * (mfn || 0) / 100,
+      reciprocal_layers: stackLayersText(reciprocal),
+      ieepa_universal: stackLayersText(byCat["IEEPA-Universal"]),
+      ieepa_china: stackLayersText(byCat["IEEPA-China"]),
+      section_301: stackLayersText(byCat["Section-301"]),
+      ch99_expected_total: totalExpCh99,
+      ch99_filed: filedCh99,
+      ch99_delta: totalExpCh99 - filedCh99,
+      categories,
+    };
+  });
+  if (respectFilters) {
+    const search = (document.getElementById("stackSearch")?.value || "").toLowerCase().trim();
+    const fCoo = document.getElementById("stackFilterCOO")?.value || "";
+    const fCat = document.getElementById("stackFilterCat")?.value || "";
+    rows = rows.filter(r => {
+      if (fCoo && r.coo !== fCoo) return false;
+      if (fCat && !r.categories.includes(fCat)) return false;
+      if (search) {
+        const blob = `${r.coo} ${r.hts} ${r.mid} ${r.item}`.toLowerCase();
+        if (!blob.includes(search)) return false;
+      }
+      return true;
+    });
+  }
+  return rows;
+}
+
+function getCriticalAggLines() {
+  const lines = new Set();
+  for (const r of state.cmp || []) {
+    if (r.AGG_LINE == null) continue;
+    if (r.CH99_CHECK === "MISMATCH" || r.CH99_CHECK === "MISSING") {
+      if (r.MATCH && !r.MATCH.startsWith("NO MATCH")) lines.add(r.AGG_LINE);
+    }
+    if (r.MATCH && r.MATCH.startsWith("NO MATCH")) lines.add(r.AGG_LINE);
+  }
+  return lines;
+}
+
+function buildAggKeyToLineMap() {
+  const m = new Map();
+  for (const a of state.agg || []) {
+    m.set(`${(a.ORIGIN || "").trim()}|${htsNormalize(a.DESTINATION_HS)}|${a.MID}`, a.AGG_LINE);
+  }
+  return m;
+}
+
+function buildMfrExportRows(respectFilters) {
+  const byMid = new Map();
+  for (const r of state.cmp || []) {
+    const mid = r.MID_TXT || r.MID_75 || "(blank)";
+    if (!byMid.has(mid)) {
+      byMid.set(mid, {
+        mid, lines: 0, htsSet: new Set(), cooSet: new Set(),
+        entered_txt: 0, entered_75: 0, mid_mismatches: 0, ch99_issues: 0, ch99_partials: 0, no_match: 0,
+      });
+    }
+    const g = byMid.get(mid);
+    g.lines++;
+    if (r.HTS) g.htsSet.add(r.HTS);
+    if (r.COO) g.cooSet.add(r.COO);
+    if (r.ENTERED_VALUE_TXT != null) g.entered_txt += r.ENTERED_VALUE_TXT;
+    if (r.ENTERED_VALUE_75 != null) g.entered_75 += r.ENTERED_VALUE_75;
+    if (r.MID_CHECK === "MISMATCH") g.mid_mismatches++;
+    if (r.CH99_CHECK === "MISMATCH" || r.CH99_CHECK === "MISSING") g.ch99_issues++;
+    if (r.CH99_CHECK === "PARTIAL") g.ch99_partials++;
+    if (r.MATCH && r.MATCH.startsWith("NO")) g.no_match++;
+  }
+  let rows = Array.from(byMid.values()).map(g => ({
+    mid: g.mid,
+    lines: g.lines,
+    coo: [...g.cooSet].sort().join("; "),
+    hts_codes: [...g.htsSet].sort().join("; "),
+    entered_txt: g.entered_txt,
+    entered_7501: g.entered_75,
+    entered_delta: g.entered_txt - g.entered_75,
+    mid_mismatches: g.mid_mismatches,
+    ch99_issues: g.ch99_issues,
+    ch99_partials: g.ch99_partials,
+    no_match_lines: g.no_match,
+    status: g.mid_mismatches > 0 ? "MID_MISMATCH"
+      : g.ch99_issues > 0 ? "CH99_ISSUE"
+      : g.no_match > 0 ? "NO_MATCH"
+      : "MATCH",
+  })).sort((a, b) => b.lines - a.lines);
+
+  if (respectFilters) {
+    const search = (document.getElementById("mfrSearch")?.value || "").toLowerCase().trim();
+    const filterStatus = document.getElementById("mfrFilterStatus")?.value || "";
+    if (filterStatus) {
+      rows = rows.filter(r => {
+        const filterKey = r.mid_mismatches > 0 ? "MISMATCH"
+          : r.ch99_issues > 0 ? "CH99_ISSUE"
+          : r.no_match_lines > 0 ? "NO_MATCH"
+          : "MATCH";
+        return filterKey === filterStatus || (filterStatus === "CH99_ISSUE" && r.ch99_issues > 0);
+      });
+    }
+    if (search) {
+      rows = rows.filter(r =>
+        r.mid.toLowerCase().includes(search) ||
+        r.coo.toLowerCase().includes(search) ||
+        r.hts_codes.toLowerCase().includes(search)
+      );
+    }
+  }
+  return rows;
+}
+
+function auditExportBaseName() {
+  const ctx = state.ctx || {};
+  const entry = String(ctx.entryNum || "entry").replace(/[^\w.-]+/g, "_");
+  const date = new Date().toISOString().slice(0, 10);
+  return `7501_audit_${entry}_${date}`;
+}
+
+const AUDIT_CSV_STACK_HEADERS = [
+  "item", "coo", "hts", "mid", "entered_value", "mfn_rate_used", "mfn_rate_filed", "mfn_duty",
+  "reciprocal_layers", "ieepa_universal", "ieepa_china", "section_301", "ch99_expected_total", "ch99_filed", "ch99_delta",
+];
+const AUDIT_CSV_RAW_HEADERS = [
+  "txt_line", "customs_sku", "coo", "hts", "mid", "agg_line", "quantity", "unit_price", "invoice_amount",
+  "entered_value", "mfn_pct", "mfn_duty", "ch99_codes", "ch99_duty", "mpf", "cotton_fee", "total_duty_fees",
+];
+
+function getFilteredComparisonRows(respectFilters) {
+  let rows = state.cmp || [];
+  if (!respectFilters) return rows;
+  const search = (document.getElementById("cmpSearch")?.value || "").toLowerCase().trim();
+  const filterMatch = document.getElementById("cmpFilterMatch")?.value || "";
+  const filterCh99 = document.getElementById("cmpFilterCh99")?.value || "";
+  return rows.filter(r => {
+    if (filterMatch && !(r.MATCH || "").startsWith(filterMatch)) return false;
+    if (filterCh99 && r.CH99_CHECK !== filterCh99) return false;
+    if (search) {
+      const blob = `${r.COO} ${r.HTS} ${r.MID_TXT} ${r.MID_75} ${r.ITEM} ${r.AGG_LINE} ${r.CH99_FILED.join(",")}`.toLowerCase();
+      if (!blob.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+function mapComparisonCsvRows(rows) {
+  return rows.map(r => ({
+    agg_line: r.AGG_LINE ?? "",
+    item_7501: r.ITEM ?? "",
+    coo: r.COO,
+    hts: r.HTS,
+    mid_txt: r.MID_TXT || "",
+    mid_7501: r.MID_75 || "",
+    mfn_pct_filed: r.MFN_RATE_PCT ?? "",
+    mfn_pct_table: r.MFN_RATE_TABLE ?? "",
+    entered_txt: r.ENTERED_VALUE_TXT ?? "",
+    entered_7501: r.ENTERED_VALUE_75 ?? "",
+    entered_delta: r.ENTERED_DIFF ?? "",
+    ch99_expected: (r.CH99_EXPECTED || []).map(e => `${e.ch99} +${(e.rate_pct || 0).toFixed(1)}%`).join("; "),
+    ch99_filed: (r.CH99_FILED || []).join("; "),
+    match: r.MATCH || "",
+    mid_check: r.MID_CHECK || "",
+    ch99_check: r.CH99_CHECK || "",
+  }));
+}
+
+function getFilteredRawSourceRows(respectFilters) {
+  let rows = state.raw || [];
+  if (!respectFilters) return rows;
+  const search = (document.getElementById("rawSearch")?.value || "").toLowerCase().trim();
+  const fCoo = document.getElementById("rawFilterCOO")?.value || "";
+  const fHts = document.getElementById("rawFilterHTS")?.value || "";
+  return rows.filter(r => {
+    if (fCoo && (r.ORIGIN || "").trim() !== fCoo) return false;
+    if (fHts && (r.DESTINATION_HS || "").trim() !== fHts) return false;
+    if (search) {
+      const blob = `${r.CUSTOMS_SKU || ""} ${r.ORIGIN} ${r.DESTINATION_HS} ${r.MID} ${r.MANUFACTURER_NAME || ""}`.toLowerCase();
+      if (!blob.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+function mapRawCsvRows(rawRows) {
+  const aggKeyMap = buildAggKeyToLineMap();
+  return rawRows.map(r => ({
+    txt_line: r.TXT_LINE,
+    customs_sku: r.CUSTOMS_SKU || "",
+    coo: r.ORIGIN,
+    hts: htsFormat(r.DESTINATION_HS),
+    mid: r.MID,
+    agg_line: aggKeyMap.get(`${(r.ORIGIN || "").trim()}|${htsNormalize(r.DESTINATION_HS)}|${r.MID}`) ?? "",
+    quantity: r.QUANTITY,
+    unit_price: r.UNIT_PRICE,
+    invoice_amount: r.AMOUNT,
+    entered_value: r.ENTERED_VALUE,
+    mfn_pct: r.MFN_RATE_PCT,
+    mfn_duty: r.MFN_DUTY_EXP,
+    ch99_codes: r.CH99_EXP || "",
+    ch99_duty: r.CH99_DUTY_EXP,
+    mpf: r.MPF_EXP,
+    cotton_fee: r.COTTON_FEE_EXP,
+    total_duty_fees: r.TOTAL_DUTY_FEES_EXP,
+  }));
+}
+
+function getFilteredAggRows(respectFilters) {
+  let rows = state.agg || [];
+  if (!respectFilters) return rows;
+  const search = (document.getElementById("aggSearch")?.value || "").toLowerCase().trim();
+  const fCoo = document.getElementById("aggFilterCOO")?.value || "";
+  return rows.filter(r => {
+    if (fCoo && r.ORIGIN !== fCoo) return false;
+    if (search) {
+      const blob = `${r.ORIGIN} ${r.DESTINATION_HS} ${r.MID}`.toLowerCase();
+      if (!blob.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+function mapAggCsvRows(rows) {
+  return rows.map(r => ({
+    agg_line: r.AGG_LINE,
+    coo: r.ORIGIN,
+    hts: htsFormat(r.DESTINATION_HS),
+    mid: r.MID,
+    raw_lines: r.RAW_LINES,
+    quantity: r.QUANTITY,
+    net_weight_kg: r.NET_WEIGHT_KG,
+    invoice_value: r.INVOICE_VALUE,
+    freight_alloc: r.ALLOC_FREIGHT,
+    insurance_alloc: r.ALLOC_INSURANCE,
+    entered_value: r.ENTERED_VALUE,
+  }));
+}
+
+function getFilteredFiledRows(respectFilters) {
+  let rows = state.filed || [];
+  if (!respectFilters) return rows;
+  const search = (document.getElementById("filedSearch")?.value || "").toLowerCase().trim();
+  const fCoo = document.getElementById("filedFilterCOO")?.value || "";
+  return rows.filter(r => {
+    if (fCoo && r.COO !== fCoo) return false;
+    if (search) {
+      const blob = `${r.COO} ${r.HTS} ${r.MID} ${r.ITEM} ${r.CH99_HTS || ""}`.toLowerCase();
+      if (!blob.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+function mapFiledCsvRows(rows) {
+  return rows.map(r => ({
+    item: r.ITEM,
+    coo: r.COO,
+    hts: htsFormat(r.HTS),
+    mid: r.MID,
+    entered_value: r.ENTERED_VALUE,
+    mfn_pct: r.MFN_RATE_PCT,
+    mfn_duty: r.MFN_DUTY,
+    ch99_duty: r.CH99_DUTY_FILED,
+    ch99_codes: (r.CH99_HTS || "").split(",").map(s => htsFormat(s.trim())).join("; "),
+    mpf: r.MPF_FILED,
+    cotton_fee: r.COTTON_FEE,
+    description: r.DESC || "",
+  }));
+}
+
+function getFilteredFindingRows(respectFilters) {
+  let rows = state.findings || [];
+  if (!respectFilters) return rows;
+  const fSev = document.getElementById("findingsFilterSev")?.value || "";
+  return rows.filter(f => !fSev || f.sev === fSev);
+}
+
+function mapFindingCsvRows(rows) {
+  return rows.map(f => ({
+    severity: f.sev,
+    category: f.cat,
+    location: f.loc,
+    description: f.desc,
+    recommendation: f.rec,
+    is_rollup: f.isRollup ? "yes" : "no",
+  }));
+}
+
+function getAuditCsvSection(sectionId, respectFilters) {
+  const base = auditExportBaseName();
+  switch (sectionId) {
+    case "comparison":
+      return {
+        id: "comparison",
+        label: "Comparison",
+        filename: `${base}_comparison.csv`,
+        headers: ["agg_line", "item_7501", "coo", "hts", "mid_txt", "mid_7501", "mfn_pct_filed", "mfn_pct_table",
+          "entered_txt", "entered_7501", "entered_delta", "ch99_expected", "ch99_filed", "match", "mid_check", "ch99_check"],
+        rows: mapComparisonCsvRows(getFilteredComparisonRows(respectFilters)),
+      };
+    case "stack":
+      return {
+        id: "stack",
+        label: "Ch99 Stack",
+        filename: `${base}_ch99_stack.csv`,
+        headers: AUDIT_CSV_STACK_HEADERS,
+        rows: buildStackExportRows(respectFilters).map(({ categories, ...r }) => r),
+      };
+    case "raw":
+      return {
+        id: "raw",
+        label: "Raw Lines",
+        filename: `${base}_raw_lines.csv`,
+        headers: AUDIT_CSV_RAW_HEADERS,
+        rows: mapRawCsvRows(getFilteredRawSourceRows(respectFilters)),
+      };
+    case "raw_critical": {
+      const criticalAgg = getCriticalAggLines();
+      const rawRows = mapRawCsvRows(getFilteredRawSourceRows(respectFilters));
+      return {
+        id: "raw_critical",
+        label: "Raw Lines (Critical)",
+        filename: `${base}_raw_lines_critical.csv`,
+        headers: AUDIT_CSV_RAW_HEADERS,
+        rows: rawRows.filter(r => r.agg_line !== "" && criticalAgg.has(r.agg_line)),
+      };
+    }
+    case "aggregated":
+      return {
+        id: "aggregated",
+        label: "Aggregated",
+        filename: `${base}_aggregated.csv`,
+        headers: ["agg_line", "coo", "hts", "mid", "raw_lines", "quantity", "net_weight_kg", "invoice_value",
+          "freight_alloc", "insurance_alloc", "entered_value"],
+        rows: mapAggCsvRows(getFilteredAggRows(respectFilters)),
+      };
+    case "filed":
+      return {
+        id: "filed",
+        label: "7501 Filed",
+        filename: `${base}_7501_filed.csv`,
+        headers: ["item", "coo", "hts", "mid", "entered_value", "mfn_pct", "mfn_duty", "ch99_duty", "ch99_codes", "mpf", "cotton_fee", "description"],
+        rows: mapFiledCsvRows(getFilteredFiledRows(respectFilters)),
+      };
+    case "findings":
+      return {
+        id: "findings",
+        label: "Findings",
+        filename: `${base}_findings.csv`,
+        headers: ["severity", "category", "location", "description", "recommendation", "is_rollup"],
+        rows: mapFindingCsvRows(getFilteredFindingRows(respectFilters)),
+      };
+    case "manufacturer":
+      return {
+        id: "manufacturer",
+        label: "Manufacturer",
+        filename: `${base}_manufacturer.csv`,
+        headers: ["mid", "lines", "coo", "hts_codes", "entered_txt", "entered_7501", "entered_delta",
+          "mid_mismatches", "ch99_issues", "ch99_partials", "no_match_lines", "status"],
+        rows: buildMfrExportRows(respectFilters),
+      };
+    default:
+      return null;
+  }
+}
+
+function downloadCsvFile(filename, headers, rows) {
+  const blob = new Blob([rowsToCsv(headers, rows)], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportAuditCsvSection(sectionId) {
+  if (!state.cmp || !state.cmp.length) {
+    toast("Run an audit first — nothing to export.", "error");
+    return;
+  }
+  const section = getAuditCsvSection(sectionId, true);
+  if (!section) {
+    toast("Unknown export section.", "error");
+    return;
+  }
+  if (sectionId === "raw" && (!state.raw || !state.raw.length)) {
+    toast("Raw lines are not available for this run.", "error");
+    return;
+  }
+  downloadCsvFile(section.filename, section.headers, section.rows);
+  trackActivity("export_audit_csv_section", {
+    section: sectionId,
+    entry: state.ctx?.entryNum,
+    rows: section.rows.length,
+    filtered: true,
+  }, "run");
+  const filterNote = section.rows.length === 1 ? "1 row" : `${section.rows.length} rows`;
+  toast(`Downloaded ${section.label} (${filterNote}, current filters).`, "success");
+}
+
+async function exportAuditCsvZip() {
+  if (!state.cmp || !state.cmp.length) {
+    toast("Run an audit first — nothing to export.", "error");
+    return;
+  }
+  if (typeof JSZip === "undefined") {
+    toast("CSV export library failed to load. Refresh the page.", "error");
+    return;
+  }
+
+  const zip = new JSZip();
+  const ctx = state.ctx || {};
+  const manifest = rowsToCsv(
+    ["field", "value"],
+    [
+      { field: "entry_num", value: ctx.entryNum || "" },
+      { field: "importer", value: ctx.importer || "" },
+      { field: "invoice", value: ctx.invoice || "" },
+      { field: "import_date", value: ctx.importDate || ctx.entryDate || "" },
+      { field: "exported_at", value: new Date().toISOString() },
+      { field: "comparison_rows", value: state.cmp.length },
+      { field: "raw_lines", value: (state.raw || []).length },
+      { field: "findings", value: (state.findings || []).length },
+    ]
+  );
+  zip.file("manifest.csv", manifest);
+
+  const zipSections = [
+    "comparison", "stack", "raw", "raw_critical", "aggregated", "filed", "findings", "manufacturer",
+  ];
+  let cmpCount = 0;
+  let rawCount = 0;
+  let rawCriticalCount = 0;
+  for (const id of zipSections) {
+    const section = getAuditCsvSection(id, false);
+    if (!section) continue;
+    const zipName = section.filename.replace(auditExportBaseName() + "_", "");
+    zip.file(zipName, rowsToCsv(section.headers, section.rows));
+    if (id === "comparison") cmpCount = section.rows.length;
+    if (id === "raw") rawCount = section.rows.length;
+    if (id === "raw_critical") rawCriticalCount = section.rows.length;
+  }
+
+  const blob = await zip.generateAsync({ type: "blob" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = auditExportBaseName() + ".zip";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  trackActivity("export_audit_csv", {
+    entry: ctx.entryNum,
+    comparison_rows: cmpCount,
+    raw_lines: rawCount,
+    raw_critical: rawCriticalCount,
+  }, "run");
+  toast(`Exported all grids (${cmpCount} comparison rows + 7 CSV files) as ZIP.`, "success");
+}
+
 // Wire Runs toolbar
 document.getElementById("saveRunBtn").addEventListener("click", () => {
   const customName = document.getElementById("runNameInput").value.trim();
@@ -5385,6 +5939,12 @@ document.getElementById("saveRunBtn").addEventListener("click", () => {
   document.getElementById("runNameInput").value = "";
 });
 document.getElementById("clearRunsBtn").addEventListener("click", clearAllRuns);
+document.getElementById("exportAuditCsvBtn")?.addEventListener("click", () => exportAuditCsvZip());
+document.addEventListener("click", e => {
+  const btn = e.target.closest("[data-csv-export]");
+  if (!btn || btn.disabled) return;
+  exportAuditCsvSection(btn.dataset.csvExport);
+});
 document.getElementById("exportRunsBtn").addEventListener("click", () => {
   const runs = loadRunsFromStorage();
   if (runs.length === 0) { toast("No runs to export.", "error"); return; }
@@ -5448,8 +6008,46 @@ document.getElementById("importRunsFile").addEventListener("change", async (e) =
 });
 
 // Initial bootstrap
+const APP_BUILD_ID = "2026.06.18-ref-hts";
+
+function showAppBuildBanner() {
+  const el = document.getElementById("appBuildBanner");
+  if (!el) return;
+  const metaBuild = document.querySelector('meta[name="app-build"]')?.content || "";
+  const onFile = location.protocol === "file:";
+  const stale = metaBuild !== APP_BUILD_ID;
+  if (!onFile && !stale) {
+    el.style.display = "none";
+    return;
+  }
+  el.style.display = "";
+  if (onFile) {
+    el.innerHTML = "<strong>Wrong URL.</strong> Open <code>http://localhost:5252</code> in your browser — do not open the HTML file directly. Reference data and MFN analytics require the Flask server.";
+  } else if (stale) {
+    el.innerHTML = "<strong>Stale UI detected</strong> (build " + escapeHtml(metaBuild || "unknown") + "). Hard-refresh with <code>Cmd+Shift+R</code> or restart <code>./start.sh</code>. Expected build: <code>" + APP_BUILD_ID + "</code>.";
+  }
+}
+
+async function probeServerBuild() {
+  const meta = document.getElementById("metaInfo");
+  try {
+    const res = await fetch("/api/health");
+    const data = res.ok ? await res.json() : null;
+    const build = res.headers.get("X-App-Build") || APP_BUILD_ID;
+    if (meta && data?.ok) {
+      const runCount = data.run_count ?? 0;
+      meta.dataset.serverBuild = build;
+      if (!state.ctx?.entryNum) {
+        meta.textContent = `DB · ${runCount} run${runCount === 1 ? "" : "s"} · build ${build}`;
+      }
+    }
+  } catch (e) { /* server offline */ }
+}
+
 (async () => {
+  showAppBuildBanner();
   auth.init();
+  probeServerBuild();
   if (!auth.token) return;   // show login overlay, wait for user to sign in
   trackActivity("session_start", { source: "page_load" }, "session");
   await runStore.init();
@@ -5633,7 +6231,18 @@ function render() {
   renderFindings();
   renderMfrRollup();
   renderHtsConsistency();
-  renderVerify();
+
+  const hasAudit = state.cmp && state.cmp.length > 0;
+  const csvBtn = document.getElementById("exportAuditCsvBtn");
+  if (csvBtn) csvBtn.disabled = !hasAudit;
+  document.querySelectorAll("[data-csv-export]").forEach(btn => {
+    const section = btn.dataset.csvExport;
+    if (section === "raw" || section === "raw_critical") {
+      btn.disabled = !hasAudit || !state.raw || !state.raw.length;
+    } else {
+      btn.disabled = !hasAudit;
+    }
+  });
 
   document.getElementById("pillCmp").textContent     = state.cmp.length;
   document.getElementById("pillStack").textContent   = state.cmp.filter(r => r.ITEM != null).length;
@@ -5941,61 +6550,6 @@ function renderHtsVerification() {
         </div></div>`;
     }
   }
-}
-
-function renderVerify() {
-  // Group rules by category, deduplicate by ch99 code.
-  // Always include all four Section 301 codes (88.01/02/03/15) regardless of
-  // whether they appear in this entry's expected stack — the mutual-exclusivity
-  // note below only makes sense if all four are visible together.
-  const usedCh99 = new Set();
-  for (const c of state.cmp) {
-    (c.CH99_EXPECTED || []).forEach(e => usedCh99.add(htsNormalize(e.ch99)));
-    (c.CH99_FILED || []).forEach(c2 => usedCh99.add(htsNormalize(c2)));
-  }
-  // Always show all Section 301 entries from state.rules so the four lists appear together.
-  state.rules.filter(r => r.category === "Section-301").forEach(r => usedCh99.add(htsNormalize(r.ch99)));
-
-  const seen = new Set();
-  const cards = state.rules
-    .filter(r => usedCh99.has(htsNormalize(r.ch99)))
-    .filter(r => { const k = r.ch99; if (seen.has(k)) return false; seen.add(k); return true; })
-    .sort((a,b) => a.ch99.localeCompare(b.ch99));
-
-  const renderCard = (r) => {
-    const cat = CH99_CATEGORIES[r.category] || CH99_CATEGORIES["Reciprocal"];
-    return `
-      <div class="ver-card cat-${r.category}">
-        <div class="ver-head">
-          <span class="ch99-chip cat-${r.category}"><span class="code">${r.ch99}</span> <span class="rate">+${r.rate.toFixed(1)}%</span></span>
-          <span class="ver-title">${r.basis}</span>
-          <span style="margin-left:auto; font-size: 11px; color: var(--gray-500); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">${cat.label}</span>
-        </div>
-        <div class="ver-grid">
-          <span class="lbl">Applies to</span><span class="val">${r.coo === "ES" || r.coo === "PT" ? "Spain & Portugal (EU)" : r.coo === "CN" ? "China (incl. HK/Macau where noted)" : r.coo}</span>
-          <span class="lbl">Authority</span><span class="val mono-inline">${r.authority}</span>
-          <span class="lbl">Effective</span><span class="val mono-inline">${r.effective}</span>
-          <span class="lbl">Notes</span><span class="val">${r.notes}</span>
-        </div>
-      </div>`;
-  };
-
-  const nonSec301Cards = cards.filter(r => r.category !== "Section-301");
-  const sec301Cards    = cards.filter(r => r.category === "Section-301");
-
-  const sec301Note = sec301Cards.length > 0 ? `
-    <p style="font-size:12px; color:var(--gray-600); margin:10px 0 8px; padding:0 2px; line-height:1.5;">
-      <strong>Section 301 lists are mutually exclusive</strong> — each Chinese HTS appears on at most one list.
-      The engine cannot determine HTS-level list membership; broker classification is authoritative.
-      The comparison accepts any <span class="mono-inline">9903.88.01/02/03/15</span> as satisfying Section 301 coverage.
-    </p>` : "";
-
-  document.getElementById("verifyCards").innerHTML =
-    nonSec301Cards.map(renderCard).join("") +
-    sec301Note +
-    sec301Cards.map(renderCard).join("");
-
-  renderHtsVerification();
 }
 
 // ---- Comparison table ----
@@ -6707,6 +7261,10 @@ function renderMfnDbLayer(target) {
 
 function invalidateMfnCache() { _mfnCache = null; }
 
+function mfnPairKey(r) {
+  return (r.coo || "") + "|" + (r.hts || "");
+}
+
 function _applyMfnRows(rows, dbEl, dbMsg, dbPill) {
   // Remember target elements so event handlers can re-render without arguments.
   _mfnElTable = dbEl; _mfnElMsg = dbMsg; _mfnElPill = dbPill;
@@ -6737,13 +7295,19 @@ function _applyMfnRows(rows, dbEl, dbMsg, dbPill) {
     ? rows.length + " pair" + (rows.length !== 1 ? "s" : "") + " · " + runIds.size + " run" + (runIds.size !== 1 ? "s" : "")
     : display.length + " of " + rows.length + " pairs";
   dbMsg.innerHTML =
-    "<div style=\"display:flex;align-items:center;gap:10px;margin-bottom:6px;\">" +
+    "<div style=\"display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;\">" +
     "<input id=\"mfnSearchInput\" placeholder=\"Search COO or HTS…\" style=\"padding:4px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:12px;width:200px;\" value=\"" + escapeHtml(_mfnSearch) + "\" />" +
     "<span style=\"font-size:12px;color:var(--gray-500);\">" + summary + "</span>" +
+    (display.length > 0
+      ? "<span style=\"margin-left:auto;display:flex;gap:10px;\">" +
+        "<button type=\"button\" class=\"mfn-toolbar-btn\" id=\"mfnExpandAll\">Expand all</button>" +
+        "<button type=\"button\" class=\"mfn-toolbar-btn\" id=\"mfnCollapseAll\">Collapse all</button>" +
+        "</span>"
+      : "") +
     "</div>";
 
   if (display.length === 0) {
-    dbEl.innerHTML = "<tbody><tr><td colspan=\"10\" style=\"text-align:center;padding:16px;color:var(--gray-400);font-size:12px;\">No pairs match this search.</td></tr></tbody>";
+    dbEl.innerHTML = "<tbody><tr><td colspan=\"11\" style=\"text-align:center;padding:16px;color:var(--gray-400);font-size:12px;\">No pairs match this search.</td></tr></tbody>";
   } else {
     var si = function(col) { return _mfnSort === col ? (_mfnSortDir < 0 ? " ▼" : " ▲") : ""; };
     var thS = function(col, lbl, cls) {
@@ -6753,38 +7317,50 @@ function _applyMfnRows(rows, dbEl, dbMsg, dbPill) {
     var tbody = "";
     display.forEach(function(r) {
       var occs = r.occurrences || [];
-      occs.forEach(function(o, i) {
-        var isFirst = i === 0;
-        var dt = o.saved_at ? new Date(o.saved_at).toLocaleDateString() : "—";
-        var groupCells = "";
-        if (isFirst) {
-          var ratesHtml = r.rates.map(function(x) {
-            return "<span style=\"display:block;\">" + fmtPct(parseFloat(x)) + "</span>";
-          }).join("");
-          groupCells =
-            "<td class=\"mono\" rowspan=\"" + occs.length + "\" style=\"vertical-align:top;background:#FFF8E8;font-weight:600;\">" + escapeHtml(r.coo) + "</td>" +
-            "<td class=\"mono\" rowspan=\"" + occs.length + "\" style=\"vertical-align:top;background:#FFF8E8;font-weight:600;\">" +
-              escapeHtml(htsFormat(r.hts)) +
-              "<div style=\"font-size:11px;color:#854F0B;font-weight:400;margin-top:2px;\">" + r.rate_count + " rates · spread " + fmtPct(r.rate_spread) + "</div>" +
-            "</td>" +
-            "<td class=\"mono\" rowspan=\"" + occs.length + "\" style=\"vertical-align:top;font-size:12px;color:var(--gray-700);\">" + ratesHtml + "</td>";
-        }
-        tbody +=
-          "<tr style=\"" + (isFirst ? "border-top:2px solid #F69000;" : "") + "\">" +
-          groupCells +
-          "<td class=\"mono\" style=\"font-size:12px;\">" + escapeHtml(o.entry_num || "—") + "</td>" +
-          "<td style=\"font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\" title=\"" + escapeHtml(o.run_name || "") + "\">" + escapeHtml(o.run_name || "—") + "</td>" +
-          "<td class=\"num mono\"><strong>" + escapeHtml(String(o.item ?? "—")) + "</strong></td>" +
-          "<td class=\"mono\" style=\"font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\" title=\"" + escapeHtml(o.mid || "") + "\">" + escapeHtml(o.mid || "—") + "</td>" +
-          "<td class=\"num\"><strong>" + fmtPct(parseFloat(o.rate)) + "</strong></td>" +
-          "<td class=\"mono\" style=\"font-size:11px;color:var(--gray-600);\">" + escapeHtml(o.rate_str || "—") + "</td>" +
-          "<td style=\"font-size:12px;color:var(--gray-600);\">" + dt + "</td>" +
-          "</tr>";
-      });
+      var key = mfnPairKey(r);
+      var expanded = _mfnExpanded.has(key);
+      var runIds = new Set(occs.map(function(o) { return o.run_id; }));
+      var ratesHtml = (r.rates || []).map(function(x) {
+        return "<span style=\"display:block;\">" + fmtPct(parseFloat(x)) + "</span>";
+      }).join("");
+
+      tbody +=
+        "<tr class=\"mfn-sum-row" + (expanded ? " expanded" : "") + "\" data-mfn-toggle=\"" + escapeHtml(key) + "\">" +
+        "<td class=\"mfn-tog\">" + (expanded ? "▼" : "▶") + "</td>" +
+        "<td class=\"mono\" style=\"font-weight:600;\">" + escapeHtml(r.coo) + "</td>" +
+        "<td class=\"mono\" style=\"font-weight:600;\">" + escapeHtml(htsFormat(r.hts)) +
+          "<div style=\"font-size:11px;color:#854F0B;font-weight:400;margin-top:2px;\">" + r.rate_count + " rates · spread " + fmtPct(r.rate_spread) + "</div>" +
+        "</td>" +
+        "<td class=\"mono\" style=\"font-size:12px;color:var(--gray-700);\">" + ratesHtml + "</td>";
+
+      if (!expanded) {
+        tbody += "<td colspan=\"7\" class=\"mfn-sum-meta\">" +
+          occs.length + " line" + (occs.length !== 1 ? "s" : "") + " · " + runIds.size + " run" + (runIds.size !== 1 ? "s" : "") +
+          " — click to expand</td></tr>";
+      } else {
+        tbody += "<td colspan=\"7\" class=\"mfn-sum-meta\">" +
+          occs.length + " line" + (occs.length !== 1 ? "s" : "") + " · " + runIds.size + " run" + (runIds.size !== 1 ? "s" : "") +
+          "</td></tr>";
+        occs.forEach(function(o) {
+          var dt = o.saved_at ? new Date(o.saved_at).toLocaleDateString() : "—";
+          tbody +=
+            "<tr class=\"mfn-det-row\">" +
+            "<td></td><td colspan=\"3\"></td>" +
+            "<td class=\"mono\" style=\"font-size:12px;\">" + escapeHtml(o.entry_num || "—") + "</td>" +
+            "<td style=\"font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\" title=\"" + escapeHtml(o.run_name || "") + "\">" + escapeHtml(o.run_name || "—") + "</td>" +
+            "<td class=\"num mono\"><strong>" + escapeHtml(String(o.item ?? "—")) + "</strong></td>" +
+            "<td class=\"mono\" style=\"font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\" title=\"" + escapeHtml(o.mid || "") + "\">" + escapeHtml(o.mid || "—") + "</td>" +
+            "<td class=\"num\"><strong>" + fmtPct(parseFloat(o.rate)) + "</strong></td>" +
+            "<td class=\"mono\" style=\"font-size:11px;color:var(--gray-600);\">" + escapeHtml(o.rate_str || "—") + "</td>" +
+            "<td style=\"font-size:12px;color:var(--gray-600);\">" + dt + "</td>" +
+            "</tr>";
+        });
+      }
     });
 
     dbEl.innerHTML =
       "<thead><tr>" +
+        "<th class=\"mfn-tog\"></th>" +
         thS("coo","COO","") + thS("hts","HTS","") + "<th>Rates observed</th>" +
         "<th>Entry #</th><th>Run name</th><th>7501 Item</th><th>MID</th>" +
         thS("spread","MFN rate","num") + "<th>Rate string</th><th>Saved</th>" +
@@ -6793,10 +7369,21 @@ function _applyMfnRows(rows, dbEl, dbMsg, dbPill) {
 
   // Wire sort headers
   dbEl.querySelectorAll("[data-mfn-sort]").forEach(function(th) {
-    th.addEventListener("click", function() {
+    th.addEventListener("click", function(e) {
+      e.stopPropagation();
       var col = th.dataset.mfnSort;
       if (_mfnSort === col) _mfnSortDir *= -1;
       else { _mfnSort = col; _mfnSortDir = -1; }
+      if (_mfnCache && _mfnElTable) _applyMfnRows(_mfnCache, _mfnElTable, _mfnElMsg, _mfnElPill);
+    });
+  });
+
+  // Wire row expand/collapse
+  dbEl.querySelectorAll("[data-mfn-toggle]").forEach(function(tr) {
+    tr.addEventListener("click", function() {
+      var key = tr.dataset.mfnToggle;
+      if (_mfnExpanded.has(key)) _mfnExpanded.delete(key);
+      else _mfnExpanded.add(key);
       if (_mfnCache && _mfnElTable) _applyMfnRows(_mfnCache, _mfnElTable, _mfnElMsg, _mfnElPill);
     });
   });
@@ -6806,6 +7393,21 @@ function _applyMfnRows(rows, dbEl, dbMsg, dbPill) {
   if (searchEl) {
     searchEl.addEventListener("input", function() {
       _mfnSearch = searchEl.value;
+      if (_mfnCache && _mfnElTable) _applyMfnRows(_mfnCache, _mfnElTable, _mfnElMsg, _mfnElPill);
+    });
+  }
+
+  var expandAllEl = document.getElementById("mfnExpandAll");
+  if (expandAllEl) {
+    expandAllEl.addEventListener("click", function() {
+      display.forEach(function(r) { _mfnExpanded.add(mfnPairKey(r)); });
+      if (_mfnCache && _mfnElTable) _applyMfnRows(_mfnCache, _mfnElTable, _mfnElMsg, _mfnElPill);
+    });
+  }
+  var collapseAllEl = document.getElementById("mfnCollapseAll");
+  if (collapseAllEl) {
+    collapseAllEl.addEventListener("click", function() {
+      _mfnExpanded.clear();
       if (_mfnCache && _mfnElTable) _applyMfnRows(_mfnCache, _mfnElTable, _mfnElMsg, _mfnElPill);
     });
   }

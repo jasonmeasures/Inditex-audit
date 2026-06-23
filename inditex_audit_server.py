@@ -51,6 +51,7 @@ INITIAL_ADMIN_USERNAME = os.environ.get("INITIAL_ADMIN_USERNAME", "admin")
 INITIAL_ADMIN_PASSWORD = os.environ.get("INITIAL_ADMIN_PASSWORD", "")
 
 DASHBOARD_PATH = Path(__file__).parent / "inditex_audit_dashboard.html"
+APP_BUILD_ID = "2026.06.18-ref-hts"
 
 # ---------------------------------------------------------------------------
 # Database helpers
@@ -365,6 +366,7 @@ def index():
         resp = send_file(str(DASHBOARD_PATH), mimetype="text/html")
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
         resp.headers["Pragma"] = "no-cache"
+        resp.headers["X-App-Build"] = APP_BUILD_ID
         return resp
     return Response(
         "<h1>Dashboard not found</h1>"
