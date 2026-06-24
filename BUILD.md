@@ -57,19 +57,19 @@ The dashboard auto-detects backend at page load by probing `/api/health`. Three 
 A working install looks like this:
 
 ```
-~/audit-tool/                              ← any folder you choose
-├── inditex_audit_dashboard.html           ← the dashboard (3,500 lines)
-├── inditex_audit_server.py                ← Flask + Postgres server (375 lines)
-├── inditex_audit.py                       ← optional CLI Python audit tool (985 lines)
-├── SETUP.md                               ← user-facing setup walkthrough
-└── BUILD.md                               ← this file
+~/Inditex-audit-main/
+├── inditex_audit_dashboard.html   ← single-file UI + audit engine (~8,600 lines)
+├── inditex_audit_server.py        ← Flask + Postgres + auth + reference API (~1,200 lines)
+├── start.sh                       ← local dev launcher (Postgres + Flask + browser)
+├── requirements.txt
+├── .env.example
+├── USER_MANUAL.md                 ← end-user guide (audit, dashboard, reference)
+├── SETUP.md                       ← install walkthrough
+├── BUILD.md                       ← this file
+├── README.md                      ← repo overview
+├── deploy.sh                      ← EB deploy (needs terraform init)
+└── terraform/                     ← infra modules (owner-managed)
 ```
-
-Optional extras (not required for runtime):
-
-- `setup-hostname.sh` — adds `127.0.0.1 7501-audit.local` to `/etc/hosts` so you can use the friendlier URL `http://7501-audit.local:5252`
-- `ARCHITECTURE.md` — deeper engineering notes
-- `README.md` — short user-facing intro
 
 ---
 
@@ -183,20 +183,34 @@ LocalStorage mode includes auto-prune on `QuotaExceededError` — evicts the old
 
 ### 4.6 UI structure
 
-Tabs (left-to-right):
+**Top-level views** (overlays toggled from the header; audit is the default `page`):
 
-1. **Saved Runs** (default landing) — list of all persisted audits, with search, save/import/export/clear-all, storage status indicator
-2. **Comparison** — main reconciliation table, 1 row per agg-line OR unmatched filed-item, with MATCH / MID / CH99 status badges
-3. **Ch99 Stack** — per-line view of expected tariff stack by category, in colored columns
-4. **Raw Lines** — TXT rows with computed expected duty
-5. **Aggregated** — what aggregateMethodB produced (the 1-row-per-COO+HTS+MID view)
-6. **7501 Filed** — what the broker actually filed, one row per item
-7. **Findings** — severity-ranked cards (Critical / High / Medium / Low / Info)
-8. **HTS Consistency** — three layers: within this entry, across saved runs, vs rules engine baseline
-9. **Chapter 99 Rules** — current ruleset with effective dates, editable
-10. **Sources & Verification** — auto-generated per-rule citation cards
+| View | ID / overlay | Auth | Purpose |
+|------|----------------|------|---------|
+| **Audit** | `.page` | Optional for run; save needs server | Upload TXT/XLSX, review results, save run |
+| **Dashboard** | `#dashOverlay` | Required | Saved runs list, portfolio analytics, import/export, bulk delete |
+| **Reference** | `#referenceOverlay` | Required | HTS table, Ch99 rules, sources & verification, re-run all (admin) |
+| **Users** | `#usersOverlay` | Admin | User CRUD |
+| **Activity** | `#activityOverlay` | Admin | Activity log + summary |
 
-KPI grid at top of most tabs: Raw lines · Filed items · Matched · Entered value · Filed duty (Block 37) · Fees (Block 39) · Ch99 rules as of · Findings.
+**Audit results — review tabs** (left-to-right):
+
+1. **Comparison** — main reconciliation table (MATCH / MID / CH99 badges)
+2. **Ch99 Stack** — expected tariff stack per line
+3. **Raw Lines** — TXT rows with computed duty
+4. **Aggregated** — Method B (COO+HTS+MID) groups
+5. **7501 Filed** — broker filed rows
+6. **Findings** — severity-ranked cards
+7. **Manufacturer** — MID rollup for current entry
+8. **HTS Consistency** — within-entry + rules baseline; cross-run HTS is on Dashboard
+
+**CSV export:** per-tab `↓ CSV` (filtered grid) + **Export all (ZIP)** above tabs.
+
+**Inputs** panel is collapsible (`setInputsCollapsed`); auto-collapses after run/load.
+
+**Saved runs** are loaded from Dashboard (`loadRunByIdAsync`) — not a tab on the audit page.
+
+KPI grid: Raw lines · Filed items · Matched · Entered value · Filed duty · Fees · Ch99 rules as of · Findings.
 
 ---
 
@@ -212,16 +226,24 @@ KPI grid at top of most tabs: Raw lines · Filed items · Matched · Entered val
 ### 5.2 Configuration (env vars, all optional)
 
 ```bash
-PGHOST=localhost          # Postgres host
-PGPORT=5432               # Postgres port
-PGUSER=<your-OS-user>     # auth user
-PGPASSWORD=               # empty for local trust auth
-PGDATABASE=inditex_audit  # auto-created on first run
-PORT=5252                 # Flask port
-HOSTNAME=7501-audit.local # used for log line only
+PGHOST=localhost
+PGPORT=5432
+PGUSER=<your-OS-user>
+PGPASSWORD=
+PGDATABASE=inditex_audit
+PORT=5252
+HOSTNAME_PRETTY=7501-audit.local
+JWT_SECRET=change-me-in-production
+JWT_EXPIRES_HOURS=8
+INITIAL_ADMIN_USERNAME=admin
+INITIAL_ADMIN_PASSWORD=      # set to seed first admin when users table is empty
 ```
 
+See `.env.example`. `start.sh` sources `.env` when present.
+
 ### 5.3 Schema
+
+Additional tables (created on startup): `users`, `reference_config` (HTS JSON + Ch99 rules), `activity_log`.
 
 ```sql
 CREATE TABLE audit_runs (
@@ -252,19 +274,33 @@ CREATE INDEX audit_runs_importer_idx  ON audit_runs (importer);
 
 ### 5.4 REST endpoints
 
-| Method | Path | Purpose |
-|---|---|---|
-| GET  | `/`                       | Serves the dashboard HTML |
-| GET  | `/api/health`             | `{ok, backend, database, host, port, user, run_count}` |
-| GET  | `/api/runs`               | Full snapshots, sorted newest first |
-| GET  | `/api/runs/_summary`      | Metadata-only (id, name, entry_num, …) for SQL-style overviews |
-| GET  | `/api/runs/<id>`          | Single full snapshot |
-| POST | `/api/runs`               | Upsert (insert or update by id) |
-| PUT  | `/api/runs/<id>`          | Rename (updates name + persists into JSONB) |
-| DELETE | `/api/runs/<id>`        | Delete one |
-| DELETE | `/api/runs`             | Delete all (used by "Clear all" UI button) |
+Most `/api/*` routes require `Authorization: Bearer <jwt>` from `POST /api/auth/login`. Exceptions: `GET /`, `GET /api/health`, `POST /api/auth/login`.
 
-CORS is wide open (server is local-only). All routes accept/return JSON.
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/` | — | Serves dashboard HTML |
+| GET | `/api/health` | — | DB connectivity + run count |
+| POST | `/api/auth/login` | — | Returns JWT |
+| POST | `/api/auth/logout` | user | End session |
+| GET | `/api/runs` | user | Full snapshots |
+| GET | `/api/runs/_summary` | user | Metadata-only list |
+| GET | `/api/runs/<id>` | user | Single snapshot |
+| POST | `/api/runs` | user | Upsert run |
+| PUT | `/api/runs/<id>` | user | Rename |
+| DELETE | `/api/runs/<id>` | user | Delete one |
+| POST | `/api/runs/_bulk_delete` | user | Body `{ids: [...]}` |
+| DELETE | `/api/runs` | user | Delete all |
+| GET | `/api/reference` | user | HTS + Ch99 rules bundle |
+| GET/PUT | `/api/reference/hts` | user / admin | HTS table |
+| PUT | `/api/reference/ch99-rules` | admin | Save rules |
+| GET/POST | `/api/users` | admin | List / create users |
+| PUT | `/api/users/<u>/password` | admin | Reset password |
+| DELETE | `/api/users/<u>` | admin | Delete user |
+| GET/POST | `/api/activity` | admin | Activity log |
+| GET | `/api/activity/summary` | admin | Aggregates |
+| GET | `/api/analytics/mfn-consistency` | user | Cross-run MFN analytics |
+
+CORS is open for local/dev. Set `JWT_SECRET` and `INITIAL_ADMIN_PASSWORD` in production.
 
 ### 5.5 Server behavior
 
@@ -275,38 +311,17 @@ CORS is wide open (server is local-only). All routes accept/return JSON.
 
 ---
 
-## 6. The CLI tool — `inditex_audit.py` (optional)
-
-A Python implementation of the same audit logic, for scripting / batch runs without a browser. Same parsers, same rules, outputs an 8-sheet Excel workbook.
-
-```bash
-python inditex_audit.py \
-  --txt /path/to/ESA15075062_03-41378_15012026_CUSTOMS_1.txt \
-  --xlsx /path/to/7501_US_Entry_Summary.xlsx \
-  --freight 653.44 \
-  --insurance 0.77 \
-  --output Audit_Result.xlsx
-```
-
-The dashboard is the user-facing tool. The CLI is for automation pipelines.
-
----
-
-## 7. Setup & first run
+## 6. Setup & first run
 
 ### macOS (target environment)
 
 ```bash
-# 1. Install Postgres
 brew install postgresql@16
 brew services start postgresql@16
-
-# 2. Install Python deps
-pip3 install flask psycopg2-binary
-
-# 3. Run the server from the folder containing the .html and .py
-cd ~/audit-tool
-python3 inditex_audit_server.py
+cd ~/Inditex-audit-main
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cp .env.example .env   # set INITIAL_ADMIN_PASSWORD, JWT_SECRET
+./start.sh
 ```
 
 You'll see:
@@ -322,7 +337,7 @@ You'll see:
 🚀 Open http://localhost:5252 in your browser
 ```
 
-Open `http://localhost:5252`. The Storage indicator on the Saved Runs tab should read **"Database · connected"**.
+Open `http://localhost:5252`, sign in, and confirm **Dashboard** loads. See [USER_MANUAL.md](USER_MANUAL.md) for workflow.
 
 ### Linux
 
@@ -340,17 +355,13 @@ Install Postgres via the EnterpriseDB installer, install Python from python.org,
 
 ### Optional: custom hostname
 
-```bash
-./setup-hostname.sh     # adds 127.0.0.1 7501-audit.local to /etc/hosts (asks for sudo)
-```
-
-Then open `http://7501-audit.local:5252` instead of `localhost`.
+Add to `/etc/hosts`: `127.0.0.1 7501-audit.local` — then open `http://7501-audit.local:5252` instead of `localhost`. Set `HOSTNAME_PRETTY=7501-audit.local` in `.env` if desired.
 
 ---
 
-## 8. Critical behaviors and conventions
+## 7. Critical behaviors and conventions
 
-### 8.1 TXT file encoding
+### 7.1 TXT file encoding
 
 Inditex exports the TXT as **UTF-16-LE**, tab-delimited, 129 columns. Parsers (both JS and Python) hard-code this:
 
@@ -365,26 +376,26 @@ pd.read_csv(path, sep='\t', encoding='utf-16-le')
 
 Other importers may use UTF-8 — add detection if you generalize.
 
-### 8.2 Aggregation method
+### 7.2 Aggregation method
 
 "Method B" = group raw TXT rows by `(ORIGIN, DESTINATION_HS, MID)` and sum quantities, weights, and invoice value. The 7501 has one item per group.
 
-### 8.3 Freight & insurance allocation
+### 7.3 Freight & insurance allocation
 
 Allocated pro-rata across rows by `INVOICE_VALUE` (or `AMOUNT` at the raw-line level). The user enters these as totals in the UI; the audit pro-rates them onto each line to compute entered value.
 
-### 8.4 Chapter 99 rules
+### 7.4 Chapter 99 rules
 
 `DEFAULT_CH99_RULES` holds 77 rules covering:
 - All 65 Annex I reciprocal codes (`9903.02.02`–`9903.02.71`) from EO 14326
-- EU cap logic (ES, PT) — `9903.02.19` if MFN ≥ 15%, else `9903.02.20` at +15%
+- EU cap logic (ES, PT) — `9903.02.19` if filed Col-1 MFN ≥ 15%, else `9903.02.20` at +15% (7501 col 33 drives branch; HTS table is fallback)
 - IEEPA Universal baseline (`9903.01.25`, +10%) for EG, MA
 - China stack: `9903.88.15` (Section 301 List 4A +7.5%) + `9903.01.24` (IEEPA China +10%) + `9903.01.25` (IEEPA Universal +10%)
 - India stack: `9903.02.26` (+25% reciprocal) + `9903.01.84` (+25% Russia-oil penalty, eff Aug 27, 2025)
 
 Each rule carries `effective_from` and `effective_to` ISO dates. The audit selects rules based on the entry's applicable date (Entry Date first, Import Date fallback).
 
-### 8.5 Section 301 PARTIAL status
+### 7.5 Section 301 PARTIAL status
 
 `CH99_CHECK` has four states: MATCH, MISMATCH, MISSING, PARTIAL.
 
@@ -401,7 +412,7 @@ The engine cannot determine HTS-level list membership, so it uses a **fuzzy mark
 
 **PARTIAL** fires only when the engine expects a Section 301 layer for a China-origin item but the broker filed **no** `9903.88.*` code at all. It surfaces as an Info advisory so the user can verify against USTR's annex whether the HTS is actually exempt from all Section 301 lists.
 
-### 8.6 Findings rollup cap
+### 7.6 Findings rollup cap
 
 Each finding category caps at 10 individual cards + 1 summary rollup. Categories:
 - **MID consistency** (High) — TXT MID vs 7501 MID differ on matched lines
@@ -410,17 +421,17 @@ Each finding category caps at 10 individual cards + 1 summary rollup. Categories
 - **Entered value** (Medium/High) — value diff > $5 absolute or > 0.5% relative
 - **7501 extract integrity** (High/Medium) — duplicate primary rows from compound-rate splits
 
-### 8.7 Snapshot raw-data budget
+### 7.7 Snapshot raw-data budget
 
 In localStorage mode, snapshots have a 500 KB cap on the raw lines array. If exceeded, raw gets dropped and `rawDropped: true` is set so the Raw Lines tab can show an explanatory empty state. Postgres mode has no cap.
 
 ---
 
-## 9. Common extensions
+## 8. Common extensions
 
 If Cursor or a developer is asked to extend this tool, the most likely tasks:
 
-### 9.1 Add a new country rule
+### 8.1 Add a new country rule
 
 In `DEFAULT_CH99_RULES`, add an `annexI(...)` entry:
 
@@ -432,7 +443,7 @@ Then verify `expectedChapter99()` looks it up correctly. The rule will inherit t
 
 For special stacks (multi-layer like India's), add separate rule objects with explicit `effective_from`/`effective_to` and the right `category` (one of: `Reciprocal`, `Reciprocal-EU`, `IEEPA-Universal`, `IEEPA-China`, `IEEPA-India`, `Section-301`).
 
-### 9.2 Add a new finding category
+### 8.2 Add a new finding category
 
 In `buildFindings(cmp, ctx)`:
 1. Add a filter step to find the offending rows
@@ -440,7 +451,7 @@ In `buildFindings(cmp, ctx)`:
 3. Add a rollup if the count exceeds `CAP` (currently 10)
 4. Update the KPI tile color thresholds in `renderKpis()` if needed
 
-### 9.3 Support a different importer's TXT format
+### 8.3 Support a different importer's TXT format
 
 Currently `parseInditexTxt(buf)` hard-codes:
 - UTF-16-LE encoding
@@ -450,17 +461,17 @@ Currently `parseInditexTxt(buf)` hard-codes:
 
 To support another importer: split off `parseInditexTxt` into `parsers[importer]`, add format detection at upload time, and let the user pick.
 
-### 9.4 Multi-tenant Postgres
+### 8.4 Multi-tenant Postgres
 
 The server currently uses one fixed database (`inditex_audit`). For SaaS, add a `tenant_id` column to `audit_runs`, key all queries on it, and add auth (Flask-Login or similar).
 
-### 9.5 Convert to a Skill
+### 8.5 Convert to a Skill
 
 Package the workflow as `/mnt/skills/user/inditex-audit/SKILL.md` with the dashboard's audit logic as a reusable agent capability. Skill would receive a TXT + XLSX, run the audit, and return findings JSON.
 
 ---
 
-## 10. Testing
+## 9. Testing
 
 There's no test framework in-tree, but the dashboard ships with an inline validation suite that runs end-to-end against the Zara fixture (entry 113-3957214-9). To regenerate:
 
@@ -489,22 +500,24 @@ Validation reference numbers:
 
 ---
 
-## 11. Known limitations & deferred work
+## 10. Known limitations & deferred work
 
 - **MULTI-country items** — when COO is "MULTI" the engine can't pick a country-specific rule. Currently 0/118 match on the big entry. Two options: (a) flag as warning and don't apply Ch99 expectations, or (b) expand multi-origin into per-component rules from the TXT children.
 - **HTS-specific Section 301** — engine treats all CN apparel as List 4A; broker classifies HTS-by-HTS against USTR's annex. PARTIAL status mitigates false positives but doesn't fix the model. Would need a real `hts_prefix` field on each rule.
+- **Section 232 splits** — steel/aluminum derivative Ch99 layers (`9903.81.*`, `9903.85.*`, `9903.01.33` exclusion) are filed on the 7501 but not in the TXT. The engine accepts these as adjunct layers on matched items (Info finding); it does not verify steel content KG or 232 rate correctness.
+- **Section 232 splits** — steel/aluminum derivative Ch99 layers (`9903.81.*`, `9903.85.*`, `9903.01.33` exclusion) are filed on the 7501 but not in the TXT. The engine accepts these as adjunct layers on matched items (Info finding); it does not verify steel content KG or 232 rate correctness.
 - **Compound rates** — when an HTS has a compound rate like "41c/KG + 16.3%", the 7501 export sometimes splits it into two rows. Dashboard uses the FIRST row only and flags the dupe; an alternative is summing AVD across both rows.
 - **Multi-invoice TXT files** — currently assumes one invoice per TXT. Would need invoice-level scoping if Inditex changes export format.
 - **Cotton fee table** — `cottonFeePerKg(hts)` covers the common cotton HTS but isn't exhaustive. Add codes as needed.
 
 ---
 
-## 12. Source-of-truth files for Cursor
+## 11. Source-of-truth files for Cursor
 
 If rebuilding from scratch, in order of dependency:
 
-1. `inditex_audit_dashboard.html` — the audit engine and UI (no external runtime deps beyond SheetJS CDN)
-2. `inditex_audit_server.py` — only needed for persistent saves; requires `flask` and `psycopg2-binary`
-3. `inditex_audit.py` — optional CLI parallel; requires `pandas` and `openpyxl`
+1. `inditex_audit_dashboard.html` — audit engine + UI (SheetJS CDN for XLSX)
+2. `inditex_audit_server.py` — Postgres persistence, auth, reference config, activity log
+3. `USER_MANUAL.md` — user-facing behavior contract
 
-That's the entire stack. No package.json, no node_modules, no Docker, no Vite build step. Single HTML + single Python file = working tool.
+No frontend build step. Docker/EB packaging lives under `Dockerfile`, `deploy.sh`, and kn-playground `applications/inditex-audit-main/`.

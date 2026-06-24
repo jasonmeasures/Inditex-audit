@@ -747,10 +747,25 @@
   }
   .dash-panel.collapsed .dash-panel-body { display: none; }
   @keyframes dashPanelIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-  .dash-panel-toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .dash-panel-toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
   .dash-panel-toolbar .rd-act-ctrl,
   .dash-panel-toolbar .rd-runs-search,
   .dash-panel-toolbar .rd-runs-fsel { flex: 1; min-width: 120px; margin-bottom: 0; }
+  .runs-selection-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    background: #FFF5F4;
+    border: 1px solid #FFD0CE;
+    border-left: 4px solid var(--red-700);
+    border-radius: var(--radius-sm);
+  }
+  .runs-selection-count { font-size: 13px; font-weight: 600; color: var(--gray-900); }
+  .runs-page-info { font-size: 12px; color: var(--gray-500); white-space: nowrap; margin-left: auto; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
   .dash-panel-scroll { max-height: 420px; overflow: auto; border: 1px solid var(--gray-100); border-radius: var(--radius-sm); }
   .dash-panel-list { border: none; overflow: visible; max-height: none; }
   .dash-panel-list.runs-tbl-wrap {
@@ -1236,7 +1251,7 @@
     <button class="btn-dashboard-open" id="usersBtn" data-nav="users" title="Manage users" style="display:none;">Users</button>
     <button class="btn-dashboard-open" id="referenceBtn" data-nav="reference" title="HTS table and Chapter 99 rules (sign in required)">Reference</button>
     <button class="btn-dashboard-open" id="activityBtn" data-nav="activity" title="User activity log" style="display:none;">Activity</button>
-    <button class="btn-new-run" id="newRunBtn" title="Clear all results and start a new audit">+ New Run</button>
+    <button type="button" class="btn-new-run" id="newRunBtn" title="Clear all results and start a new audit">+ New Run</button>
     <div class="topbar-user" id="topbarUser" style="display:none;">
       <div class="user-pill">
         <div class="user-avatar" id="userAvatar"></div>
@@ -1263,7 +1278,6 @@
         <button type="button" class="btn btn-secondary" id="exportRunsBtn" style="padding:7px 14px;font-size:12px;">Export all</button>
         <button type="button" class="btn btn-danger" id="clearRunsBtn" style="padding:7px 14px;font-size:12px;">Clear all</button>
         <input type="file" id="importRunsFile" accept=".json" style="display:none;" />
-        <button type="button" class="btn btn-danger" id="deleteSelectedRunsBtn" disabled style="display:none;padding:7px 14px;font-size:12px;">Delete selected</button>
       </div>
     </div>
   </div>
@@ -1382,7 +1396,7 @@
         <span id="adminHtsMeta" style="font-size:11px;color:var(--gray-400);max-width:480px;line-height:1.45;"></span>
       </div>
       <p class="ref-admin-only" style="font-size:12px;color:var(--gray-500);margin:0 0 16px 0;line-height:1.5;">
-        MFN rates from this table override broker-filed 7501 rates and drive EU cap logic (9903.02.19 vs 9903.02.20).
+        MFN rates from this table override broker-filed 7501 rates for duty projection. For EU cap logic (9903.02.19 vs 9903.02.20), the engine uses the <strong>7501 column 33 rate first</strong> (CBP ties the branch to the filed Column 1 / ad valorem equivalent rate).
       </p>
       <div class="users-toolbar" style="padding:0 0 10px 0;border:none;background:transparent;">
         <div>
@@ -1438,6 +1452,15 @@
           <span class="lbl">Authority</span><span class="val">EO 14326 § 2(b) (Aug 5, 2025)</span>
           <span class="lbl">Mechanism</span><span class="val">For an EU good, if the Column 1 (MFN) rate ≥ 15%, the additional ad valorem duty is <strong>0%</strong> (code 9903.02.19). If MFN &lt; 15%, the additional duty is set so the total reaches 15% — applied as an additive <strong>15%</strong> via code 9903.02.20.</span>
           <span class="lbl">Effect</span><span class="val">EU shipments pay a flat 15% landed reciprocal rate, never more.</span>
+        </div>
+      </div>
+
+      <h4 class="subsection-title" style="margin-top: 22px;">Section 232 Split — Steel / Aluminum Derivative Lines</h4>
+      <div class="ver-card">
+        <div class="ver-grid">
+          <span class="lbl">What it is</span><span class="val">Products with reportable steel or aluminum content may file <strong>additional Ch99 rows on the same CM item</strong> — e.g. <span class="mono-inline">9903.01.33</span> (reciprocal exclusion) + <span class="mono-inline">9903.81.91</span> (steel derivative duty). These are <strong>not</strong> in the importer TXT.</span>
+          <span class="lbl">Audit handling</span><span class="val">One TXT agg row still matches the primary HTS (e.g. <span class="mono-inline">3303.00.3000</span>). The engine accepts filed 9903.81/85 layers without expecting them from rules. Verify steel content and rate manually.</span>
+          <span class="lbl">Separate item</span><span class="val">If the ACE extract puts 9903.81 on its own CM item, the engine pairs it to the nearest matched line as a <strong>232 split adjunct</strong> (Info, not Critical).</span>
         </div>
       </div>
 
@@ -1634,6 +1657,7 @@
             <option value="STRICT">Strict match</option>
             <option value="LOOSE (MID mismatch)">Loose (MID diff)</option>
             <option value="NO MATCH">No match</option>
+            <option value="232 SPLIT">232 split (adjunct)</option>
           </select>
           <select id="cmpFilterCh99">
             <option value="">All CH99 status</option>
@@ -1662,6 +1686,8 @@
             <option value="IEEPA-Universal">IEEPA Universal</option>
             <option value="IEEPA-China">IEEPA CN/HK</option>
             <option value="Section-301">Section 301</option>
+            <option value="Section-232">Section 232 (filed)</option>
+            <option value="232-Exclusion">232 Exclusion (filed)</option>
           </select>
           <button type="button" class="btn-csv-tab" data-csv-export="stack" disabled title="Download this grid as CSV (respects filters)">↓ CSV</button>
           <span class="filter-count" id="stackCount">0 of 0</span>
@@ -1671,7 +1697,7 @@
         </div>
         <div style="padding: 14px 18px; border-top: 1px solid var(--gray-200); background: var(--gray-50); font-size: 12px; color: var(--gray-600); line-height: 1.6;">
           <strong>How to read this:</strong> each row is one filed line item. The four colored columns show every Chapter 99 layer that <em>should</em> apply per the rules engine, with the code, rate %, and computed $ amount.
-          <strong>MFN %</strong> drives EU cap logic (9903.02.19 vs 9903.02.20): it uses the <strong>HTS Classification Table</strong> when loaded, otherwise the rate from the <strong>7501 extract</strong> (column 33).
+          <strong>MFN %</strong> drives EU cap logic (9903.02.19 vs 9903.02.20): for ES/PT/BG the engine uses the <strong>7501 column 33</strong> rate when present, then falls back to the HTS Classification Table. Free or sub-15% → 9903.02.20; ≥15% → 9903.02.19.
           The <strong>Δ vs Filed</strong> column compares expected total Ch99 duty to what was filed on the 7501 — green within $1, amber within $5, red beyond.
         </div>
       </div>
@@ -1910,29 +1936,35 @@ const DEFAULT_CH99_RULES = [
 
   // ── EU cap logic (handled specially by expectedChapter99 for any EU country) ─
   { coo: "BG", ch99: "9903.02.19", rate:  0.0, category: "Reciprocal-EU",  basis: "Reciprocal EU (high-MFN cap)",
+    eu_cap_when: "mfn_gte_15",
     authority: ANNEX_I_AUTHORITY, effective: ANNEX_I_EFFECTIVE_STR,
     effective_from: ANNEX_I_EFFECTIVE_FROM, effective_to: ANNEX_I_EFFECTIVE_TO,
-    notes: "EU goods where Col-1 ≥ 15% pay Col-1 only — 0% additional" },
+    notes: "EU: Col-1 ≥ 15% → 9903.02.19 (0% additional). Auto-selected by MFN — not a static layer." },
   { coo: "BG", ch99: "9903.02.20", rate: 15.0, category: "Reciprocal-EU",  basis: "Reciprocal EU (additive)",
+    eu_cap_when: "mfn_lt_15",
     authority: ANNEX_I_AUTHORITY, effective: ANNEX_I_EFFECTIVE_STR,
     effective_from: ANNEX_I_EFFECTIVE_FROM, effective_to: ANNEX_I_EFFECTIVE_TO,
-    notes: "EU goods where Col-1 < 15% — additive to bring total to 15%" },
+    notes: "EU: Col-1 < 15% (incl. Free) → 9903.02.20 (+15% additive). Auto-selected by MFN — not a static layer." },
   { coo: "ES", ch99: "9903.02.19", rate:  0.0, category: "Reciprocal-EU",  basis: "Reciprocal EU (high-MFN cap)",
+    eu_cap_when: "mfn_gte_15",
     authority: ANNEX_I_AUTHORITY, effective: ANNEX_I_EFFECTIVE_STR,
     effective_from: ANNEX_I_EFFECTIVE_FROM, effective_to: ANNEX_I_EFFECTIVE_TO,
-    notes: "EU goods where Col-1 ≥ 15% pay Col-1 only — 0% additional" },
+    notes: "EU: Col-1 ≥ 15% → 9903.02.19 (0% additional). Auto-selected by MFN — not a static layer." },
   { coo: "ES", ch99: "9903.02.20", rate: 15.0, category: "Reciprocal-EU",  basis: "Reciprocal EU (additive)",
+    eu_cap_when: "mfn_lt_15",
     authority: ANNEX_I_AUTHORITY, effective: ANNEX_I_EFFECTIVE_STR,
     effective_from: ANNEX_I_EFFECTIVE_FROM, effective_to: ANNEX_I_EFFECTIVE_TO,
-    notes: "EU goods where Col-1 < 15% — additive to bring total to 15%" },
+    notes: "EU: Col-1 < 15% (incl. Free) → 9903.02.20 (+15% additive). Auto-selected by MFN — not a static layer." },
   { coo: "PT", ch99: "9903.02.19", rate:  0.0, category: "Reciprocal-EU",  basis: "Reciprocal EU (high-MFN cap)",
+    eu_cap_when: "mfn_gte_15",
     authority: ANNEX_I_AUTHORITY, effective: ANNEX_I_EFFECTIVE_STR,
     effective_from: ANNEX_I_EFFECTIVE_FROM, effective_to: ANNEX_I_EFFECTIVE_TO,
-    notes: "EU goods where Col-1 ≥ 15% pay Col-1 only — 0% additional" },
+    notes: "EU: Col-1 ≥ 15% → 9903.02.19 (0% additional). Auto-selected by MFN — not a static layer." },
   { coo: "PT", ch99: "9903.02.20", rate: 15.0, category: "Reciprocal-EU",  basis: "Reciprocal EU (additive)",
+    eu_cap_when: "mfn_lt_15",
     authority: ANNEX_I_AUTHORITY, effective: ANNEX_I_EFFECTIVE_STR,
     effective_from: ANNEX_I_EFFECTIVE_FROM, effective_to: ANNEX_I_EFFECTIVE_TO,
-    notes: "EU goods where Col-1 < 15% — additive to bring total to 15%" },
+    notes: "EU: Col-1 < 15% (incl. Free) → 9903.02.20 (+15% additive). Auto-selected by MFN — not a static layer." },
 
   // ── IEEPA Universal baseline (non-Annex I countries) ──────────────────────
   { coo: "EG", ch99: "9903.01.25", rate: 10.0, category: "IEEPA-Universal", basis: "IEEPA Universal baseline",
@@ -2051,10 +2083,106 @@ const CH99_CATEGORIES = {
   "IEEPA-China":      { label: "IEEPA CN/HK",       color: "#B42B23", bg: "#FFF5F4", border: "#FFD0CE" },
   "IEEPA-India":      { label: "IEEPA India",       color: "#7A3E12", bg: "#FCF1E5", border: "#F3D3A8" },
   "Section-301":      { label: "Section 301",       color: "#6D28D9", bg: "#EDE9FE", border: "#DDD6FE" },
+  "Section-232":      { label: "Section 232",       color: "#92400E", bg: "#FEF3C7", border: "#FDE68A" },
+  "232-Exclusion":    { label: "232 Exclusion",     color: "#78716C", bg: "#F5F5F4", border: "#E7E5E4" },
 };
+
+// Section 232 steel/aluminum derivative codes filed on the 7501 but not in importer TXT.
+const SECTION_232_STEEL_PREFIX = "990381";
+const SECTION_232_ALUM_PREFIX = "990385";
+// IEEPA reciprocal exclusion when Section 232 derivative duty applies instead.
+const SECTION_232_EXCLUSION_CODES = new Set(["99030133", "99030134"]);
+
+function isSection301Code(code) {
+  return /^99038[78]/.test(htsNormalize(code));
+}
+
+function isSection232Code(code) {
+  const n = htsNormalize(code);
+  return n.startsWith(SECTION_232_STEEL_PREFIX) || n.startsWith(SECTION_232_ALUM_PREFIX);
+}
+
+function is232ReciprocalExclusion(code) {
+  return SECTION_232_EXCLUSION_CODES.has(htsNormalize(code));
+}
+
+function isSection232OrphanCompareRow(r) {
+  if (!r || r.MATCH !== "NO MATCH (7501 only)") return false;
+  if (isSection232Code(r.HTS)) return true;
+  return (r.CH99_FILED || []).some(c => isSection232Code(c) || is232ReciprocalExclusion(c));
+}
+
+function partitionCh99NormCodes(normCodes) {
+  const reciprocal = [], section232 = [], exclusion232 = [], section301 = [], other = [];
+  for (const n of normCodes) {
+    if (isSection301Code(n)) section301.push(n);
+    else if (isSection232Code(n)) section232.push(n);
+    else if (is232ReciprocalExclusion(n)) exclusion232.push(n);
+    else if (/^9903/.test(n)) reciprocal.push(n);
+    else other.push(n);
+  }
+  return { reciprocal, section232, exclusion232, section301, other };
+}
+
+function evaluateCh99Check(row) {
+  const filNorm = row.CH99_FILED.map(c => htsNormalize(c));
+  const expNorm = row.CH99_EXPECTED.map(e => htsNormalize(e.ch99));
+  const filPart = partitionCh99NormCodes(filNorm);
+  const expPart = partitionCh99NormCodes(expNorm);
+  const has232Stack = filPart.section232.length > 0 || filPart.exclusion232.length > 0;
+
+  if (has232Stack) {
+    row.SECTION_232_STACK = true;
+    row.CH99_232_FILED = filPart.section232.map(htsFormat);
+    row.CH99_232_EXCLUSION = filPart.exclusion232.map(htsFormat);
+  }
+
+  if (filNorm.length === 0 && expNorm.length === 0) {
+    row.CH99_CHECK = "—";
+    return;
+  }
+
+  const expHas301 = row.CH99_EXPECTED.some(e => e.section301_fuzzy || isSection301Code(e.ch99));
+  const filHas301 = filPart.section301.length > 0;
+
+  const expRec = new Set(has232Stack ? [] : expPart.reciprocal);
+  const filRec = new Set(filPart.reciprocal);
+  const expNonRec = new Set([...expPart.section301, ...expPart.other]);
+  const filNonRec = new Set([...filPart.section301, ...filPart.other]);
+
+  let reciprocalOk = setsEqual(expRec, filRec);
+  if (has232Stack && filRec.size === 0) reciprocalOk = true;
+
+  let section301Ok = true;
+  if (expHas301 && filHas301) section301Ok = true;
+  else if (expHas301 && !filHas301) {
+    row.CH99_CHECK = "PARTIAL";
+    return;
+  } else if (!expHas301 && filHas301) section301Ok = false;
+
+  const section232Ok = !has232Stack || filPart.section232.length > 0;
+  const otherOk = setsEqual(expNonRec, filNonRec) || (expNonRec.size === 0 && filNonRec.size === 0);
+
+  if (reciprocalOk && section301Ok && section232Ok && otherOk) {
+    row.CH99_CHECK = "MATCH";
+    return;
+  }
+  if (has232Stack && reciprocalOk && section301Ok && section232Ok) {
+    row.CH99_CHECK = "MATCH";
+    return;
+  }
+  if (filNorm.length === 0 && expNorm.length > 0) {
+    row.CH99_CHECK = "MISSING";
+    return;
+  }
+  row.CH99_CHECK = "MISMATCH";
+}
 
 // EU rules use the cap logic — keys: ch99 NOT applied as both, picked by MFN
 const EU_COUNTRIES = new Set(["BG", "ES", "PT"]);
+const EU_CAP_THRESHOLD_PCT = 15.0;
+const EU_CAP_CODE_HIGH_MFN = "9903.02.19"; // Col-1 ≥ 15% → 0% additional reciprocal (CBP CSMS 65829726)
+const EU_CAP_CODE_LOW_MFN  = "9903.02.20"; // Col-1 < 15% → +15% additive to reach 15% landed
 
 const MPF_RATE = 0.003464;
 
@@ -2126,13 +2254,148 @@ function parseHtsTable(buffer) {
   return lookup;
 }
 
-// Return the authoritative MFN rate: table wins over broker rate when table is loaded.
+// Return the authoritative MFN rate for duty math: HTS table wins when loaded.
 function getMfnRate(hts, brokerRate) {
   if (htsLookup) {
     const entry = htsLookup.get(htsNormalize(hts));
     if (entry != null) return entry.rate_pct;
   }
-  return brokerRate;
+  return brokerRate != null && !isNaN(brokerRate) ? Number(brokerRate) : null;
+}
+
+// EU cap branch (9903.02.19 vs .20) must use the Column 1 rate on the entry (7501 col 33)
+// when available — CBP ties the branch to the filed ad valorem / ad valorem equivalent rate.
+// HTS table is fallback only when the 7501 rate is missing.
+function getMfnRateForEuCap(hts, brokerRate) {
+  if (brokerRate != null && !isNaN(brokerRate)) return Number(brokerRate);
+  if (htsLookup) {
+    const entry = htsLookup.get(htsNormalize(hts));
+    if (entry != null) return entry.rate_pct;
+  }
+  return null;
+}
+
+function resolveEuReciprocalLayer(mfnPct, rules, coo) {
+  const euRules = (rules || []).filter(r => r.coo === coo && r.category === "Reciprocal-EU");
+  const gteRule = euRules.find(r => r.eu_cap_when === "mfn_gte_15")
+    || euRules.find(r => htsNormalize(r.ch99) === htsNormalize(EU_CAP_CODE_HIGH_MFN));
+  const ltRule = euRules.find(r => r.eu_cap_when === "mfn_lt_15")
+    || euRules.find(r => htsNormalize(r.ch99) === htsNormalize(EU_CAP_CODE_LOW_MFN));
+  const useHigh = mfnPct != null && mfnPct >= EU_CAP_THRESHOLD_PCT;
+  const rule = useHigh ? gteRule : ltRule;
+  const ch99 = rule?.ch99 || (useHigh ? EU_CAP_CODE_HIGH_MFN : EU_CAP_CODE_LOW_MFN);
+  const rate_pct = rule?.rate ?? (useHigh ? 0.0 : 15.0);
+  return {
+    ch99,
+    rate_pct,
+    category: "Reciprocal-EU",
+    basis: rule?.basis || (useHigh ? "Reciprocal EU (high-MFN cap)" : "Reciprocal EU (additive)"),
+    notes: rule?.notes || (useHigh ? `EU MFN ≥ ${EU_CAP_THRESHOLD_PCT}%` : `EU MFN < ${EU_CAP_THRESHOLD_PCT}% (additive to reach 15%)`),
+    authority: rule?.authority || "EO 14326 (Aug 5, 2025)",
+    effective: rule?.effective || "Aug 7, 2025 → Feb 24, 2026",
+    eu_cap_branch: useHigh ? "mfn_gte_15" : "mfn_lt_15",
+    mfn_used: mfnPct,
+  };
+}
+
+function isEuCapCodeSwapMismatch(coo, expectedCodes, filedCodes) {
+  if (!EU_COUNTRIES.has((coo || "").trim().toUpperCase())) return false;
+  const exp = new Set((expectedCodes || []).map(c => htsNormalize(c)));
+  const fil = new Set((filedCodes || []).map(c => htsNormalize(c)));
+  const expHigh = exp.has(htsNormalize(EU_CAP_CODE_HIGH_MFN));
+  const expLow = exp.has(htsNormalize(EU_CAP_CODE_LOW_MFN));
+  const filHigh = fil.has(htsNormalize(EU_CAP_CODE_HIGH_MFN));
+  const filLow = fil.has(htsNormalize(EU_CAP_CODE_LOW_MFN));
+  return (expHigh && filLow && !filHigh) || (expLow && filHigh && !filLow);
+}
+
+function isEuCapCh99Code(code) {
+  if (code == null || code === "") return false;
+  const n = htsNormalize(String(code));
+  return n === htsNormalize(EU_CAP_CODE_HIGH_MFN) || n === htsNormalize(EU_CAP_CODE_LOW_MFN);
+}
+
+function parseFiledCh99Codes(f) {
+  return (f?.CH99_HTS || "")
+    .split(",")
+    .map(s => htsFormat(s.trim()))
+    .filter(Boolean);
+}
+
+/** Scan a saved run for ES/PT/BG lines touching 9903.02.19 or 9903.02.20. */
+function scanRunEuCap(r, rules) {
+  const filed = r?.state?.filed || [];
+  if (!filed.length) {
+    return { lineCount: 0, mismatchCount: 0, lines: [], incomplete: isSummaryRun(r), runId: r?.id };
+  }
+  const ruleset = rules || r.state?.rules || state.rules || DEFAULT_CH99_RULES;
+  const applicableDate = r.state?.ctx?.applicableDate;
+  const effectiveRules = applicableDate ? rulesInEffectOn(ruleset, applicableDate) : ruleset;
+  const lines = [];
+  let mismatchCount = 0;
+  for (const f of filed) {
+    const coo = (f.COO || "").trim().toUpperCase();
+    if (!EU_COUNTRIES.has(coo)) continue;
+    const filedCodes = parseFiledCh99Codes(f);
+    const mfn = getMfnRateForEuCap(f.HTS, f.MFN_RATE_PCT);
+    const exp = expectedChapter99(coo, f.HTS, mfn, effectiveRules);
+    const expCodes = exp.map(e => e.ch99);
+    const touchesCap = filedCodes.some(isEuCapCh99Code) || expCodes.some(isEuCapCh99Code);
+    if (!touchesCap) continue;
+    const swap = isEuCapCodeSwapMismatch(coo, expCodes, filedCodes);
+    if (swap) mismatchCount++;
+    lines.push({
+      item: f.ITEM,
+      coo,
+      hts: htsFormat(f.HTS),
+      mfn,
+      filed: filedCodes,
+      expected: expCodes,
+      swap,
+    });
+  }
+  return { lineCount: lines.length, mismatchCount, lines, incomplete: false, runId: r.id };
+}
+
+function runMatchesEuCapFilter(r) {
+  return scanRunEuCap(r).lineCount > 0;
+}
+
+function aggregateEuCapStats(runs) {
+  let runCount = 0;
+  let lineCount = 0;
+  let mismatchRuns = 0;
+  let mismatchLines = 0;
+  const byRun = new Map();
+  for (const r of runs) {
+    const scan = scanRunEuCap(r);
+    byRun.set(r.id, scan);
+    if (scan.lineCount > 0) {
+      runCount++;
+      lineCount += scan.lineCount;
+      if (scan.mismatchCount > 0) {
+        mismatchRuns++;
+        mismatchLines += scan.mismatchCount;
+      }
+    }
+  }
+  return { runCount, lineCount, mismatchRuns, mismatchLines, byRun };
+}
+
+function euCapPanelHint(stats, visibleRunCount) {
+  if (_rdFilter !== "eu_cap") return "";
+  if (stats.runCount === 0) {
+    return `<div class="runs-selection-bar" style="background:var(--gray-50);border-color:var(--gray-200);border-left-color:var(--gray-400);">
+      <span class="runs-selection-count">No saved runs with scannable ES/PT/BG ${EU_CAP_CODE_HIGH_MFN} / ${EU_CAP_CODE_LOW_MFN} lines</span>
+      <span style="font-size:13px;color:var(--gray-600);">Runs loaded as summary-only may need to be opened once to scan line detail.</span>
+    </div>`;
+  }
+  return `<div class="runs-selection-bar" style="background:#FDF4E5;border-color:#FCDDAF;border-left-color:#F69000;">
+    <span class="runs-selection-count">${visibleRunCount} run${visibleRunCount !== 1 ? "s" : ""} shown · ${stats.lineCount} EU cap line${stats.lineCount !== 1 ? "s" : ""}</span>
+    ${stats.mismatchRuns > 0
+      ? `<span style="font-size:13px;color:var(--red-700);">${stats.mismatchRuns} run${stats.mismatchRuns !== 1 ? "s" : ""} with .19/.20 branch mismatch — re-run to refresh verdicts</span>`
+      : `<span style="font-size:13px;color:var(--gray-600);">Re-run checklist: open each run and use Re-run audit after the EU cap logic fix</span>`}
+  </div>`;
 }
 
 // ---------- Money helpers ----------
@@ -2339,7 +2602,7 @@ function loadReferenceLocal() {
     const raw = localStorage.getItem(REFERENCE_LS_KEY);
     if (!raw) return;
     const data = JSON.parse(raw);
-    if (Array.isArray(data.rules) && data.rules.length) state.rules = data.rules;
+    if (Array.isArray(data.rules) && data.rules.length) state.rules = normalizeEuCapRules(data.rules);
     referenceMeta.rulesUpdatedAt = data.rulesUpdatedAt || null;
     referenceMeta.rulesUpdatedBy = data.rulesUpdatedBy || null;
     referenceMeta.htsUpdatedAt = data.htsUpdatedAt || null;
@@ -2358,6 +2621,26 @@ function loadReferenceLocal() {
   }
 }
 
+function normalizeEuCapRules(rules) {
+  if (!Array.isArray(rules)) return rules;
+  for (const r of rules) {
+    if (r.category !== "Reciprocal-EU" || !EU_COUNTRIES.has(r.coo)) continue;
+    const ch = htsNormalize(r.ch99);
+    if (!r.eu_cap_when) {
+      if (ch === htsNormalize(EU_CAP_CODE_HIGH_MFN)) r.eu_cap_when = "mfn_gte_15";
+      if (ch === htsNormalize(EU_CAP_CODE_LOW_MFN)) r.eu_cap_when = "mfn_lt_15";
+    }
+    if (r.eu_cap_when === "mfn_gte_15") {
+      r.ch99 = EU_CAP_CODE_HIGH_MFN;
+      r.rate = 0;
+    } else if (r.eu_cap_when === "mfn_lt_15") {
+      r.ch99 = EU_CAP_CODE_LOW_MFN;
+      r.rate = 15;
+    }
+  }
+  return rules;
+}
+
 async function loadReferenceFromServer() {
   if (!auth.token) {
     loadReferenceLocal();
@@ -2371,7 +2654,7 @@ async function loadReferenceFromServer() {
     }
     const data = await res.json();
     if (Array.isArray(data.ch99Rules) && data.ch99Rules.length) {
-      state.rules = data.ch99Rules;
+      state.rules = normalizeEuCapRules(data.ch99Rules);
       referenceMeta.rulesUpdatedAt = data.ch99RulesMeta?.updatedAt || null;
       referenceMeta.rulesUpdatedBy = data.ch99RulesMeta?.updatedBy || null;
     }
@@ -2967,15 +3250,7 @@ function expectedChapter99(country, hts, mfnPct, rules) {
   const c = (country || "").trim().toUpperCase();
   const out = [];
   if (EU_COUNTRIES.has(c)) {
-    if (mfnPct != null && mfnPct >= 15.0) {
-      out.push({ ch99: "9903.02.19", rate_pct: 0.0, category: "Reciprocal-EU",
-                 basis: "Reciprocal EU (high-MFN cap)", notes: "EU MFN ≥ 15%",
-                 authority: "EO 14326 (Aug 5, 2025)", effective: "Aug 7, 2025 → Feb 24, 2026" });
-    } else {
-      out.push({ ch99: "9903.02.20", rate_pct: 15.0, category: "Reciprocal-EU",
-                 basis: "Reciprocal EU (additive)", notes: "EU MFN < 15% (additive to reach 15%)",
-                 authority: "EO 14326 (Aug 5, 2025)", effective: "Aug 7, 2025 → Feb 24, 2026" });
-    }
+    out.push(resolveEuReciprocalLayer(mfnPct, rules, c));
     return out;
   }
   for (const r of rules) {
@@ -3109,14 +3384,42 @@ function compareAggToFiled(agg, filed, rules) {
       Object.assign(row, replaced);
     }
   }
-  // Filed rows never matched
+  // Filed rows never matched — try Section 232 adjunct pairing before finalizing orphans
   filed.forEach((f, i) => {
     if (!usedFiledIdx.has(i)) {
       out.push(makeCompareRow(null, f, "NO MATCH (7501 only)", rules));
     }
   });
 
+  pairSection232OrphanRows(out);
+
   return out.sort((a,b) => (a.AGG_LINE||999) - (b.AGG_LINE||999));
+}
+
+function pairSection232OrphanRows(out) {
+  const matched = out.filter(r => r.MATCH && !r.MATCH.startsWith("NO MATCH"));
+  for (const r of out) {
+    if (!isSection232OrphanCompareRow(r)) continue;
+    let parent = matched.find(m =>
+      m.INVOICE_7501 && r.INVOICE_7501 && m.INVOICE_7501 === r.INVOICE_7501
+      && m.MID_75 && r.MID_75 && m.MID_75 === r.MID_75
+    );
+    if (!parent && r.ITEM != null) {
+      const itemNum = Number(r.ITEM);
+      if (!isNaN(itemNum)) {
+        parent = matched
+          .filter(m => m.ITEM != null && !isNaN(Number(m.ITEM)))
+          .sort((a, b) => Math.abs(Number(a.ITEM) - itemNum) - Math.abs(Number(b.ITEM) - itemNum))[0];
+        if (parent && Math.abs(Number(parent.ITEM) - itemNum) > 3) parent = null;
+      }
+    }
+    if (!parent) continue;
+    r.MATCH = "232 SPLIT (7501 adjunct)";
+    r.PARENT_ITEM = parent.ITEM;
+    r.PARENT_AGG_LINE = parent.AGG_LINE;
+    r.SECTION_232_ORPHAN = true;
+    r.CH99_CHECK = "—";
+  }
 }
 
 function makeCompareRow(a, f, matchType, rules) {
@@ -3124,7 +3427,11 @@ function makeCompareRow(a, f, matchType, rules) {
   const htsForLookup = a ? a.DESTINATION_HS : (f ? f.HTS : "");
   const tableEntry = htsLookup ? htsLookup.get(htsNormalize(htsForLookup)) : null;
   const MFN_RATE_TABLE = tableEntry ? tableEntry.rate_pct : null;
-  const mfnForCh99 = MFN_RATE_TABLE !== null ? MFN_RATE_TABLE : (f ? f.MFN_RATE_PCT : null);
+  const coo = (a ? a.ORIGIN : (f ? f.COO : "")).trim().toUpperCase();
+  const brokerMfn = f ? f.MFN_RATE_PCT : null;
+  const mfnForCh99 = EU_COUNTRIES.has(coo)
+    ? getMfnRateForEuCap(htsForLookup, brokerMfn)
+    : (MFN_RATE_TABLE !== null ? MFN_RATE_TABLE : brokerMfn);
   const row = {
     MATCH: matchType,
     AGG_LINE: a ? a.AGG_LINE : null,
@@ -3149,45 +3456,8 @@ function makeCompareRow(a, f, matchType, rules) {
   else if (matchType.startsWith("LOOSE")) row.MID_CHECK = "MISMATCH";
   else row.MID_CHECK = "—";
 
-  // CH99 check
-  // Section 301 lists (9903.88.01/02/03/15) are mutually exclusive — each HTS is on
-  // at most one list. The engine cannot determine which list applies to a given HTS,
-  // so it uses a fuzzy marker: ANY 9903.88.* filed by the broker satisfies coverage.
-  // PARTIAL fires only when the engine expects a Section 301 layer but none was filed.
-  const isSection301 = (code) => /^99038[78]/.test(htsNormalize(code));
-  const expSet = new Set(row.CH99_EXPECTED.map(e => htsNormalize(e.ch99)));
-  const filSet = new Set(row.CH99_FILED.map(s => htsNormalize(s)));
-  if (expSet.size === 0 && filSet.size === 0) {
-    row.CH99_CHECK = "—";
-  } else if (setsEqual(expSet, filSet)) {
-    row.CH99_CHECK = "MATCH";
-  } else {
-    // Separate Section 301 codes from the rest for independent evaluation.
-    const expNon301 = new Set([...expSet].filter(c => !isSection301(c)));
-    const filNon301 = new Set([...filSet].filter(c => !isSection301(c)));
-    const expHas301 = row.CH99_EXPECTED.some(e => e.section301_fuzzy || isSection301(htsNormalize(e.ch99)));
-    const filHas301 = [...filSet].some(c => isSection301(c));
-
-    if (setsEqual(expNon301, filNon301)) {
-      // Non-301 layers match — now evaluate Section 301 coverage independently.
-      if (expHas301 && filHas301) {
-        // Broker filed some 9903.88.* code — any list satisfies coverage.
-        row.CH99_CHECK = "MATCH";
-      } else if (expHas301 && !filHas301) {
-        // Engine expects Section 301 but broker filed none.
-        row.CH99_CHECK = "PARTIAL";
-      } else if (!expHas301 && filHas301) {
-        // Broker filed a Section 301 code the engine doesn't expect (non-CN item, or rule gap).
-        row.CH99_CHECK = "MISMATCH";
-      } else {
-        row.CH99_CHECK = "MATCH";
-      }
-    } else if (filSet.size === 0) {
-      row.CH99_CHECK = "MISSING";
-    } else {
-      row.CH99_CHECK = "MISMATCH";
-    }
-  }
+  // CH99 check — layer-aware (Section 301 fuzzy, Section 232 adjunct, EU reciprocal)
+  evaluateCh99Check(row);
 
   // Entered diff
   if (row.ENTERED_VALUE_TXT != null && row.ENTERED_VALUE_75 != null) {
@@ -3240,7 +3510,9 @@ function buildFindings(cmp, ctx) {
     sev: "Critical", cat: "Chapter 99 application",
     loc: `Item #${r.ITEM} (Agg #${r.AGG_LINE}) · ${r.COO} · ${r.HTS}`,
     desc: `Expected CH99: [${r.CH99_EXPECTED.map(e => e.ch99).join(", ") || "—"}] but filed: [${r.CH99_FILED.join(", ") || "—"}]`,
-    rec: "Confirm tariff stack per rules; if rules changed, update the Chapter 99 Rules tab.",
+    rec: isEuCapCodeSwapMismatch(r.COO, r.CH99_EXPECTED.map(e => e.ch99), r.CH99_FILED)
+      ? `EU cap branch mismatch: Free/sub-15% Col-1 → ${EU_CAP_CODE_LOW_MFN}; Col-1 ≥ ${EU_CAP_THRESHOLD_PCT}% → ${EU_CAP_CODE_HIGH_MFN}. Engine uses 7501 column 33 for the branch. Re-run this entry after fixing rules/MFN source.`
+      : "Confirm tariff stack per rules; if rules changed, update the Chapter 99 Rules tab.",
   }));
   if (ch99Mismatches.length > CAP) {
     out.push({
@@ -3273,6 +3545,37 @@ function buildFindings(cmp, ctx) {
       isRollup: true,
     });
   }
+
+  // ── Section 232 stack (matched lines — broker-only steel/aluminum adjunct) ─
+  const s232Stacks = cmp.filter(r => r.SECTION_232_STACK && r.MATCH && !r.MATCH.startsWith("NO MATCH"));
+  s232Stacks.slice(0, CAP).forEach(r => {
+    const codes = [...(r.CH99_232_EXCLUSION || []), ...(r.CH99_232_FILED || [])].join(", ");
+    out.push({
+      sev: "Info", cat: "Section 232 stack",
+      loc: `Item #${r.ITEM} (Agg #${r.AGG_LINE}) · ${r.COO} · ${r.HTS}`,
+      desc: `Broker filed Section 232 adjunct Ch99 [${codes || "—"}] on the same item as primary ${r.HTS}. These layers are not in the importer TXT — verify steel/aluminum content and duty.`,
+      rec: "Expected when the product has reportable steel or aluminum content. Confirm the 9903.01.33 exclusion (if present) and 9903.81/85 duty rate against the broker's steel content declaration.",
+    });
+  });
+  if (s232Stacks.length > CAP) {
+    out.push({
+      sev: "Info", cat: "Section 232 stack",
+      loc: `${s232Stacks.length} total occurrences`,
+      desc: `+${s232Stacks.length - CAP} more Section 232 stacks (showing top ${CAP}).`,
+      rec: "Review steel/aluminum derivative duty on each flagged item against the 7501 PDF.",
+      isRollup: true,
+    });
+  }
+
+  const s232Orphans = cmp.filter(r => r.SECTION_232_ORPHAN);
+  s232Orphans.slice(0, CAP).forEach(r => {
+    out.push({
+      sev: "Info", cat: "Section 232 stack",
+      loc: `Item #${r.ITEM} adjunct → parent Item #${r.PARENT_ITEM} (Agg #${r.PARENT_AGG_LINE})`,
+      desc: `7501-only Section 232 line (${r.HTS}) paired to a matched commercial line — not expected in TXT.`,
+      rec: "Verify this is a broker-created steel/aluminum split item, not a missing commercial line.",
+    });
+  });
 
   // ── No-match (unmatched on either side) ────────────────────────────────
   const noMatch = cmp.filter(r => r.MATCH && r.MATCH.startsWith("NO MATCH"));
@@ -3326,8 +3629,8 @@ function buildFindings(cmp, ctx) {
     });
   }
 
-  // Generic Reconciliation findings — excludes rows already diagnosed as COO mismatches.
-  const noMatchFiltered = noMatch.filter(r => !cooMismatchPaired.has(r));
+  // Generic Reconciliation findings — excludes COO mismatches and Section 232 adjunct orphans.
+  const noMatchFiltered = noMatch.filter(r => !cooMismatchPaired.has(r) && !r.SECTION_232_ORPHAN);
   noMatchFiltered.slice(0, CAP).forEach(r => {
     const isTxtOnly = r.MATCH === "NO MATCH (TXT only)";
     return out.push({
@@ -3569,7 +3872,7 @@ document.getElementById("saveRulesBtn").addEventListener("click", async () => {
 });
 document.getElementById("resetRulesBtn").addEventListener("click", () => {
   if (!confirm("Reset Chapter 99 rules to built-in defaults?")) return;
-  state.rules = JSON.parse(JSON.stringify(DEFAULT_CH99_RULES));
+  state.rules = normalizeEuCapRules(JSON.parse(JSON.stringify(DEFAULT_CH99_RULES)));
   referenceMeta.rulesDirty = true;
   renderAdminRules();
   updateAdminRulesMeta();
@@ -3831,6 +4134,7 @@ function summaryRowToRun(row) {
         entryNum: row.entry_num || "",
         invoice: row.invoice_num || "",
         importer: row.importer || "",
+        importerEin: row.importer_ein || "",
         aggLines: row.agg_lines ?? 0,
         enteredAgg: row.entered_value,
         filedCH99: row.total_duty,
@@ -4334,7 +4638,10 @@ function recomputeRawDuties(raw, filed, effectiveRules) {
   return raw.map(r => {
     const coo = (r.ORIGIN || "").toUpperCase();
     const hts = r.DESTINATION_HS || "";
-    const mfn = getMfnRate(hts, mfnLookup.get(`${coo}|${htsNormalize(hts)}`) ?? 16.0);
+    const brokerMfn = mfnLookup.get(`${coo}|${htsNormalize(hts)}`) ?? null;
+    const mfn = EU_COUNTRIES.has(coo)
+      ? getMfnRateForEuCap(hts, brokerMfn)
+      : getMfnRate(hts, brokerMfn);
     const exp = expectedChapter99(coo, hts, mfn, effectiveRules);
     const mfnDuty = r.ENTERED_VALUE * (mfn || 0) / 100;
     const ch99Duty = exp.reduce((s, a) => s + r.ENTERED_VALUE * (a.rate_pct || 0) / 100, 0);
@@ -4716,6 +5023,7 @@ async function deleteSelectedRuns() {
     setActiveBadge(null);
   }
   scheduleRenderRuns(true);
+  if (_activeView === "dashboard") renderDashboard();
   toast(`Deleted ${deleted} run(s).`, "success");
 }
 
@@ -4727,6 +5035,7 @@ async function clearAllRuns() {
   state.activeRunId = null;
   setActiveBadge(null);
   scheduleRenderRuns(true);
+  if (_activeView === "dashboard") renderDashboard();
   toast("All runs cleared.", "success");
 }
 
@@ -4746,6 +5055,8 @@ function startNewRun() {
     if (!confirm("You have an unsaved audit. Start a new run anyway? (Your unsaved results will be lost.)")) return;
   }
 
+  closeAllViews();
+
   // Clear all audit state
   clearUploadedFiles();
   state.raw = null; state.agg = null; state.filed = null;
@@ -4757,36 +5068,56 @@ function startNewRun() {
 
   renderTxtFilesList();
   syncSourceFileUi();
+  resetAuditFilterSelects();
 
-  // Reset numeric inputs
-  document.getElementById("freight").value  = "0.00";
-  document.getElementById("insurance").value = "0.00";
+  const freightEl = document.getElementById("freight");
+  const insuranceEl = document.getElementById("insurance");
+  if (freightEl) freightEl.value = "0.00";
+  if (insuranceEl) insuranceEl.value = "0.00";
 
-  // Clear the run-name field and active badge
-  document.getElementById("runNameInput").value = "";
+  const runNameEl = document.getElementById("runNameInput");
+  if (runNameEl) runNameEl.value = "";
   setActiveBadge(null);
 
-  // Disable buttons that require an active audit
-  document.getElementById("runBtn").disabled = true;
-  document.getElementById("saveRunBtn").disabled = true;
-  document.getElementById("metaInfo").textContent = "No audit run";
+  const runBtn = document.getElementById("runBtn");
+  if (runBtn) runBtn.disabled = true;
+  const saveBtn = document.getElementById("saveRunBtn");
+  if (saveBtn) saveBtn.disabled = true;
+  const metaInfo = document.getElementById("metaInfo");
+  if (metaInfo) metaInfo.textContent = "No audit run";
 
-  // Show empty state, hide results
-  document.getElementById("emptyState").style.display = "";
-  document.getElementById("results").style.display = "none";
-  document.getElementById("mismatchBanner").style.display = "none";
+  const emptyState = document.getElementById("emptyState");
+  const results = document.getElementById("results");
+  const mismatchBanner = document.getElementById("mismatchBanner");
+  if (emptyState) emptyState.style.display = "";
+  if (results) results.style.display = "none";
+  if (mismatchBanner) mismatchBanner.style.display = "none";
 
-  // Return to comparison tab; expand inputs for the next upload
+  _activeTab = "comparison";
+  document.querySelectorAll(".tab").forEach(b => {
+    b.classList.toggle("active", b.dataset.tab === "comparison");
+  });
+  document.querySelectorAll(".tab-panel").forEach(p => {
+    p.classList.toggle("active", p.id === "panel-comparison");
+  });
+  ["pillCmp", "pillStack", "pillRaw", "pillAgg", "pillFiled", "pillFindings", "pillMfr", "pillHts"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = "0";
+  });
+
   setInputsCollapsed(false);
-  document.querySelector('.tab[data-tab="comparison"]')?.click();
+  syncRerunPanel();
 
-  // Scroll to top so the file-upload inputs are visible
+  const csvBtn = document.getElementById("exportAuditCsvBtn");
+  if (csvBtn) csvBtn.disabled = true;
+  document.querySelectorAll("[data-csv-export]").forEach(btn => { btn.disabled = true; });
+
   window.scrollTo({ top: 0, behavior: "smooth" });
 
   toast("Ready for a new audit — upload TXT and 7501 XLSX to begin.", "success");
 }
 
-document.getElementById("newRunBtn").addEventListener("click", startNewRun);
+document.getElementById("newRunBtn")?.addEventListener("click", startNewRun);
 
 // Keep Dashboard header pill count in sync without full re-render
 function _syncDashPill() {
@@ -4993,10 +5324,339 @@ function formatActivityLabel(e) {
   return `${escapeHtml(label)}${who}`;
 }
 
-// Strip punctuation and normalise whitespace so "ZARA USA INC." and
-// "ZARA USA, INC." both key to "ZARA USA INC".
+// Pick a 7501 header column by exact name or partial label match.
+function pick7501Col(row, candidates, opts = {}) {
+  if (!row) return "";
+  const requireImporter = !!opts.requireImporter;
+  for (const c of candidates) {
+    if (row[c] != null && String(row[c]).trim()) return coerce7501CellString(row[c]);
+  }
+  for (const c of candidates) {
+    const needle = c.replace(/^\d+\.\s*(CS|CM|CD)\s+/i, "").toLowerCase();
+    if (!needle) continue;
+    const hit = Object.keys(row).find(k => {
+      const kl = k.toLowerCase();
+      if (requireImporter && !kl.includes("importer")) return false;
+      return kl.includes(needle);
+    });
+    if (hit && row[hit] != null && String(row[hit]).trim()) return coerce7501CellString(row[hit]);
+  }
+  return "";
+}
+
+function coerce7501CellString(v) {
+  if (v == null || v === "") return "";
+  if (typeof v === "number" && isFinite(v)) {
+    const n = Math.trunc(v);
+    if (n > 0) return String(n);
+  }
+  return String(v).trim();
+}
+
+function find7501ImporterEinCol(row) {
+  if (!row) return "";
+  const keys = Object.keys(row).filter(k => {
+    const kl = k.toLowerCase();
+    if (!kl.includes("importer")) return false;
+    if (kl.includes("name") || kl.includes("address") || kl.includes("mailing")
+        || kl.includes("physical") || kl.includes("alias") || kl.includes("dba")) return false;
+    return /\b(id|number|no\.?|ein|tax|irs|ior)\b/.test(kl)
+      || /\d+\.\s*cs\s+importer\s+(id|no|number)/i.test(k);
+  });
+  keys.sort();
+  for (const k of keys) {
+    const s = coerce7501CellString(row[k]);
+    if (s && !/^same$/i.test(s)) return s;
+  }
+  return "";
+}
+
+function extract7501ImporterFields(row) {
+  const nameRaw = pick7501Col(row, [
+    "26. CS Importer Name",
+    "26. CS Importer of Record Name",
+    "Importer of Record Name",
+    "Importer Name",
+  ], { requireImporter: true }) || pick7501Col(row, [
+    "26. CS Importer Name",
+    "Importer Name",
+  ]);
+  const einRaw = pick7501Col(row, [
+    "23. CS Importer Number",
+    "23. CS Importer ID",
+    "23. CS Importer No",
+    "24. CS Importer Number",
+    "24. CS Importer ID",
+    "25. CS Importer ID",
+    "25. CS Importer Number",
+    "22. CS Importer Number",
+    "22. CS Importer ID",
+    "27. CS Importer Number",
+    "27. CS Importer ID",
+    "Importer of Record Number",
+    "Importer Number",
+    "Importer ID",
+    "IOR Number",
+  ], { requireImporter: true }) || pick7501Col(row, [
+    "Importer Number",
+    "Importer ID",
+  ]) || find7501ImporterEinCol(row);
+  return {
+    nameRaw,
+    name: normalizeImporterName(nameRaw) || nameRaw,
+    einRaw,
+    ein: normalizeImporterEin(einRaw),
+  };
+}
+
+/** Scan line rows — importer header fields may be blank on the first row. */
+function extract7501ImporterFromRows(rows) {
+  if (!rows?.length) {
+    return { nameRaw: "", name: "", einRaw: "", ein: "" };
+  }
+  let best = null;
+  for (const row of rows) {
+    const imp = extract7501ImporterFields(row);
+    if (!best) best = imp;
+    if (imp.einRaw) return imp;
+    if (imp.nameRaw && (!best.nameRaw || imp.nameRaw.length > best.nameRaw.length)) best = imp;
+  }
+  return best || extract7501ImporterFields(rows[0]);
+}
+
+function runCtxFromRun(r) {
+  const ctx = { ...(r?.state?.ctx || {}) };
+  if (!normalizeImporterEin(ctx.importerEin || ctx.importerId)) {
+    const full = runStore.getCachedFull?.(r.id);
+    const fc = full?.state?.ctx;
+    if (fc?.importerEin) ctx.importerEin = fc.importerEin;
+    if (fc?.importerId && !ctx.importerId) ctx.importerId = fc.importerId;
+  }
+  return ctx;
+}
+
+// Strip punctuation, quotes, zero-width chars, and unicode whitespace so
+// "ZARA USA INC." / "ZARA USA, INC." / "ZARA USA INC " all become "ZARA USA INC".
+function normalizeImporterName(s) {
+  let t = String(s || "");
+  t = t.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, "");
+  t = t.replace(/["'`]/g, "");
+  t = t.replace(/[\u00A0\u2009\u202F\u3000\t\r\n]+/g, " ");
+  return t.toUpperCase().replace(/[.,]/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function normalizeImporterKey(s) {
-  return (s || "").toUpperCase().replace(/[.,]/g, " ").replace(/\s+/g, " ").trim();
+  return normalizeImporterName(s);
+}
+
+// Normalise IRS EIN / importer ID to digits for grouping (9-digit EIN when available).
+function normalizeImporterEin(s) {
+  const raw = String(s || "").trim();
+  if (!raw || /^same$/i.test(raw)) return "";
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length >= 9) return digits.slice(0, 9);
+  return digits.length ? digits : "";
+}
+
+function formatImporterEin(s) {
+  const d = normalizeImporterEin(s);
+  if (d.length === 9) return `${d.slice(0, 2)}-${d.slice(2)}`;
+  return d || "";
+}
+
+function importerIdentityFromCtx(ctx) {
+  const einDigits = normalizeImporterEin(ctx?.importerEin || ctx?.importerId || "");
+  const displayName = normalizeImporterName(ctx?.importer || "") || String(ctx?.importer || "").trim() || "Unknown";
+  const displayEin = formatImporterEin(ctx?.importerEin || ctx?.importerId || einDigits);
+  const groupKey = einDigits ? `ein:${einDigits}` : `name:${displayName}`;
+  return { groupKey, displayName, einDigits, displayEin };
+}
+
+function displayImporter(ctx) {
+  const name = normalizeImporterName(ctx?.importer || "") || String(ctx?.importer || "").trim();
+  return name || "—";
+}
+
+function runDutyTotal(ctx) {
+  if (!ctx) return 0;
+  return Number(ctx.filedMFN || 0) + Number(ctx.filedCH99 || 0)
+       + Number(ctx.filedMPF || 0) + Number(ctx.filedCotton || 0);
+}
+
+function runsPanelSubtitle(filteredCount, totalCount, page, totalPages) {
+  let s = `${filteredCount} of ${totalCount} run${totalCount === 1 ? "" : "s"}`;
+  if (totalPages > 1) s += ` · page ${page + 1} of ${totalPages}`;
+  s += " · click row to open · ▼ for details";
+  return s;
+}
+
+function buildAuditRunsPanelBody(pageRows, totalPages, allPageSelected, statusBadgeFn, opts = {}) {
+  const selCount = _rdSelectedIds.size;
+  const euCapByRun = opts.euCapByRun || null;
+  const panelHint = opts.panelHint || "";
+  const paginationHtml = totalPages > 1 ? `
+    <span class="runs-page-info">Page ${_rdPage + 1} of ${totalPages}</span>
+    <button type="button" class="btn btn-secondary btn-sm rd-runs-prev" ${_rdPage <= 0 ? "disabled" : ""}>← Prev</button>
+    <button type="button" class="btn btn-secondary btn-sm rd-runs-next" ${_rdPage >= totalPages - 1 ? "disabled" : ""}>Next →</button>
+  ` : "";
+  const selectionHtml = selCount > 0 ? `
+    <div class="runs-selection-bar">
+      <span class="runs-selection-count">${selCount} run${selCount === 1 ? "" : "s"} selected</span>
+      <button type="button" class="btn btn-danger btn-sm rd-delete-selected-btn">Delete selected</button>
+      <button type="button" class="btn btn-ghost btn-sm rd-clear-selection-btn">Clear selection</button>
+    </div>
+  ` : "";
+  const rowsHtml = pageRows.length === 0
+    ? `<tr><td colspan="10"><div class="dash-panel-empty">No runs match this filter or search.</div></td></tr>`
+    : pageRows.map((r) => {
+        const ctx = r.state?.ctx || {};
+        const aggLines = r.state?.agg?.length || ctx.aggLines || 0;
+        const duty = runDutyTotal(ctx);
+        const matched = (ctx.strictMatched || 0) + (ctx.looseMatched || 0);
+        const mPct = aggLines > 0 ? Math.round((matched / aggLines) * 100) : null;
+        const isActive = r.id === state.activeRunId;
+        const isSel = r.id === _rdSelectedId;
+        const isChecked = _rdSelectedIds.has(r.id);
+        const euScan = euCapByRun?.get(r.id);
+        const euBadge = euScan?.lineCount
+          ? `<span class="badge ${euScan.mismatchCount ? "badge-crit" : "badge-high"}" style="margin-left:4px;font-size:10px;" title="ES/PT/BG lines on ${EU_CAP_CODE_HIGH_MFN} or ${EU_CAP_CODE_LOW_MFN}">${euScan.lineCount} EU cap${euScan.mismatchCount ? " · review" : ""}</span>`
+          : "";
+        const mc = mPct === null ? "var(--gray-400)"
+          : mPct === 100 ? "var(--green-700)"
+          : mPct >= 80 ? "var(--gray-700)"
+          : "var(--red-700)";
+        return `<tr class="${isSel ? "sel-row" : ""}" data-rd-id="${escapeHtml(r.id)}">
+          <td onclick="event.stopPropagation();"><input type="checkbox" class="rd-run-check" data-rd-id="${escapeHtml(r.id)}" ${isChecked ? "checked" : ""} /></td>
+          <td class="sm">${escapeHtml(displayImporter(ctx))}</td>
+          <td><span class="run-link">${escapeHtml(r.name)}</span>${isActive ? `<span class="badge badge-active" style="margin-left:4px;font-size:10px;">ACTIVE</span>` : ""}${euBadge}</td>
+          <td>${statusBadgeFn(r)}</td>
+          <td class="mono">${escapeHtml(String(ctx.entryNum || "—"))}</td>
+          <td class="r">${aggLines > 0 ? aggLines.toLocaleString() : "—"}</td>
+          <td class="r">${duty > 0 ? fmtUSD(duty) : "—"}</td>
+          <td class="r" style="color:${mc};">${mPct !== null ? mPct + "%" : "—"}</td>
+          <td class="sm">${new Date(r.savedAt).toLocaleDateString()}</td>
+          <td class="tog">${isSel ? "▲" : "▼"}</td>
+        </tr>
+        ${isSel ? rdDetailPanel(r) : ""}`;
+      }).join("");
+
+  return `
+    ${selectionHtml}
+    ${panelHint}
+    <div class="dash-panel-toolbar">
+      <input id="rdRunsSearch" class="rd-runs-search" placeholder="Search company, entry, invoice…" value="${escapeHtml(_rdSearch)}" />
+      <select id="rdRunsFsel" class="rd-runs-fsel">
+        <option value="all"    ${_rdFilter === "all"    ? "selected" : ""}>All statuses</option>
+        <option value="clean"  ${_rdFilter === "clean"  ? "selected" : ""}>Clean</option>
+        <option value="crit"   ${_rdFilter === "crit"   ? "selected" : ""}>Has Critical</option>
+        <option value="high"   ${_rdFilter === "high"   ? "selected" : ""}>Has High</option>
+        <option value="recent" ${_rdFilter === "recent" ? "selected" : ""}>Last 7 Days</option>
+        <option value="eu_cap" ${_rdFilter === "eu_cap" ? "selected" : ""}>EU cap affected (${opts.euCapRunCount ?? "—"})</option>
+      </select>
+      ${paginationHtml}
+    </div>
+    <div class="dash-panel-list runs-tbl-wrap">
+      <table class="runs-tbl">
+        <thead><tr>
+          <th style="width:32px;"><input type="checkbox" id="rdSelectPage" ${allPageSelected ? "checked" : ""} title="Select all on this page" /></th>
+          <th>Company</th><th>Run</th><th>Status</th>
+          <th>Entry #</th><th class="r">Lines</th>
+          <th class="r">Duty Filed</th><th class="r">Matched</th>
+          <th>Created</th><th></th>
+        </tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>`;
+}
+
+function wireAuditRunsPanel(container, pageRows, totalPages, refreshFn) {
+  if (!container) return;
+  container.querySelectorAll("tr[data-rd-id]").forEach(tr => {
+    tr.addEventListener("click", () => loadRunById(tr.dataset.rdId));
+  });
+  container.querySelectorAll("td.tog").forEach(td => {
+    td.addEventListener("click", e => {
+      e.stopPropagation();
+      const tr = td.closest("tr[data-rd-id]");
+      if (!tr) return;
+      _rdSelectedId = (_rdSelectedId === tr.dataset.rdId) ? null : tr.dataset.rdId;
+      refreshFn();
+    });
+  });
+  container.querySelectorAll(".rd-run-check").forEach(cb => {
+    cb.addEventListener("change", e => {
+      e.stopPropagation();
+      if (cb.checked) _rdSelectedIds.add(cb.dataset.rdId);
+      else _rdSelectedIds.delete(cb.dataset.rdId);
+      refreshFn();
+    });
+  });
+  const selectPage = container.querySelector("#rdSelectPage");
+  if (selectPage) {
+    selectPage.addEventListener("change", e => {
+      e.stopPropagation();
+      for (const r of pageRows) {
+        if (selectPage.checked) _rdSelectedIds.add(r.id);
+        else _rdSelectedIds.delete(r.id);
+      }
+      refreshFn();
+    });
+  }
+  container.querySelector(".rd-runs-prev")?.addEventListener("click", e => {
+    e.stopPropagation();
+    if (_rdPage > 0) { _rdPage--; refreshFn(); }
+  });
+  container.querySelector(".rd-runs-next")?.addEventListener("click", e => {
+    e.stopPropagation();
+    if (_rdPage < totalPages - 1) { _rdPage++; refreshFn(); }
+  });
+  container.querySelector(".rd-delete-selected-btn")?.addEventListener("click", e => {
+    e.stopPropagation();
+    deleteSelectedRuns();
+  });
+  container.querySelector(".rd-clear-selection-btn")?.addEventListener("click", e => {
+    e.stopPropagation();
+    _rdSelectedIds.clear();
+    refreshFn();
+  });
+  const rsEl = container.querySelector("#rdRunsSearch");
+  if (rsEl) {
+    rsEl.addEventListener("input", e => {
+      _rdSearch = e.target.value;
+      _rdSelectedId = null;
+      _rdPage = 0;
+      refreshFn();
+    });
+    rsEl.addEventListener("click", e => e.stopPropagation());
+  }
+  const rfEl = container.querySelector("#rdRunsFsel");
+  if (rfEl) {
+    rfEl.addEventListener("change", e => {
+      _rdFilter = e.target.value;
+      _rdSelectedId = null;
+      _rdPage = 0;
+      refreshFn();
+    });
+    rfEl.addEventListener("click", e => e.stopPropagation());
+  }
+  container.querySelectorAll(".rdp-load-btn").forEach(b => {
+    b.addEventListener("click", e => { e.stopPropagation(); loadRunById(b.dataset.rdId); });
+  });
+  container.querySelectorAll(".rdp-rename-btn").forEach(b => {
+    b.addEventListener("click", e => {
+      e.stopPropagation();
+      const r = loadRunsFromStorage().find(x => x.id === b.dataset.rdId);
+      if (!r) return;
+      const n = prompt("Rename run:", r.name);
+      if (n?.trim() && n !== r.name) renameRun(b.dataset.rdId, n.trim());
+    });
+  });
+  container.querySelectorAll(".rdp-delete-btn").forEach(b => {
+    b.addEventListener("click", e => { e.stopPropagation(); deleteRunById(b.dataset.rdId); });
+  });
+  container.querySelectorAll(".rdp-close-btn").forEach(b => {
+    b.addEventListener("click", e => { e.stopPropagation(); _rdSelectedId = null; refreshFn(); });
+  });
 }
 
 // Simple in-memory activity log; entries are { type, name, entry, importer, sev, ts }
@@ -5060,7 +5720,7 @@ function rdDetailPanel(r) {
         <div class="rdp-meta">
           <div class="rdp-mc"><div class="rdp-mk">Entry #</div><div class="rdp-mv">${escapeHtml(String(ctx.entryNum || "—"))}</div></div>
           <div class="rdp-mc"><div class="rdp-mk">Invoice</div><div class="rdp-mv">${escapeHtml(String(ctx.invoice || "—"))}</div></div>
-          <div class="rdp-mc"><div class="rdp-mk">Importer</div><div class="rdp-mv" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(ctx.importer || "—")}</div></div>
+          <div class="rdp-mc"><div class="rdp-mk">Importer</div><div class="rdp-mv" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(displayImporter(ctx))}${ctx.importerEin ? `<div style="font-size:11px;color:var(--gray-500);font-weight:400;">EIN ${escapeHtml(formatImporterEin(ctx.importerEin))}</div>` : ""}</div></div>
           <div class="rdp-mc"><div class="rdp-mk">Freight / Insurance</div><div class="rdp-mv">${fmtUSD(r.inputs?.freight ?? 0)} / ${fmtUSD(r.inputs?.insurance ?? 0)}${((r.inputs?.freight ?? 0) === 0 && (r.inputs?.insurance ?? 0) === 0) ? ' <span style="color:var(--marigold-700);">(both $0)</span>' : ""}</div></div>
           <div class="rdp-mc"><div class="rdp-mk">Lines (Agg)</div><div class="rdp-mv">${aggLines.toLocaleString()}</div></div>
           <div class="rdp-mc"><div class="rdp-mk">Findings</div><div class="rdp-mv">${sevHtml}</div></div>
@@ -5135,7 +5795,7 @@ async function renderDashboard() {
   const midMap = new Map();
 
   for (const r of runs) {
-    const ctx = r.state?.ctx || {};
+    const ctx = runCtxFromRun(r);
     const mfn = ctx.filedMFN||0, ch99 = ctx.filedCH99||0,
           mpf = ctx.filedMPF||0, cot = ctx.filedCotton||0;
     totalMFN    += mfn;
@@ -5161,13 +5821,19 @@ async function renderDashboard() {
     else if (rh > 0) highOnlyCount++;
     else cleanCount++;
 
-    // Importer map — normalise key so "ZARA USA INC." and "ZARA USA, INC." merge
-    const imp = normalizeImporterKey(ctx.importer || "Unknown");
-    if (ctx.importer) importerSet.add(imp);
-    if (!importerMap.has(imp)) {
-      importerMap.set(imp, { runs:0, lines:0, entered:0, duty:0, ch99:0, crit:0, high:0, findings:0 });
+    // Importer map — group by EIN (CS Importer ID) when present, else normalised name
+    const impId = importerIdentityFromCtx(ctx);
+    if (ctx.importer || impId.einDigits) importerSet.add(impId.groupKey);
+    if (!importerMap.has(impId.groupKey)) {
+      importerMap.set(impId.groupKey, {
+        displayName: impId.displayName,
+        ein: impId.displayEin,
+        runs:0, lines:0, entered:0, duty:0, ch99:0, crit:0, high:0, findings:0,
+      });
     }
-    const im = importerMap.get(imp);
+    const im = importerMap.get(impId.groupKey);
+    if (impId.displayName.length > im.displayName.length) im.displayName = impId.displayName;
+    if (!im.ein && impId.displayEin) im.ein = impId.displayEin;
     im.runs++;
     im.lines    += r.state?.agg?.length || ctx.aggLines || 0;
     im.entered  += ctx.enteredFiled || 0;
@@ -5210,8 +5876,8 @@ async function renderDashboard() {
   const totalOther    = Math.max(0, totalFindings - totalCrit - totalHigh);
 
   // Sorted importer rows
-  const importerRows = [...importerMap.entries()]
-    .sort((a, b) => b[1].duty - a[1].duty);
+  const importerRows = [...importerMap.values()]
+    .sort((a, b) => b.duty - a.duty);
 
   // Top 8 COOs by duty
   const cooRows = [...cooMap.entries()]
@@ -5233,22 +5899,34 @@ async function renderDashboard() {
   });
   if (!_rdMidSearch.trim()) midRows = midRows.slice(0, 50);
 
+  const euCapStats = aggregateEuCapStats(runs);
+
   // ── Filter + search for runs table ────────────────────────────────
   let filtered = runs;
   if (_rdFilter === "clean")  filtered = filtered.filter(r => (r.findingsCritical??0) === 0 && (r.findingsHigh??0) === 0);
   if (_rdFilter === "crit")   filtered = filtered.filter(r => (r.findingsCritical??0) > 0);
   if (_rdFilter === "high")   filtered = filtered.filter(r => (r.findingsCritical??0) === 0 && (r.findingsHigh??0) > 0);
   if (_rdFilter === "recent") filtered = filtered.filter(r => new Date(r.savedAt).getTime() > sevenDaysAgo);
+  if (_rdFilter === "eu_cap") filtered = filtered.filter(runMatchesEuCapFilter);
   if (_rdSearch.trim()) {
     const q = _rdSearch.trim().toLowerCase();
     filtered = filtered.filter(r => {
       const ctx = r.state?.ctx || {};
       return r.name.toLowerCase().includes(q)
         || (ctx.importer||"").toLowerCase().includes(q)
+        || (ctx.importerEin||"").toLowerCase().includes(q)
+        || formatImporterEin(ctx.importerEin).toLowerCase().includes(q)
         || (ctx.entryNum||"").toLowerCase().includes(q)
         || (ctx.invoice ||"").toLowerCase().includes(q);
     });
   }
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / RUNS_PAGE_SIZE));
+  if (_rdPage >= totalPages) _rdPage = Math.max(0, totalPages - 1);
+  const pageStart = _rdPage * RUNS_PAGE_SIZE;
+  const pageRows = filtered.slice(pageStart, pageStart + RUNS_PAGE_SIZE);
+  const pageSelectedOnPage = pageRows.filter(r => _rdSelectedIds.has(r.id)).length;
+  const allPageSelected = pageRows.length > 0 && pageSelectedOnPage === pageRows.length;
 
   // ── Activity feed (full server log — not capped to run count) ───────
   const feedItems = buildActivityFeedItems(runs);
@@ -5355,6 +6033,11 @@ async function renderDashboard() {
         <div class="rd-sc-val">${recentCount}</div>
         <div class="rd-sc-sub">Recently saved</div>
       </div>
+      <div class="rd-status-card ${_rdFilter==="eu_cap"?"sel-high":""}" data-rd-filter="eu_cap" title="ES/PT/BG lines on 9903.02.19 or 9903.02.20 — re-run checklist">
+        <div class="rd-sc-lbl">EU Cap Re-run</div>
+        <div class="rd-sc-val amber">${euCapStats.runCount}</div>
+        <div class="rd-sc-sub">${euCapStats.lineCount} line${euCapStats.lineCount !== 1 ? "s" : ""}${euCapStats.mismatchRuns ? ` · ${euCapStats.mismatchRuns} mismatch` : ""}</div>
+      </div>
       <div class="rd-status-card" style="cursor:default;">
         <div class="rd-sc-lbl">Importers</div>
         <div class="rd-sc-val blue">${importerCount}</div>
@@ -5443,6 +6126,7 @@ async function renderDashboard() {
       <table class="imp-tbl">
         <thead><tr>
           <th>Importer</th>
+          <th>EIN</th>
           <th class="r">Runs</th>
           <th class="r">Lines</th>
           <th class="r">Entered Value</th>
@@ -5453,14 +6137,15 @@ async function renderDashboard() {
           <th class="r">Status</th>
         </tr></thead>
         <tbody>
-          ${importerRows.map(([imp, s]) => {
+          ${importerRows.map(s => {
             const ch99Pct = s.duty>0 ? Math.round((s.ch99/s.duty)*100) : 0;
             const sevBadge = s.crit>0
               ? `<span class="badge badge-crit">${s.crit} crit</span>`
               : s.high>0 ? `<span class="badge badge-high">${s.high} high</span>`
               : `<span class="badge badge-clean">Clean</span>`;
             return `<tr>
-              <td style="font-weight:600;color:var(--gray-900);">${escapeHtml(imp)}</td>
+              <td style="font-weight:600;color:var(--gray-900);">${escapeHtml(s.displayName)}</td>
+              <td class="mono sm">${s.ein ? escapeHtml(s.ein) : "—"}</td>
               <td class="r">${s.runs}</td>
               <td class="r">${s.lines.toLocaleString()}</td>
               <td class="r">${fmtUSD(s.entered)}</td>
@@ -5586,55 +6271,13 @@ async function renderDashboard() {
       ${renderDashPanel(
         "runs",
         "Audit Runs",
-        `${filtered.length} of ${runs.length} runs · click a row to load · ▼ for details`,
+        runsPanelSubtitle(filtered.length, runs.length, _rdPage, totalPages),
         `<span class="dash-panel-badge">${runs.length}</span>`,
-        `
-        <div class="dash-panel-toolbar">
-          <input id="rdRunsSearch" class="rd-runs-search" placeholder="Search company, entry, invoice…" value="${escapeHtml(_rdSearch)}" />
-          <select id="rdRunsFsel" class="rd-runs-fsel">
-            <option value="all"    ${_rdFilter==="all"   ?"selected":""}>All statuses</option>
-            <option value="clean"  ${_rdFilter==="clean" ?"selected":""}>Clean</option>
-            <option value="crit"   ${_rdFilter==="crit"  ?"selected":""}>Has Critical</option>
-            <option value="high"   ${_rdFilter==="high"  ?"selected":""}>Has High</option>
-            <option value="recent" ${_rdFilter==="recent"?"selected":""}>Last 7 Days</option>
-          </select>
-        </div>
-        <div class="dash-panel-list runs-tbl-wrap">
-          <table class="runs-tbl">
-            <thead><tr>
-              <th>Company</th><th>Run</th><th>Status</th>
-              <th>Entry #</th><th class="r">Lines</th>
-              <th class="r">Duty Filed</th><th class="r">Matched</th>
-              <th>Created</th><th></th>
-            </tr></thead>
-            <tbody>
-              ${filtered.length===0
-                ? `<tr><td colspan="9"><div class="dash-panel-empty">No runs match this filter or search.</div></td></tr>`
-                : filtered.map(r => {
-                    const ctx      = r.state?.ctx||{};
-                    const aggLines = r.state?.agg?.length||ctx.aggLines||0;
-                    const duty     = (ctx.filedMFN||0)+(ctx.filedCH99||0)+(ctx.filedMPF||0)+(ctx.filedCotton||0);
-                    const matched  = (ctx.strictMatched||0)+(ctx.looseMatched||0);
-                    const mPct     = aggLines>0?Math.round((matched/aggLines)*100):null;
-                    const isActive = r.id===state.activeRunId;
-                    const isSel    = r.id===_rdSelectedId;
-                    const mc = mPct===null?"var(--gray-400)":mPct===100?"var(--green-700)":mPct>=80?"var(--gray-700)":"var(--red-700)";
-                    return `<tr class="${isSel?"sel-row":""}" data-rd-id="${escapeHtml(r.id)}">
-                      <td class="sm">${escapeHtml(ctx.importer||"—")}</td>
-                      <td><span class="run-link">${escapeHtml(r.name)}</span>${isActive?`<span class="badge badge-active" style="margin-left:4px;font-size:10px;">ACTIVE</span>`:""}</td>
-                      <td>${statusBadge(r)}</td>
-                      <td class="mono">${escapeHtml(String(ctx.entryNum||"—"))}</td>
-                      <td class="r">${aggLines>0?aggLines.toLocaleString():"—"}</td>
-                      <td class="r">${duty>0?fmtUSD(duty):"—"}</td>
-                      <td class="r" style="color:${mc};">${mPct!==null?mPct+"%":"—"}</td>
-                      <td class="sm">${new Date(r.savedAt).toLocaleDateString()}</td>
-                      <td class="tog">${isSel?"▲":"▼"}</td>
-                    </tr>
-                    ${isSel?rdDetailPanel(r):""}`;
-                  }).join("")}
-            </tbody>
-          </table>
-        </div>`
+        buildAuditRunsPanelBody(pageRows, totalPages, allPageSelected, statusBadge, {
+          euCapByRun: euCapStats.byRun,
+          euCapRunCount: euCapStats.runCount,
+          panelHint: euCapPanelHint(euCapStats, filtered.length),
+        })
       )}
 
     </div>
@@ -5642,39 +6285,15 @@ async function renderDashboard() {
 
   // ── Wire all events ────────────────────────────────────────────────
   dashList.querySelectorAll("[data-rd-filter]").forEach(el => {
-    el.addEventListener("click", e => { e.stopPropagation(); _rdFilter=el.dataset.rdFilter; _rdSelectedId=null; renderDashboard(); });
+    el.addEventListener("click", e => { e.stopPropagation(); _rdFilter=el.dataset.rdFilter; _rdSelectedId=null; _rdPage=0; renderDashboard(); });
   });
   dashList.querySelectorAll("[data-rd-load]").forEach(a => {
     a.addEventListener("click", e => { e.stopPropagation(); loadRunById(a.dataset.rdLoad); });
   });
-  dashList.querySelectorAll("tr[data-rd-id]").forEach(tr => {
-    tr.addEventListener("click", () => loadRunById(tr.dataset.rdId));
-  });
-  dashList.querySelectorAll("td.tog").forEach(td => {
-    td.addEventListener("click", e => {
-      e.stopPropagation();
-      const tr = td.closest("tr[data-rd-id]");
-      if (!tr) return;
-      _rdSelectedId = (_rdSelectedId === tr.dataset.rdId) ? null : tr.dataset.rdId;
-      renderDashboard();
-    });
-  });
-  const rsEl = dashList.querySelector("#rdRunsSearch");
-  if (rsEl) { rsEl.addEventListener("input", e=>{_rdSearch=e.target.value;_rdSelectedId=null;renderDashboard();}); rsEl.addEventListener("click",e=>e.stopPropagation()); }
-  const rfEl = dashList.querySelector("#rdRunsFsel");
-  if (rfEl) { rfEl.addEventListener("change",e=>{_rdFilter=e.target.value;_rdSelectedId=null;renderDashboard();}); rfEl.addEventListener("click",e=>e.stopPropagation()); }
+  const runsPanel = dashList.querySelector('[data-dash-panel="runs"]');
+  wireAuditRunsPanel(runsPanel, pageRows, totalPages, renderDashboard);
   const afEl = dashList.querySelector("#rdActFilter");
   if (afEl) { afEl.addEventListener("change",e=>{_rdActFilter=e.target.value;renderDashboard();}); afEl.addEventListener("click",e=>e.stopPropagation()); }
-  dashList.querySelectorAll(".rdp-load-btn").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();loadRunById(b.dataset.rdId);}));
-  dashList.querySelectorAll(".rdp-rename-btn").forEach(b=>b.addEventListener("click",e=>{
-    e.stopPropagation();
-    const r=loadRunsFromStorage().find(x=>x.id===b.dataset.rdId);
-    if(!r)return;
-    const n=prompt("Rename run:",r.name);
-    if(n?.trim()&&n!==r.name)renameRun(b.dataset.rdId,n.trim());
-  }));
-  dashList.querySelectorAll(".rdp-delete-btn").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();deleteRunById(b.dataset.rdId);}));
-  dashList.querySelectorAll(".rdp-close-btn").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();_rdSelectedId=null;renderDashboard();}));
 
   // MID sort + search
   const midSearchEl = dashList.querySelector("#rdMidSearch");
@@ -5783,12 +6402,13 @@ async function renderRuns(forceRefresh = false) {
   let critRunCount = 0, highOnlyCount = 0, cleanCount = 0;
   const importerSet = new Set();
   for (const r of runs) {
-    const ctx = r.state?.ctx || {};
+    const ctx = runCtxFromRun(r);
     const mfn = ctx.filedMFN || 0, ch99 = ctx.filedCH99 || 0, mpf = ctx.filedMPF || 0, cot = ctx.filedCotton || 0;
     totalDutyAll  += mfn + ch99 + mpf + cot;
     totalCh99All  += ch99;
     totalLinesAll += (r.state?.agg?.length || ctx.aggLines || 0);
-    if (ctx.importer) importerSet.add(normalizeImporterKey(ctx.importer));
+    const impId = importerIdentityFromCtx(ctx);
+    if (ctx.importer || impId.einDigits) importerSet.add(impId.groupKey);
     const rc = r.findingsCritical ?? 0, rh = r.findingsHigh ?? 0;
     if (rc > 0) critRunCount++;
     else if (rh > 0) highOnlyCount++;
@@ -5796,6 +6416,7 @@ async function renderRuns(forceRefresh = false) {
   }
   const recentCount  = runs.filter(r => new Date(r.savedAt).getTime() > sevenDaysAgo).length;
   const importerCount = importerSet.size;
+  const euCapStats = aggregateEuCapStats(runs);
 
   // ── Apply filter + search ──────────────────────────────────────────
   let filtered = runs;
@@ -5803,12 +6424,15 @@ async function renderRuns(forceRefresh = false) {
   if (_rdFilter === "crit")   filtered = filtered.filter(r => (r.findingsCritical ?? 0) > 0);
   if (_rdFilter === "high")   filtered = filtered.filter(r => (r.findingsCritical ?? 0) === 0 && (r.findingsHigh ?? 0) > 0);
   if (_rdFilter === "recent") filtered = filtered.filter(r => new Date(r.savedAt).getTime() > sevenDaysAgo);
+  if (_rdFilter === "eu_cap") filtered = filtered.filter(runMatchesEuCapFilter);
   if (_rdSearch.trim()) {
     const q = _rdSearch.trim().toLowerCase();
     filtered = filtered.filter(r => {
       const ctx = r.state?.ctx || {};
       return r.name.toLowerCase().includes(q)
         || (ctx.importer || "").toLowerCase().includes(q)
+        || (ctx.importerEin || "").toLowerCase().includes(q)
+        || formatImporterEin(ctx.importerEin).toLowerCase().includes(q)
         || (ctx.entryNum || "").toLowerCase().includes(q)
         || (ctx.invoice  || "").toLowerCase().includes(q);
     });
@@ -5899,6 +6523,11 @@ async function renderRuns(forceRefresh = false) {
         <div class="rd-sc-lbl">Last 7 Days</div>
         <div class="rd-sc-val">${recentCount}</div>
         <div class="rd-sc-sub">Recently saved</div>
+      </div>
+      <div class="rd-status-card ${_rdFilter === "eu_cap" ? "sel-high" : ""}" data-rd-filter="eu_cap" title="ES/PT/BG lines on 9903.02.19 or 9903.02.20 — re-run checklist">
+        <div class="rd-sc-lbl">EU Cap Re-run</div>
+        <div class="rd-sc-val amber">${euCapStats.runCount}</div>
+        <div class="rd-sc-sub">${euCapStats.lineCount} line${euCapStats.lineCount !== 1 ? "s" : ""}${euCapStats.mismatchRuns ? ` · ${euCapStats.mismatchRuns} mismatch` : ""}</div>
       </div>
       <div class="rd-status-card" style="cursor:default;">
         <div class="rd-sc-lbl">Importers</div>
@@ -6081,80 +6710,17 @@ async function renderRuns(forceRefresh = false) {
       ${renderDashPanel(
         "runs",
         "Audit Runs",
-        `${filtered.length} of ${runs.length} runs · page ${_rdPage + 1}/${totalPages} · click a row to load · ▼ for details`,
+        runsPanelSubtitle(filtered.length, runs.length, _rdPage, totalPages),
         `<span class="dash-panel-badge">${runs.length}</span>`,
-        `
-        <div class="dash-panel-toolbar">
-          <input id="rdRunsSearch" class="rd-runs-search" placeholder="Search company, entry, invoice…" value="${escapeHtml(_rdSearch)}" />
-          <select id="rdRunsFsel" class="rd-runs-fsel">
-            <option value="all"    ${_rdFilter === "all"    ? "selected" : ""}>All statuses</option>
-            <option value="clean"  ${_rdFilter === "clean"  ? "selected" : ""}>Clean</option>
-            <option value="crit"   ${_rdFilter === "crit"   ? "selected" : ""}>Has Critical</option>
-            <option value="high"   ${_rdFilter === "high"   ? "selected" : ""}>Has High</option>
-            <option value="recent" ${_rdFilter === "recent" ? "selected" : ""}>Last 7 Days</option>
-          </select>
-          <button type="button" class="btn btn-secondary" id="rdRunsPrev" style="font-size:12px;padding:6px 10px;" ${_rdPage <= 0 ? "disabled" : ""}>← Prev</button>
-          <button type="button" class="btn btn-secondary" id="rdRunsNext" style="font-size:12px;padding:6px 10px;" ${_rdPage >= totalPages - 1 ? "disabled" : ""}>Next →</button>
-        </div>
-        <div class="dash-panel-list runs-tbl-wrap">
-          <table class="runs-tbl">
-            <thead>
-              <tr>
-                <th style="width:32px;"><input type="checkbox" id="rdSelectPage" ${allPageSelected ? "checked" : ""} title="Select all on this page" /></th>
-                <th>Company</th>
-                <th>Run</th>
-                <th>Status</th>
-                <th>Entry #</th>
-                <th class="r">Lines</th>
-                <th class="r">Duty Filed</th>
-                <th class="r">Matched</th>
-                <th>Created</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              ${pageRows.length === 0
-                ? `<tr><td colspan="10"><div class="dash-panel-empty">No runs match this filter or search.</div></td></tr>`
-                : pageRows.map(r => {
-                    const ctx      = r.state?.ctx || {};
-                    const aggLines = r.state?.agg?.length || ctx.aggLines || 0;
-                    const duty     = (ctx.filedMFN||0) + (ctx.filedCH99||0) + (ctx.filedMPF||0) + (ctx.filedCotton||0);
-                    const matched  = (ctx.strictMatched||0) + (ctx.looseMatched||0);
-                    const matchPct = aggLines > 0 ? Math.round((matched/aggLines)*100) : null;
-                    const isActive = r.id === state.activeRunId;
-                    const isSel    = r.id === _rdSelectedId;
-                    const matchColor = matchPct === null ? "var(--gray-400)"
-                      : matchPct === 100 ? "var(--green-700)"
-                      : matchPct >= 80   ? "var(--gray-700)"
-                      : "var(--red-700)";
-                    const isChecked = _rdSelectedIds.has(r.id);
-                    return `<tr class="${isSel ? "sel-row" : ""}" data-rd-id="${escapeHtml(r.id)}">
-                      <td onclick="event.stopPropagation();"><input type="checkbox" class="rd-run-check" data-rd-id="${escapeHtml(r.id)}" ${isChecked ? "checked" : ""} /></td>
-                      <td class="sm">${escapeHtml(ctx.importer || "—")}</td>
-                      <td>
-                        <span class="run-link">${escapeHtml(r.name)}</span>
-                        ${isActive ? `<span class="badge badge-active" style="margin-left:4px;font-size:10px;">ACTIVE</span>` : ""}
-                      </td>
-                      <td>${statusBadge(r)}</td>
-                      <td class="mono">${escapeHtml(String(ctx.entryNum || "—"))}</td>
-                      <td class="r">${aggLines > 0 ? aggLines.toLocaleString() : "—"}</td>
-                      <td class="r">${duty > 0 ? fmtUSD(duty) : "—"}</td>
-                      <td class="r" style="color:${matchColor};">${matchPct !== null ? matchPct + "%" : "—"}</td>
-                      <td class="sm">${new Date(r.savedAt).toLocaleDateString()}</td>
-                      <td class="tog">${isSel ? "▲" : "▼"}</td>
-                    </tr>
-                    ${isSel ? rdDetailPanel(r) : ""}`;
-                  }).join("")}
-            </tbody>
-          </table>
-        </div>`
+        buildAuditRunsPanelBody(pageRows, totalPages, allPageSelected, statusBadge, {
+          euCapByRun: euCapStats.byRun,
+          euCapRunCount: euCapStats.runCount,
+          panelHint: euCapPanelHint(euCapStats, filtered.length),
+        })
       )}
 
     </div>
   </div><!-- /runs-dash -->`;
-
-  const delSelBtn = document.getElementById("deleteSelectedRunsBtn");
-  if (delSelBtn) delSelBtn.disabled = _rdSelectedIds.size === 0;
 
   // ── Wire events ────────────────────────────────────────────────────
   // Status card filter clicks
@@ -6173,71 +6739,8 @@ async function renderRuns(forceRefresh = false) {
     a.addEventListener("click", e => { e.stopPropagation(); loadRunById(a.dataset.rdLoad); });
   });
 
-  // Table row — click loads audit; ▼ toggles inline details
-  list.querySelectorAll("tr[data-rd-id]").forEach(tr => {
-    tr.addEventListener("click", () => loadRunById(tr.dataset.rdId));
-  });
-  list.querySelectorAll("td.tog").forEach(td => {
-    td.addEventListener("click", e => {
-      e.stopPropagation();
-      const tr = td.closest("tr[data-rd-id]");
-      if (!tr) return;
-      _rdSelectedId = (_rdSelectedId === tr.dataset.rdId) ? null : tr.dataset.rdId;
-      scheduleRenderRuns();
-    });
-  });
-
-  list.querySelectorAll(".rd-run-check").forEach(cb => {
-    cb.addEventListener("change", e => {
-      e.stopPropagation();
-      if (cb.checked) _rdSelectedIds.add(cb.dataset.rdId);
-      else _rdSelectedIds.delete(cb.dataset.rdId);
-      scheduleRenderRuns();
-    });
-  });
-  const selectPage = list.querySelector("#rdSelectPage");
-  if (selectPage) {
-    selectPage.addEventListener("change", e => {
-      e.stopPropagation();
-      for (const r of pageRows) {
-        if (selectPage.checked) _rdSelectedIds.add(r.id);
-        else _rdSelectedIds.delete(r.id);
-      }
-      scheduleRenderRuns();
-    });
-  }
-  list.querySelector("#rdRunsPrev")?.addEventListener("click", e => {
-    e.stopPropagation();
-    if (_rdPage > 0) { _rdPage--; scheduleRenderRuns(); }
-  });
-  list.querySelector("#rdRunsNext")?.addEventListener("click", e => {
-    e.stopPropagation();
-    if (_rdPage < totalPages - 1) { _rdPage++; scheduleRenderRuns(); }
-  });
-
-  // Search input (table)
-  const runsSearchEl = list.querySelector("#rdRunsSearch");
-  if (runsSearchEl) {
-    runsSearchEl.addEventListener("input", e => {
-      _rdSearch = e.target.value;
-      _rdSelectedId = null;
-      _rdPage = 0;
-      scheduleRenderRuns();
-    });
-    runsSearchEl.addEventListener("click", e => e.stopPropagation());
-  }
-
-  // Status filter dropdown
-  const runsFilterEl = list.querySelector("#rdRunsFsel");
-  if (runsFilterEl) {
-    runsFilterEl.addEventListener("change", e => {
-      _rdFilter = e.target.value;
-      _rdSelectedId = null;
-      _rdPage = 0;
-      scheduleRenderRuns();
-    });
-    runsFilterEl.addEventListener("click", e => e.stopPropagation());
-  }
+  const runsPanel = list.querySelector('[data-dash-panel="runs"]');
+  wireAuditRunsPanel(runsPanel, pageRows, totalPages, () => scheduleRenderRuns());
 
   // Activity type filter dropdown
   const actFilterEl = list.querySelector("#rdActFilter");
@@ -6259,25 +6762,6 @@ async function renderRuns(forceRefresh = false) {
     actSearchEl.addEventListener("click", e => e.stopPropagation());
   }
 
-  // Detail panel buttons
-  list.querySelectorAll(".rdp-load-btn").forEach(b => {
-    b.addEventListener("click", e => { e.stopPropagation(); loadRunById(b.dataset.rdId); });
-  });
-  list.querySelectorAll(".rdp-rename-btn").forEach(b => {
-    b.addEventListener("click", e => {
-      e.stopPropagation();
-      const r = loadRunsFromStorage().find(x => x.id === b.dataset.rdId);
-      if (!r) return;
-      const newName = prompt("Rename run:", r.name);
-      if (newName?.trim() && newName !== r.name) renameRun(b.dataset.rdId, newName.trim());
-    });
-  });
-  list.querySelectorAll(".rdp-delete-btn").forEach(b => {
-    b.addEventListener("click", e => { e.stopPropagation(); deleteRunById(b.dataset.rdId); });
-  });
-  list.querySelectorAll(".rdp-close-btn").forEach(b => {
-    b.addEventListener("click", e => { e.stopPropagation(); _rdSelectedId = null; scheduleRenderRuns(); });
-  });
   wireDashPanels(list);
 }
 
@@ -6311,7 +6795,10 @@ function buildStackExportRows(respectFilters) {
     : state.rules;
   let rows = (state.filed || []).map(f => {
     const ev = Number(f.ENTERED_VALUE) || 0;
-    const mfn = getMfnRate(f.HTS, f.MFN_RATE_PCT);
+    const coo = (f.COO || "").trim().toUpperCase();
+    const mfn = EU_COUNTRIES.has(coo)
+      ? getMfnRateForEuCap(f.HTS, f.MFN_RATE_PCT)
+      : getMfnRate(f.HTS, f.MFN_RATE_PCT);
     const exp = expectedChapter99(f.COO, f.HTS, mfn, dateRules);
     const byCat = { "Reciprocal": [], "Reciprocal-EU": [], "IEEPA-Universal": [], "IEEPA-China": [], "Section-301": [] };
     let totalExpCh99 = 0;
@@ -6752,7 +7239,8 @@ async function exportAuditCsvZip() {
     ["field", "value"],
     [
       { field: "entry_num", value: ctx.entryNum || "" },
-      { field: "importer", value: ctx.importer || "" },
+      { field: "importer", value: displayImporter(ctx) },
+      { field: "importer_ein", value: formatImporterEin(ctx.importerEin) || "" },
       { field: "invoice", value: ctx.invoice || "" },
       { field: "import_date", value: ctx.importDate || ctx.entryDate || "" },
       { field: "exported_at", value: new Date().toISOString() },
@@ -6808,7 +7296,6 @@ document.getElementById("saveRunBtn").addEventListener("click", () => {
   document.getElementById("runNameInput").value = "";
 });
 document.getElementById("clearRunsBtn").addEventListener("click", clearAllRuns);
-document.getElementById("deleteSelectedRunsBtn")?.addEventListener("click", deleteSelectedRuns);
 document.getElementById("rerunAuditBtn")?.addEventListener("click", () => rerunLoadedAudit());
 document.getElementById("rerunTxtFile")?.addEventListener("change", async e => {
   const files = [...(e.target.files || [])];
@@ -7175,9 +7662,12 @@ function runAudit(options = {}) {
     }
     let raw = allocateCharges(txt, "AMOUNT", totalInvoice, freight, insurance);
     raw = raw.map(r => {
-      const coo = (r.ORIGIN||"").toUpperCase();
-      const hts = r.DESTINATION_HS || "";
-      const mfn = getMfnRate(hts, mfnLookup.get(`${coo}|${htsNormalize(hts)}`) ?? 16.0);
+    const coo = (r.ORIGIN || "").toUpperCase();
+    const hts = r.DESTINATION_HS || "";
+    const brokerMfn = mfnLookup.get(`${coo}|${htsNormalize(hts)}`) ?? null;
+    const mfn = EU_COUNTRIES.has(coo)
+      ? getMfnRateForEuCap(hts, brokerMfn)
+      : getMfnRate(hts, brokerMfn);
       const exp = expectedChapter99(coo, hts, mfn, effectiveRules);
       const mfnDuty = r.ENTERED_VALUE * (mfn || 0) / 100;
       const ch99Duty = exp.reduce((s, a) => s + r.ENTERED_VALUE * (a.rate_pct || 0) / 100, 0);
@@ -7220,7 +7710,14 @@ function runAudit(options = {}) {
       ...buildTxtInvoiceContext(txt),
       invoiceFiled:  xl.rows[0]?.["28. CM Invoice No"] ?? "—",
       entryNum:      xl.rows[0]?.["1. CS Entry Number"] ?? "—",
-      importer:      xl.rows[0]?.["26. CS Importer Name"] ?? "—",
+      ...(() => {
+        const imp = extract7501ImporterFromRows(xl.rows);
+        return {
+          importer: imp.name || "—",
+          importerEin: imp.einRaw || "",
+          importerId: imp.ein || "",
+        };
+      })(),
       // Applicable-date metadata so the UI can show which date governed Ch99 selection
       applicableDate:       applicable.date,
       applicableDateSource: applicable.source,   // "entry" | "import" | "today"
@@ -7259,6 +7756,7 @@ function runAudit(options = {}) {
       entry_num: ctx.entryNum,
       invoice: ctx.invoice,
       importer: ctx.importer,
+      importer_ein: ctx.importerEin || "",
       agg_lines: agg.length,
       findings_count: findings.length,
     }, "run");
@@ -7294,7 +7792,8 @@ function render(options = {}) {
   document.getElementById("metaInfo").textContent =
     `Entry ${state.ctx.entryNum} · Invoice ${state.ctx.invoice}` +
     (state.ctx.txtFileCount > 1 ? ` · ${state.ctx.txtFileCount} TXT files` : "") +
-    ` · ${state.ctx.importer}`;
+    ` · ${displayImporter(state.ctx)}` +
+    (state.ctx.importerEin ? ` · EIN ${formatImporterEin(state.ctx.importerEin)}` : "");
 
   // Mismatch banner: TXT invoice and 7501 invoice came from different shipments
   const banner = document.getElementById("mismatchBanner");
@@ -7473,7 +7972,10 @@ function renderStack() {
   const stackRows = state.filed.map(f => {
     const c = cmpById.get(f.ITEM) || {};
     const ev = Number(f.ENTERED_VALUE) || 0;
-    const mfn = getMfnRate(f.HTS, f.MFN_RATE_PCT);
+    const coo = (f.COO || "").trim().toUpperCase();
+    const mfn = EU_COUNTRIES.has(coo)
+      ? getMfnRateForEuCap(f.HTS, f.MFN_RATE_PCT)
+      : getMfnRate(f.HTS, f.MFN_RATE_PCT);
     // Use the applicable date from ctx to filter rules — Ch99 stack expectations
     // must reflect the tariff regime in force on the entry/import date.
     const dateRules = state.ctx?.applicableDate
@@ -7490,14 +7992,25 @@ function renderStack() {
       byCat[cat].push({ ...e, amt });
       totalExpCh99 += amt;
     }
+    const filedCodes = (f.CH99_HTS || "").split(",").map(s => htsFormat(s.trim())).filter(Boolean);
+    for (const code of filedCodes) {
+      if (isSection232Code(code)) {
+        byCat["Section-232"] = byCat["Section-232"] || [];
+        byCat["Section-232"].push({ ch99: code, rate_pct: null, amt: null, filed_only: true });
+      } else if (is232ReciprocalExclusion(code)) {
+        byCat["232-Exclusion"] = byCat["232-Exclusion"] || [];
+        byCat["232-Exclusion"].push({ ch99: code, rate_pct: 0, amt: 0, filed_only: true });
+      }
+    }
     const mfnAmt = ev * (mfn || 0) / 100;
     const filedCh99 = Number(f.CH99_DUTY_FILED) || 0;
-    const diff = totalExpCh99 - filedCh99;
+    const has232Stack = !!c.SECTION_232_STACK || (byCat["Section-232"] || []).length > 0;
+    const diff = has232Stack ? null : totalExpCh99 - filedCh99;
     return {
       ITEM: f.ITEM, COO: f.COO, HTS: htsFormat(f.HTS), MID: f.MID,
       ENTERED_VALUE: ev, MFN_RATE: mfn, MFN_RATE_FILED: f.MFN_RATE_PCT, MFN_AMT: mfnAmt,
-      byCat, totalExpCh99, filedCh99, diff,
-      categories: Object.keys(byCat).filter(k => byCat[k].length > 0),
+      byCat, totalExpCh99, filedCh99, diff, has232Stack,
+      categories: Object.keys(byCat).filter(k => byCat[k] && byCat[k].length > 0),
     };
   });
 
@@ -7524,8 +8037,8 @@ function renderStack() {
     if (!layers || layers.length === 0) return `<span class="stack-cell"><span class="empty">—</span></span>`;
     return `<div class="stack-cell">` + layers.map(l => `
       <span class="code">${l.ch99}</span>
-      <span class="pct">+${(l.rate_pct||0).toFixed(1)}%</span>
-      <span class="amt">${fmtUSD(l.amt)}</span>
+      <span class="pct">${l.filed_only ? "filed" : `+${(l.rate_pct||0).toFixed(1)}%`}</span>
+      <span class="amt">${l.amt != null ? fmtUSD(l.amt) : "—"}</span>
     `).join('<div style="border-top:1px dashed var(--gray-200);margin:4px 0;"></div>') + `</div>`;
   };
 
@@ -7544,6 +8057,8 @@ function renderStack() {
         <th class="col-cat-IEEPA-Universal" colspan="1">IEEPA Universal</th>
         <th class="col-cat-IEEPA-China" colspan="1">IEEPA CN/HK</th>
         <th class="col-cat-Section-301" colspan="1">Sec 301</th>
+        <th class="col-cat-Section-232" colspan="1">Sec 232</th>
+        <th class="col-cat-232-Exclusion" colspan="1">232 Excl</th>
         <th data-k="totalExpCh99" rowspan="2" class="num col-total">Total Ch99 (exp) ${sortIndicator("stackTable","totalExpCh99")}</th>
         <th data-k="filedCh99" rowspan="2" class="num col-total">Filed Ch99 ${sortIndicator("stackTable","filedCh99")}</th>
         <th data-k="diff" rowspan="2" class="num">Δ vs Filed ${sortIndicator("stackTable","diff")}</th>
@@ -7553,6 +8068,8 @@ function renderStack() {
         <th class="col-cat-IEEPA-Universal" style="font-size:9px;font-weight:400;">Code · rate · $</th>
         <th class="col-cat-IEEPA-China" style="font-size:9px;font-weight:400;">Code · rate · $</th>
         <th class="col-cat-Section-301" style="font-size:9px;font-weight:400;">Code · rate · $</th>
+        <th class="col-cat-Section-232" style="font-size:9px;font-weight:400;">Filed 232</th>
+        <th class="col-cat-232-Exclusion" style="font-size:9px;font-weight:400;">Filed excl</th>
       </tr>
     </thead>
     <tbody>
@@ -7572,9 +8089,11 @@ function renderStack() {
           <td>${cellFor(r.byCat["IEEPA-Universal"])}</td>
           <td>${cellFor(r.byCat["IEEPA-China"])}</td>
           <td>${cellFor(r.byCat["Section-301"])}</td>
+          <td>${cellFor(r.byCat["Section-232"])}</td>
+          <td>${cellFor(r.byCat["232-Exclusion"])}</td>
           <td class="num"><strong>${fmtUSD(r.totalExpCh99)}</strong></td>
           <td class="num">${fmtUSD(r.filedCh99)}</td>
-          <td class="num"><span class="badge ${diffClass(r.diff)}">${r.diff >= 0 ? "+" : ""}${fmtUSD(r.diff)}</span></td>
+          <td class="num">${r.has232Stack ? `<span class="badge badge-neutral">232 stack</span>` : `<span class="badge ${diffClass(r.diff)}">${r.diff >= 0 ? "+" : ""}${fmtUSD(r.diff)}</span>`}</td>
         </tr>`).join("")}
     </tbody>
   `;
@@ -7590,7 +8109,7 @@ function renderHtsVerification() {
 
   if (htsLookup && htsLookup.size > 0) {
     if (mfnEl) {
-      mfnEl.innerHTML = `Authoritative MFN rates from the global <strong>HTS Classification Table</strong> (<span class="mono-inline">${escapeHtml(htsName || "table")}</span>, ${htsLookup.size.toLocaleString()} codes). Broker-filed 7501 rates in column <span class="mono-inline">33. CD HTS US Rate</span> are shown for comparison; where they differ, the table rate drives Ch99 EU-cap logic and raw-line duty projection. Comparison tab marks divergences with a <span class="mfn-table-badge">tbl:</span> badge. Browse the full table under <strong>Reference</strong> in the top bar.`;
+      mfnEl.innerHTML = `Authoritative MFN rates from the global <strong>HTS Classification Table</strong> (<span class="mono-inline">${escapeHtml(htsName || "table")}</span>, ${htsLookup.size.toLocaleString()} codes). Broker-filed 7501 rates in column <span class="mono-inline">33. CD HTS US Rate</span> are shown for comparison. For <strong>EU cap branching</strong> (9903.02.19 vs .20), the filed 7501 rate wins when present; the table is fallback only. Other duty projection still prefers the table when loaded. Comparison tab marks divergences with a <span class="mfn-table-badge">tbl:</span> badge.`;
     }
     const entryHts = new Set();
     for (const f of state.filed || []) {
@@ -8528,12 +9047,18 @@ function renderAdminRules() {
     <tbody>
       ${state.rules.map((r, i) => {
         const cat = CH99_CATEGORIES[r.category] || CH99_CATEGORIES["Reciprocal"];
+        const euCapLbl = r.eu_cap_when === "mfn_gte_15"
+          ? `<div style="font-size:10px;color:var(--gray-500);margin-top:2px;">Auto if MFN ≥ ${EU_CAP_THRESHOLD_PCT}%</div>`
+          : r.eu_cap_when === "mfn_lt_15"
+          ? `<div style="font-size:10px;color:var(--gray-500);margin-top:2px;">Auto if MFN &lt; ${EU_CAP_THRESHOLD_PCT}%</div>`
+          : "";
+        const euReadonly = r.eu_cap_when ? "readonly" : "";
         return `
         <tr>
-          <td><span class="ch99-chip cat-${r.category || "Reciprocal"}" style="margin:0;">${cat.label}</span></td>
-          <td><input type="text" value="${r.coo}" data-idx="${i}" data-k="coo" class="rule-input" style="${inputStyle} width:50px; font-family:var(--font-mono);"/></td>
-          <td><input type="text" value="${r.ch99}" data-idx="${i}" data-k="ch99" class="rule-input" style="${inputStyle} width:110px; font-family:var(--font-mono);"/></td>
-          <td><input type="number" step="0.1" value="${r.rate}" data-idx="${i}" data-k="rate" class="rule-input" style="${inputStyle} width:70px; font-family:var(--font-mono); text-align:right;"/></td>
+          <td><span class="ch99-chip cat-${r.category || "Reciprocal"}" style="margin:0;">${cat.label}</span>${euCapLbl}</td>
+          <td><input type="text" value="${r.coo}" data-idx="${i}" data-k="coo" class="rule-input" ${euReadonly} style="${inputStyle} width:50px; font-family:var(--font-mono);"/></td>
+          <td><input type="text" value="${r.ch99}" data-idx="${i}" data-k="ch99" class="rule-input" ${euReadonly} style="${inputStyle} width:110px; font-family:var(--font-mono);"/></td>
+          <td><input type="number" step="0.1" value="${r.rate}" data-idx="${i}" data-k="rate" class="rule-input" ${euReadonly} style="${inputStyle} width:70px; font-family:var(--font-mono); text-align:right;"/></td>
           <td><input type="text" value="${r.basis || ''}" data-idx="${i}" data-k="basis" class="rule-input" style="${inputStyle} width:220px;"/></td>
           <td><input type="text" value="${r.authority || ''}" data-idx="${i}" data-k="authority" class="rule-input" style="${inputStyle} width:200px;"/></td>
           <td><input type="text" value="${r.effective || ''}" data-idx="${i}" data-k="effective" class="rule-input" style="${inputStyle} width:200px; font-family:var(--font-mono);"/></td>

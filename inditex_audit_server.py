@@ -102,6 +102,7 @@ def _ensure_schema(conn: psycopg2.extensions.connection) -> None:
         entry_num         TEXT,
         invoice_num       TEXT,
         importer          TEXT,
+        importer_ein      TEXT,
         agg_lines         INTEGER,
         entered_value     NUMERIC,
         total_duty        NUMERIC,
@@ -122,6 +123,23 @@ def _ensure_schema(conn: psycopg2.extensions.connection) -> None:
     """
     with conn.cursor() as cur:
         cur.execute(ddl)
+        cur.execute("ALTER TABLE audit_runs ADD COLUMN IF NOT EXISTS importer_ein TEXT;")
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS audit_runs_importer_ein_idx
+                ON audit_runs (importer_ein);
+        """)
+        cur.execute("""
+            UPDATE audit_runs
+            SET importer_ein = COALESCE(
+                NULLIF(TRIM(data->'state'->'ctx'->>'importerEin'), ''),
+                NULLIF(TRIM(data->'state'->'ctx'->>'importerId'), '')
+            )
+            WHERE (importer_ein IS NULL OR TRIM(importer_ein) = '')
+              AND (
+                NULLIF(TRIM(data->'state'->'ctx'->>'importerEin'), '') IS NOT NULL
+                OR NULLIF(TRIM(data->'state'->'ctx'->>'importerId'), '') IS NOT NULL
+              );
+        """)
     conn.commit()
     print("  • Schema ready (table: audit_runs)")
 
@@ -268,6 +286,7 @@ def _extract_fields(snapshot: dict) -> dict:
         "entry_num":         ctx.get("entryNum"),
         "invoice_num":       ctx.get("invoice"),
         "importer":          ctx.get("importer"),
+        "importer_ein":      ctx.get("importerEin") or ctx.get("importerId"),
         "agg_lines":         _to_int(snapshot.get("aggLines") or len(state.get("agg", []))),
         "entered_value":     _to_numeric(ctx.get("enteredAgg")),
         "total_duty":        _to_numeric(ctx.get("filedCH99")),  # Block 37
@@ -596,6 +615,11 @@ def get_runs_summary():
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT id, name, entry_num, invoice_num, importer,
+                       COALESCE(
+                         NULLIF(TRIM(importer_ein), ''),
+                         NULLIF(TRIM(data->'state'->'ctx'->>'importerEin'), ''),
+                         NULLIF(TRIM(data->'state'->'ctx'->>'importerId'), '')
+                       ) AS importer_ein,
                        txt_name, xlsx_name, freight, insurance,
                        agg_lines, entered_value, total_duty,
                        findings_count, findings_critical, findings_high,
@@ -650,14 +674,14 @@ def upsert_run():
             cur.execute("""
                 INSERT INTO audit_runs (
                     id, name, saved_at, txt_name, xlsx_name,
-                    freight, insurance, entry_num, invoice_num, importer,
+                    freight, insurance, entry_num, invoice_num, importer, importer_ein,
                     agg_lines, entered_value, total_duty,
                     findings_count, findings_critical, findings_high,
                     data, created_at, updated_at
                 ) VALUES (
                     %(id)s, %(name)s, %(saved_at)s, %(txt_name)s, %(xlsx_name)s,
                     %(freight)s, %(insurance)s, %(entry_num)s, %(invoice_num)s,
-                    %(importer)s, %(agg_lines)s, %(entered_value)s, %(total_duty)s,
+                    %(importer)s, %(importer_ein)s, %(agg_lines)s, %(entered_value)s, %(total_duty)s,
                     %(findings_count)s, %(findings_critical)s, %(findings_high)s,
                     %(data)s, NOW(), NOW()
                 )
@@ -671,6 +695,7 @@ def upsert_run():
                     entry_num         = EXCLUDED.entry_num,
                     invoice_num       = EXCLUDED.invoice_num,
                     importer          = EXCLUDED.importer,
+                    importer_ein      = EXCLUDED.importer_ein,
                     agg_lines         = EXCLUDED.agg_lines,
                     entered_value     = EXCLUDED.entered_value,
                     total_duty        = EXCLUDED.total_duty,
