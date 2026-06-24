@@ -31,7 +31,7 @@ The audit runs in your browser. With the Flask server connected, saved runs pers
 | Role | Can do |
 |------|--------|
 | **Collaborator** | Run audits, save/load runs, view Dashboard analytics, browse Reference (read-only) |
-| **Admin** | Everything above, plus: upload HTS table, edit Chapter 99 rules, manage users, view Activity log, bulk re-run all saved audits |
+| **Admin** | Everything above, plus: upload HTS table, edit Chapter 99 rules, manage users, view Activity log, **Re-run all saved audits** |
 
 Your administrator creates accounts under **Users** (admin only). On first install, an initial admin is seeded when `INITIAL_ADMIN_PASSWORD` is set in the server environment.
 
@@ -47,7 +47,7 @@ The top bar is your home base:
 | **Reference** | Global HTS Classification Table, Chapter 99 rules, sources & verification (sign-in required) |
 | **Users** | Create/delete users, reset passwords (admin only) |
 | **Activity** | Audit trail of sign-ins and actions (admin only) |
-| **+ New Run** | Clear the current audit view and start fresh |
+| **+ New Run** | Clear the current audit view and start fresh (does not delete saved runs) |
 | **Sign out** | End your session |
 
 The main **Audit** view is where you upload files and review results. There is **no Saved Runs tab on the audit page** — use **Dashboard** to open prior runs.
@@ -97,14 +97,22 @@ Use **Export all (ZIP)** above the tabs to download every review grid as separat
 
 | Tab | What you see |
 |-----|----------------|
-| **Comparison** | One row per aggregated line (or unmatched filed item); MATCH / MID / Ch99 status |
-| **Ch99 Stack** | Expected tariff layers per line by category |
+| **Comparison** | One row per aggregated line (or unmatched filed item); MATCH / MID / Ch99 status. Filter includes **232 split (adjunct)** for orphan Section 232 CM items paired to a parent. |
+| **Ch99 Stack** | Expected tariff layers per line by category; filed Section 232 / 232 exclusion columns when present |
 | **Raw Lines** | Individual TXT rows with computed duty |
 | **Aggregated** | Method B groups (COO + HTS + MID) — the grain the 7501 files at |
 | **7501 Filed** | What the broker filed, one row per item |
 | **Findings** | Severity-ranked issues (Critical → Info) with recommendations |
 | **Manufacturer** | MID rollup across the current entry |
 | **HTS Consistency** | Within-entry HTS checks and rules baseline. **Cross-run HTS discrepancies** are on the **Dashboard**, not here |
+
+### Comparison filters (common)
+
+| Filter | Use when |
+|--------|----------|
+| **MATCH** | Strict / loose / no-match / 232 split |
+| **CH99 status** | MATCH, MISMATCH, MISSING, PARTIAL |
+| **Ch99 Stack → Section 232** | Review broker-filed steel/aluminum derivative layers |
 
 ---
 
@@ -129,7 +137,11 @@ Open **Dashboard** from the top bar.
 
 Scroll through summary cards: total duty, match rates, findings breakdown, importer/COO/MID analytics, MFN consistency panels, and more.
 
-### 7.2 Runs list
+### 7.2 By Importer
+
+The **By Importer** table rolls up saved runs by **CS Importer ID (EIN)** when present on the 7501 extract. Importer names are normalized (trimmed, collapsed whitespace) so variants like `ZARA USA INC` and `ZARA USA INC ` group together. The **EIN** column shows the identifier from the filed entry.
+
+### 7.3 Runs list
 
 | Action | How |
 |--------|-----|
@@ -137,10 +149,14 @@ Scroll through summary cards: total duty, match rates, findings breakdown, impor
 | **Expand details** | Click **▼** on the row for metadata without loading |
 | **Rename** | **Rename** button on the row |
 | **Delete one** | **Delete** on the row |
-| **Delete many** | Select checkboxes → **Delete selected** |
-| **Search / filter** | Use the search box and filter chips (All / Clean / Critical / etc.) |
+| **Delete many** | Check rows → selection bar appears → **Delete selected** |
+| **Search / filter** | Search box and filter chips (All / Clean / Critical / **EU cap affected**, etc.) |
 
-### 7.3 Import / export / clear
+Runs with ES/PT/BG lines on `9903.02.19` or `9903.02.20` show an **EU cap** badge. Use the **EU cap affected** filter to build a re-run checklist after logic or rules updates.
+
+Pagination appears only when there are more than 25 runs.
+
+### 7.4 Import / export / clear
 
 | Button | Purpose |
 |--------|---------|
@@ -162,6 +178,8 @@ You can:
 
 The panel shows **Original source files** (filenames from when the run was saved). Labels like “Keep current TXT set” mean the audit uses data already in the saved snapshot, not files on disk.
 
+**Re-run all saved audits** (admin, Reference tab) recomputes every stored run from its saved agg/filed snapshot — use after Chapter 99 rule or engine logic changes. It does **not** re-parse original XLSX/TXT files.
+
 ---
 
 ## 9. Reference data
@@ -174,24 +192,61 @@ Reference data is **global** — shared across all audits and all users.
 
 Admins upload an `.xlsx` HTS table. MFN rates from this table:
 
-- Override broker-filed rates for EU cap logic (`9903.02.19` vs `9903.02.20`)
-- Drive baseline HTS verification
+- Drive **duty projection** and HTS verification baselines
+- Are shown alongside broker-filed rates in Comparison (divergences marked with a **tbl:** badge)
+
+**EU cap branching** (`9903.02.19` vs `9903.02.20` for ES/PT/BG) uses the **broker-filed 7501 column 33 rate first** when present, then falls back to the HTS table. CBP ties the branch to the filed Column 1 / ad valorem equivalent rate on the entry.
 
 Collaborators can **search and browse** loaded codes but cannot upload.
 
 ### 9.2 Chapter 99 rules (admin edit)
 
-Admins edit the rules grid, **Save rules**, or **Reset to defaults**. Rules include effective date windows per executive order.
+Admins edit the rules grid, **Save rules**, or **Reset to defaults**. Rules include effective date windows per executive order. EU reciprocal rules for ES/PT/BG are auto-selected by MFN branch (`eu_cap_when`).
 
-After changing reference data, use **Re-run all saved audits** (admin, bottom of Reference) so historical runs reflect the new rules and HTS table.
+After changing reference data or after an engine deploy, use **Re-run all saved audits** (admin, bottom of Reference) so historical runs reflect the new rules and logic.
 
 ### 9.3 Sources & verification
 
-Read-only cards explaining tariff authority, EU cap logic, China stack layers, and data provenance.
+Read-only cards explaining tariff authority, **EU cap logic** (why `.19` vs `.20`), **Section 232 split** handling, China stack layers, and data provenance.
 
 ---
 
-## 10. Admin: Users & Activity
+## 10. Tariff logic — what analysts should know
+
+### 10.1 EU cap (ES, PT, BG)
+
+For EU origin goods, reciprocal duty is capped at a **15% landed rate**:
+
+| Filed Column 1 rate (col 33) | Expected Ch99 | Reciprocal duty |
+|------------------------------|---------------|-----------------|
+| **≥ 15%** | `9903.02.19` | 0% additional (full Col-1 on primary line) |
+| **&lt; 15%** (incl. Free) | `9903.02.20` | +15% additive (CBP: duty on Ch99 line, $0 on primary) |
+
+The engine flags **EU cap branch mismatch** when the broker filed the wrong `.19`/`.20` for the Col-1 rate. A common pattern: primary at exactly 15% with `9903.02.20` filed at FREE — wrong **heading**, but duty placement may still match the `.19` economic outcome. Review the 7501 Filed tab and consider a PSC to correct the Ch99 code.
+
+### 10.2 Section 232 (steel / aluminum derivatives)
+
+Products with reportable steel or aluminum content may file extra Ch99 rows on the **same CM item** that are not in the importer TXT, for example:
+
+- `9903.01.33` — reciprocal exclusion when 232 applies
+- `9903.81.91` — steel derivative duty
+
+The engine **accepts** these as adjunct layers:
+
+- **Ch99 MATCH** on the primary line (reciprocal expectation waived when a 232 stack is filed)
+- **Info** finding: *Section 232 stack* — not Critical
+
+If the ACE extract puts `9903.81.*` on a **separate CM item**, the engine pairs it to the nearest matched parent as **232 SPLIT (7501 adjunct)**.
+
+The tool does **not** verify steel content KG or 232 rate correctness — confirm against the broker’s steel declaration manually.
+
+### 10.3 Section 301 (China)
+
+Expected layers include a fuzzy Section 301 marker when list membership cannot be determined at HTS level. **PARTIAL** in Comparison means the broker filed no `9903.88.*` code — confirm against USTR annexes.
+
+---
+
+## 11. Admin: Users & Activity
 
 ### Users (admin)
 
@@ -204,17 +259,22 @@ Filter by user or action type (login, run_audit, save_run, load_run, upload_hts_
 
 ---
 
-## 11. Tips & conventions
+## 12. Tips & conventions
 
 ### Matching logic
 
 - **Strict match:** same COO + HTS + MID on TXT and 7501
 - **Loose match:** same COO + HTS, MID differs (often OCR/fill-down defects on the extract)
 - **No match:** row exists on one side only
+- **232 SPLIT (7501 adjunct):** Section 232 Ch99 on its own CM item, paired to a matched parent
 
-### Chapter 99
+### Findings severity
 
-Expected layers come from global rules + country of origin + applicable entry date. Section 301 uses a fuzzy marker when list membership cannot be determined at HTS level — see Findings for **PARTIAL** advisories.
+| Severity | Typical categories |
+|----------|-------------------|
+| **Critical** | Chapter 99 application (wrong/missing reciprocal layer), reconciliation gaps |
+| **High** | MID consistency, entered value drift |
+| **Info** | Section 232 stack, Section 301 coverage advisory (PARTIAL) |
 
 ### Storage indicator
 
@@ -227,7 +287,7 @@ When connected to Postgres via the server, runs persist in the database with no 
 
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
@@ -235,14 +295,17 @@ When connected to Postgres via the server, runs persist in the database with no 
 | Loaded run shows wrong data | Ensure you clicked the **row** on Dashboard to load; hard-refresh if needed |
 | “Storage: browser localStorage” | You opened `file://` — use `http://localhost:5252` |
 | Re-run didn’t change totals | Expand Inputs, confirm freight/insurance in **Update & re-run**, click **Re-run audit** |
+| Old runs still show wrong EU cap | Reference → **Re-run all saved audits** (admin), or re-upload 7501 and re-run per entry |
+| EU cap mismatch at exactly 15% | Engine expects `9903.02.19` per CBP (Col-1 ≥ 15%); broker may have used `.20` with FREE — check duty placement |
 | CSV export button disabled | Run an audit first (or load a saved run) |
 | Reference locked | Sign in; collaborators have read-only access |
 | HTS table missing | Ask an admin to upload under **Reference** |
+| Importer EIN blank on Dashboard | Re-upload 7501 extract (EIN backfilled from snapshot on save) or re-run after deploy |
 | Server won’t start | See [SETUP.md](SETUP.md) — Postgres running, port free, venv deps installed |
 
 ---
 
-## 13. Getting help
+## 14. Getting help
 
 - **Setup / install issues:** [SETUP.md](SETUP.md)
 - **How the engine works:** [BUILD.md](BUILD.md)
