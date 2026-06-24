@@ -194,10 +194,84 @@
   }
   .file-zone:hover { border-color: var(--primary-500); background: var(--primary-50); }
   .file-zone.has-file { border-style: solid; border-color: var(--green-500); background: var(--green-50); }
+  .file-zone.has-file-meta { border-style: solid; border-color: var(--marigold-500); background: #FFFBEB; }
   .file-zone .fname { font-weight: 600; color: var(--gray-800); font-size: 13px; word-break: break-all; }
   .file-zone .fmeta { font-size: 11px; color: var(--gray-500); }
   .file-zone input[type="file"] { display: none; }
   .mfn-table-badge { font-size: 10px; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; border-radius: 3px; padding: 1px 4px; margin-left: 4px; white-space: nowrap; }
+
+  .section-collapse-hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .section-collapse-hd .section-title { margin: 0; }
+  .inputs-collapse-toggle {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary-500);
+    background: var(--primary-50);
+    border: 1px solid var(--primary-100);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    padding: 6px 12px;
+    white-space: nowrap;
+  }
+  .inputs-collapse-toggle:hover { background: var(--primary-100); }
+  .inputs-collapse-body { margin-top: 14px; }
+  .inputs-collapse-body.is-collapsed { display: none; }
+
+  .audit-save-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+  }
+  .audit-save-bar input[type="text"] {
+    flex: 1;
+    min-width: 200px;
+    padding: 9px 12px;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+  }
+  .audit-save-hint {
+    font-size: 12px;
+    color: var(--gray-500);
+    margin-left: auto;
+  }
+  .audit-save-hint button {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary-500);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  .view-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .view-header-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
 
   .btn {
     padding: 11px 22px; border-radius: var(--radius-sm); border: none;
@@ -347,6 +421,25 @@
     opacity: 0.45;
     cursor: not-allowed;
   }
+
+  .txt-files-list {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; min-height: 0;
+  }
+  .txt-file-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 10px; font-size: 12px;
+    background: white; border: 1px solid var(--gray-300); border-radius: 999px;
+    max-width: 100%;
+  }
+  .txt-file-chip .name {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-family: var(--font-mono); color: var(--primary-700);
+  }
+  .txt-file-chip button {
+    border: none; background: transparent; color: var(--gray-500);
+    cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px;
+  }
+  .txt-file-chip button:hover { color: var(--red-700); }
 
   /* ---------- Tables ---------- */
   .table-wrap { overflow-x: auto; max-height: 65vh; }
@@ -1160,8 +1253,19 @@
 <!-- ── Dashboard view ── -->
 <div class="dash-overlay" id="dashOverlay">
   <div class="view-header">
-    <h1>Runs Dashboard</h1>
-    <p class="view-sub">Totals and activity across all saved audit runs</p>
+    <div class="view-header-row">
+      <div>
+        <h1>Runs Dashboard</h1>
+        <p class="view-sub">Totals and activity across all saved audit runs</p>
+      </div>
+      <div class="view-header-actions">
+        <button type="button" class="btn btn-secondary" id="importRunsBtn" style="padding:7px 14px;font-size:12px;">Import</button>
+        <button type="button" class="btn btn-secondary" id="exportRunsBtn" style="padding:7px 14px;font-size:12px;">Export all</button>
+        <button type="button" class="btn btn-danger" id="clearRunsBtn" style="padding:7px 14px;font-size:12px;">Clear all</button>
+        <input type="file" id="importRunsFile" accept=".json" style="display:none;" />
+        <button type="button" class="btn btn-danger" id="deleteSelectedRunsBtn" disabled style="display:none;padding:7px 14px;font-size:12px;">Delete selected</button>
+      </div>
+    </div>
   </div>
   <div class="dash-ov-body">
     <div id="runsDashList"></div>
@@ -1380,15 +1484,20 @@
     </div>
   </section>
   <section class="section">
-    <div class="card">
-      <h2 class="section-title">1. Inputs</h2>
+    <div class="card" id="inputsCard">
+      <div class="section-collapse-hd" id="inputsCollapseHd">
+        <h2 class="section-title">1. Inputs</h2>
+        <button type="button" class="inputs-collapse-toggle" id="inputsCollapseBtn" aria-expanded="true">Hide ▲</button>
+      </div>
+      <div class="inputs-collapse-body" id="inputsCollapseBody">
       <div class="inputs-grid">
-        <div class="field">
-          <label>Inditex source TXT</label>
+        <div class="field" style="grid-column: span 2;">
+          <label>Inditex source TXT (one or more)</label>
+          <div class="txt-files-list" id="txtFilesList"></div>
           <label class="file-zone" id="txtZone">
-            <div class="fname" id="txtName">Click to choose .txt</div>
-            <div class="fmeta">UTF-16-LE, tab-delimited</div>
-            <input type="file" id="txtFile" accept=".txt" />
+            <div class="fname" id="txtName">Click to add .txt files</div>
+            <div class="fmeta">UTF-16-LE, tab-delimited · multiple invoices supported</div>
+            <input type="file" id="txtFile" accept=".txt" multiple />
           </label>
         </div>
         <div class="field">
@@ -1412,6 +1521,47 @@
           <button class="btn btn-primary" id="runBtn" disabled>Run Audit</button>
         </div>
       </div>
+      <div id="rerunPanel" class="rerun-panel" style="display:none;margin-top:14px;padding:14px 16px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--radius-sm);">
+        <div style="font-weight:600;color:var(--primary-700);margin-bottom:6px;">Update &amp; re-run</div>
+        <div id="rerunPanelIntro" style="font-size:13px;color:var(--gray-600);margin-bottom:12px;line-height:1.5;">
+          Adjust freight/insurance or replace source files, then re-run without deleting the saved run.
+        </div>
+        <div id="savedSourcesSummary" style="display:none;margin-bottom:12px;padding:10px 12px;background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-sm);font-size:13px;">
+          <div style="font-weight:600;color:var(--gray-700);margin-bottom:4px;">Original source files</div>
+          <div id="savedSourcesSummaryBody" style="color:var(--gray-600);line-height:1.55;"></div>
+          <div style="font-size:12px;color:var(--gray-500);margin-top:6px;">Files are not kept in the browser — upload below only if you want to replace them before re-running.</div>
+        </div>
+        <div class="inputs-row" style="margin-bottom:10px;">
+          <div class="field">
+            <label>Freight (USD)</label>
+            <input type="number" id="rerunFreight" step="0.01" />
+          </div>
+          <div class="field">
+            <label>Insurance (USD)</label>
+            <input type="number" id="rerunInsurance" step="0.01" />
+          </div>
+          <div class="field">
+            <label>Add/replace TXT (optional)</label>
+            <label class="file-zone" id="rerunTxtZone" style="min-height:48px;padding:8px 12px;">
+              <div class="fname" id="rerunTxtName">Keep current TXT set</div>
+              <input type="file" id="rerunTxtFile" accept=".txt" multiple />
+            </label>
+          </div>
+          <div class="field">
+            <label>Replace 7501 XLSX (optional)</label>
+            <label class="file-zone" id="rerunXlsxZone" style="min-height:48px;padding:8px 12px;">
+              <div class="fname" id="rerunXlsxName">Keep current 7501</div>
+              <input type="file" id="rerunXlsxFile" accept=".xlsx,.xls" />
+            </label>
+          </div>
+          <div class="field">
+            <label>&nbsp;</label>
+            <button type="button" class="btn btn-primary" id="rerunAuditBtn">Re-run audit</button>
+          </div>
+        </div>
+        <div id="rerunFiWarn" style="display:none;font-size:12px;color:var(--marigold-700);"></div>
+      </div>
+      </div>
     </div>
   </section>
 
@@ -1428,6 +1578,12 @@
   <!-- ============== RESULTS ============== -->
   <div id="results" style="display:none;">
 
+    <div id="auditSaveBar" class="audit-save-bar">
+      <input type="text" id="runNameInput" placeholder="Name this run (optional)" />
+      <button type="button" class="btn btn-primary" id="saveRunBtn" disabled style="padding:9px 16px;font-size:13px;">Save run</button>
+      <span class="audit-save-hint">Browse previous runs in <button type="button" id="openDashboardFromAudit">Dashboard</button></span>
+    </div>
+
     <!-- Input mismatch banner (only shown when TXT and 7501 don't match) -->
     <div id="mismatchBanner" style="display:none;margin:0 0 20px 0;padding:16px 20px;background:#FEF3F2;border:1px solid #FECDCA;border-left:4px solid #B83227;border-radius:6px;">
       <div style="display:flex;align-items:flex-start;gap:12px;">
@@ -1435,7 +1591,7 @@
         <div style="flex:1;">
           <div style="font-weight:700;color:#B83227;font-size:15px;margin-bottom:6px;">Source files don't appear to be for the same shipment</div>
           <div id="mismatchBannerBody" style="font-size:13px;color:#5C1A14;line-height:1.55;"></div>
-          <div style="font-size:12px;color:#7A2820;margin-top:8px;font-style:italic;">The audit results below are computed but likely meaningless. Re-upload the TXT and 7501 extract for the same shipment, then Run Audit again.</div>
+          <div style="font-size:12px;color:#7A2820;margin-top:8px;font-style:italic;">The audit still runs — review the comparison and findings tabs for line-level mismatches. If these files are for different shipments, re-upload matching TXT and 7501 extracts and run again.</div>
         </div>
       </div>
     </div>
@@ -1452,17 +1608,14 @@
       <div class="recon-grid" id="reconGrid"></div>
     </section>
 
-  </div>
-
-    <!-- Tabs (always visible - includes Runs tab) -->
-    <section class="section">
+    <!-- Tabs -->
+    <section class="section" id="reviewSection">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
-        <h2 class="section-title" style="margin:0;">Review &amp; Runs</h2>
+        <h2 class="section-title" style="margin:0;">Review</h2>
         <button type="button" class="btn btn-secondary" id="exportAuditCsvBtn" disabled style="padding:7px 14px;font-size:12px;white-space:nowrap;" title="Download all review grids as a ZIP of CSV files">Export all (ZIP)</button>
       </div>
       <div class="tabs" id="tabs">
-        <button class="tab active" data-tab="runs">Saved Runs <span class="pill" id="pillRuns">0</span></button>
-        <button class="tab" data-tab="comparison">Comparison <span class="pill" id="pillCmp">0</span></button>
+        <button class="tab active" data-tab="comparison">Comparison <span class="pill" id="pillCmp">0</span></button>
         <button class="tab" data-tab="stack">Ch99 Stack <span class="pill" id="pillStack">0</span></button>
         <button class="tab" data-tab="raw">Raw Lines <span class="pill" id="pillRaw">0</span></button>
         <button class="tab" data-tab="agg">Aggregated <span class="pill" id="pillAgg">0</span></button>
@@ -1472,23 +1625,8 @@
         <button class="tab" data-tab="hts">HTS Consistency <span class="pill" id="pillHts">0</span></button>
       </div>
 
-      <!-- Runs Panel -->
-      <div class="tab-panel active" id="panel-runs">
-        <div class="runs-toolbar" style="grid-template-columns: 1fr 200px 110px 110px 110px;">
-          <input type="text" id="runNameInput" placeholder="Name this run (e.g. 'Zara Jan 2026 — Entry 113-3957214-9')" />
-          <button class="btn btn-primary" id="saveRunBtn" disabled>Save current run</button>
-          <button class="btn btn-secondary" id="importRunsBtn">Import</button>
-          <button class="btn btn-secondary" id="exportRunsBtn">Export all</button>
-          <button class="btn btn-danger" id="clearRunsBtn">Clear all</button>
-          <input type="file" id="importRunsFile" accept=".json" style="display:none;" />
-        </div>
-        <div id="storageStatus" style="padding: 8px 16px; background: var(--gray-50); border-bottom: 1px solid var(--gray-200); font-size: 12px; color: var(--gray-600); display: flex; gap: 16px; align-items: center; font-family: var(--font-mono);"></div>
-        <div id="storagePressureBanner" style="padding: 12px 16px 0 16px; display: none;"></div>
-        <div class="runs-list" id="runsList"></div>
-      </div>
-
       <!-- Comparison Panel -->
-      <div class="tab-panel" id="panel-comparison">
+      <div class="tab-panel active" id="panel-comparison">
         <div class="filter-bar">
           <input type="text" class="search" id="cmpSearch" placeholder="Search HTS, COO, MID, item #…" />
           <select id="cmpFilterMatch">
@@ -1653,6 +1791,8 @@
       </div>
 
     </section>
+
+  </div>
 
 </main>
 
@@ -2017,8 +2157,10 @@ function toast(msg, kind="info") {
 //  File handling
 // ============================================================
 const state = {
-  txtBuffer: null, txtName: null,
+  txtFiles: [],   // { id, name, buffer }
+  txtBuffer: null, txtName: null,  // legacy single-file session fallback
   xlsxBuffer: null, xlsxName: null,
+  savedInputMeta: null,  // { txtName, xlsxName, txtFiles } from last save/load — metadata only
   raw: null, agg: null, filed: null, cmp: null, findings: null, ctx: null,
   rules: JSON.parse(JSON.stringify(DEFAULT_CH99_RULES)),  // global reference — synced from server
 };
@@ -2303,19 +2445,117 @@ function updateAdminRulesMeta() {
 function wireFileZone(zoneId, inputId, nameId, key) {
   const zone = document.getElementById(zoneId);
   const input = document.getElementById(inputId);
-  const name = document.getElementById(nameId);
   input.addEventListener("change", async (e) => {
     const f = e.target.files[0];
     if (!f) return;
     const buf = await f.arrayBuffer();
     state[key + "Buffer"] = buf;
     state[key + "Name"] = f.name;
-    name.textContent = f.name;
-    zone.classList.add("has-file");
-    updateRunBtn();
+    syncSourceFileUi();
   });
 }
-wireFileZone("txtZone",  "txtFile",  "txtName",  "txt");
+
+function mergeTxtFiles(txtFiles) {
+  const rows = [];
+  let lineNo = 1;
+  for (const tf of txtFiles || []) {
+    if (!tf?.buffer) continue;
+    const parsed = parseInditexTxt(tf.buffer);
+    for (const r of parsed) {
+      rows.push({
+        ...r,
+        TXT_LINE: lineNo++,
+        TXT_SOURCE: tf.name || "txt",
+        TXT_SOURCE_ID: tf.id,
+        INVOICE_NUMBER: normalizeInvoiceNumber(r.INVOICE_NUMBER),
+      });
+    }
+  }
+  return rows;
+}
+
+function getMergedTxtRows() {
+  if (state.txtFiles?.length) return mergeTxtFiles(state.txtFiles);
+  if (state.txtBuffer) {
+    return parseInditexTxt(state.txtBuffer).map((r, i) => ({
+      ...r,
+      TXT_LINE: r.TXT_LINE ?? (i + 1),
+      TXT_SOURCE: state.txtName || "txt",
+      TXT_SOURCE_ID: "legacy",
+      INVOICE_NUMBER: normalizeInvoiceNumber(r.INVOICE_NUMBER),
+    }));
+  }
+  if (state.rerunTxtFiles?.length) return mergeTxtFiles(state.rerunTxtFiles);
+  return [];
+}
+
+function txtInputsSummary() {
+  if (state.txtFiles?.length) {
+    return {
+      txtFiles: state.txtFiles.map(f => ({ id: f.id, name: f.name })),
+      txtName: state.txtFiles.map(f => f.name).join("; "),
+    };
+  }
+  return {
+    txtFiles: state.txtName ? [{ id: "legacy", name: state.txtName }] : [],
+    txtName: state.txtName || "",
+  };
+}
+
+function renderTxtFilesList() {
+  const list = document.getElementById("txtFilesList");
+  if (!list) return;
+  if (!state.txtFiles.length) {
+    list.innerHTML = "";
+    syncSourceFileUi();
+    return;
+  }
+  list.innerHTML = state.txtFiles.map(f => `
+    <span class="txt-file-chip" title="${escapeHtml(f.name)}">
+      <span class="name">${escapeHtml(f.name)}</span>
+      <button type="button" data-txt-remove="${escapeHtml(f.id)}" title="Remove">×</button>
+    </span>`).join("");
+  list.querySelectorAll("[data-txt-remove]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.preventDefault();
+      e.stopPropagation();
+      removeTxtFile(btn.dataset.txtRemove);
+    });
+  });
+  syncSourceFileUi();
+}
+
+async function addTxtFiles(fileList) {
+  for (const f of fileList) {
+    if (!f) continue;
+    const buf = await f.arrayBuffer();
+    state.txtFiles.push({
+      id: "txt_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+      name: f.name,
+      buffer: buf,
+    });
+  }
+  state.txtBuffer = null;
+  state.txtName = null;
+  renderTxtFilesList();
+}
+
+function removeTxtFile(id) {
+  state.txtFiles = state.txtFiles.filter(f => f.id !== id);
+  renderTxtFilesList();
+}
+
+function wireTxtFileZone() {
+  const zone = document.getElementById("txtZone");
+  const input = document.getElementById("txtFile");
+  input.addEventListener("change", async (e) => {
+    const files = [...(e.target.files || [])];
+    if (!files.length) return;
+    await addTxtFiles(files);
+    e.target.value = "";
+  });
+}
+wireTxtFileZone();
 wireFileZone("xlsxZone", "xlsxFile", "xlsxName", "xlsx");
 
 document.getElementById("adminHtsFile").addEventListener("change", async (e) => {
@@ -2338,12 +2578,222 @@ document.getElementById("adminHtsSearch")?.addEventListener("input", (e) => {
 
 function updateRunBtn() {
   const btn = document.getElementById("runBtn");
-  btn.disabled = !(state.txtBuffer && state.xlsxBuffer);
+  if (!btn) return;
+  const hasTxt = state.txtFiles.length > 0 || !!state.txtBuffer;
+  btn.disabled = !(hasTxt && state.xlsxBuffer);
+}
+
+function hasSourceBuffers() {
+  return (state.txtFiles.length > 0 || !!state.txtBuffer) && !!state.xlsxBuffer;
+}
+
+function resolveTxtSourceDisplay() {
+  if (state.rerunTxtFiles?.length) {
+    return { name: state.rerunTxtFiles.map(f => f.name).join("; "), loaded: true, context: "rerun" };
+  }
+  if (state.rerunTxtBuffer && state.rerunTxtName) {
+    return { name: state.rerunTxtName, loaded: true, context: "rerun" };
+  }
+  if (state.txtFiles.length) {
+    return { name: state.txtFiles.map(f => f.name).join("; "), loaded: true, context: "session" };
+  }
+  if (state.txtBuffer && state.txtName) {
+    return { name: state.txtName, loaded: true, context: "session" };
+  }
+  const meta = state.savedInputMeta || {};
+  if (meta.txtFiles?.length) {
+    return { name: meta.txtFiles.map(f => f.name).join("; "), loaded: false, context: "saved" };
+  }
+  if (meta.txtName) {
+    return { name: meta.txtName, loaded: false, context: "saved" };
+  }
+  return null;
+}
+
+function resolveXlsxSourceDisplay() {
+  if (state.rerunXlsxBuffer && state.rerunXlsxName) {
+    return { name: state.rerunXlsxName, loaded: true, context: "rerun" };
+  }
+  if (state.xlsxBuffer && state.xlsxName) {
+    return { name: state.xlsxName, loaded: true, context: "session" };
+  }
+  const meta = state.savedInputMeta || {};
+  if (meta.xlsxName) {
+    return { name: meta.xlsxName, loaded: false, context: "saved" };
+  }
+  return null;
+}
+
+function syncSourceFileUi() {
+  const txtZone = document.getElementById("txtZone");
+  const xlsxZone = document.getElementById("xlsxZone");
+  const txtNameEl = document.getElementById("txtName");
+  const xlsxNameEl = document.getElementById("xlsxName");
+  const rerunTxtNameEl = document.getElementById("rerunTxtName");
+  const rerunXlsxNameEl = document.getElementById("rerunXlsxName");
+  const primaryGrid = document.querySelector(".inputs-grid");
+  const runBtnField = document.getElementById("runBtn")?.closest(".field");
+  const savedSummary = document.getElementById("savedSourcesSummary");
+  const savedSummaryBody = document.getElementById("savedSourcesSummaryBody");
+  const rerunIntro = document.getElementById("rerunPanelIntro");
+
+  const txt = resolveTxtSourceDisplay();
+  const xlsx = resolveXlsxSourceDisplay();
+  const viewingSavedOnly = !!(state.cmp?.length && !hasSourceBuffers());
+
+  if (primaryGrid) primaryGrid.style.display = viewingSavedOnly ? "none" : "";
+  if (runBtnField) runBtnField.style.display = viewingSavedOnly ? "none" : "";
+
+  if (savedSummary && savedSummaryBody) {
+    if (viewingSavedOnly && (txt || xlsx)) {
+      savedSummary.style.display = "";
+      const lines = [];
+      if (txt) lines.push(`<strong>TXT:</strong> ${escapeHtml(txt.name)}`);
+      if (xlsx) lines.push(`<strong>7501:</strong> ${escapeHtml(xlsx.name)}`);
+      savedSummaryBody.innerHTML = lines.join("<br>");
+    } else {
+      savedSummary.style.display = "none";
+      savedSummaryBody.innerHTML = "";
+    }
+  }
+
+  if (rerunIntro) {
+    rerunIntro.textContent = viewingSavedOnly
+      ? "Adjust freight/insurance below, or upload replacement files to re-run this saved entry."
+      : "Adjust freight/insurance or replace source files, then re-run without deleting the saved run.";
+  }
+
+  const primaryTxtLabel = (d) => {
+    if (d.context === "session" && state.txtFiles.length) {
+      return `Add more .txt files (${state.txtFiles.length} loaded)`;
+    }
+    return d.loaded ? d.name : `${d.name} (saved — upload to run fresh)`;
+  };
+  const primaryXlsxLabel = (d) => (d.loaded ? d.name : `${d.name} (saved — upload to run fresh)`);
+  const rerunLabel = (d) => {
+    if (d.context === "rerun") return d.name;
+    if (d.loaded) return d.name;
+    return `${d.name} (saved)`;
+  };
+
+  if (txt) {
+    if (txtNameEl && !viewingSavedOnly) {
+      txtNameEl.textContent = primaryTxtLabel(txt);
+      txtZone?.classList.toggle("has-file", txt.loaded && txt.context === "session");
+      txtZone?.classList.toggle("has-file-meta", !txt.loaded || txt.context === "saved");
+    }
+    if (rerunTxtNameEl) rerunTxtNameEl.textContent = rerunLabel(txt);
+  } else {
+    if (txtNameEl && !viewingSavedOnly) {
+      txtNameEl.textContent = "Click to add .txt files";
+      txtZone?.classList.remove("has-file", "has-file-meta");
+    }
+    if (rerunTxtNameEl) {
+      rerunTxtNameEl.textContent = state.raw?.length
+        ? "Using data from this run"
+        : "Click to add/replace TXT";
+    }
+  }
+
+  if (xlsx) {
+    if (xlsxNameEl && !viewingSavedOnly) {
+      xlsxNameEl.textContent = primaryXlsxLabel(xlsx);
+      xlsxZone?.classList.toggle("has-file", xlsx.loaded && xlsx.context === "session");
+      xlsxZone?.classList.toggle("has-file-meta", !xlsx.loaded || xlsx.context === "saved");
+    }
+    if (rerunXlsxNameEl) rerunXlsxNameEl.textContent = rerunLabel(xlsx);
+  } else {
+    if (xlsxNameEl && !viewingSavedOnly) {
+      xlsxNameEl.textContent = "Click to choose .xlsx";
+      xlsxZone?.classList.remove("has-file", "has-file-meta");
+    }
+    if (rerunXlsxNameEl) rerunXlsxNameEl.textContent = "Click to replace 7501";
+  }
+
+  updateRunBtn();
 }
 
 // ============================================================
 //  TXT parser  (UTF-16-LE, tab-delimited)
 // ============================================================
+function scrubInvoiceRaw(v) {
+  return String(v ?? "")
+    .replace(/\0/g, "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim();
+}
+
+// Pull bare invoice numbers from 7501-style strings, e.g. "001/04-29640" → ["29640"].
+// Also tolerates spaced/null-separated TXT digits ("2 9 6 4 0" → "29640").
+function extractInvoiceNumbers(v) {
+  const raw = scrubInvoiceRaw(v);
+  if (!raw || raw === "—") return [];
+  const parts = raw.split(/[,;]+/).map(p => p.trim()).filter(Boolean);
+  const numbers = [];
+  for (const part of (parts.length ? parts : [raw])) {
+    let seg = part.split("/").pop() || part;
+    seg = (seg.split(/[-–—]/).pop() || seg).trim();
+    const digits = seg.replace(/\D/g, "");
+    if (digits.length >= 3) {
+      numbers.push(digits);
+      continue;
+    }
+    const runs = part.match(/\d{3,}/g);
+    if (runs) numbers.push(...runs);
+  }
+  return [...new Set(numbers.filter(Boolean))];
+}
+
+function normalizeInvoiceNumber(v) {
+  const nums = extractInvoiceNumbers(v);
+  if (!nums.length) {
+    const s = scrubInvoiceRaw(v);
+    return s || "(blank)";
+  }
+  return nums.sort((a, b) => b.length - a.length || a.localeCompare(b))[0];
+}
+
+function collect7501InvoiceNumbers(xlRows) {
+  const set = new Set();
+  for (const r of xlRows || []) {
+    for (const n of extractInvoiceNumbers(r["28. CM Invoice No"])) set.add(n);
+  }
+  return [...set];
+}
+
+function invoiceNumberMatches(txtInv, filedInvRaw, filedNums = []) {
+  const txtNorm = normalizeInvoiceNumber(txtInv);
+  if (!txtNorm || txtNorm === "(blank)") return false;
+  if (filedNums.includes(txtNorm)) return true;
+  const filedRaw = scrubInvoiceRaw(filedInvRaw);
+  if (!filedRaw || filedRaw === "—") return false;
+  if (extractInvoiceNumbers(filedRaw).includes(txtNorm)) return true;
+  return filedRaw.replace(/\D/g, "").includes(txtNorm);
+}
+
+function detectInvoiceMismatch(txtInvoices, invoiceSummary, invoiceFiledRaw, xlRows) {
+  const filedRaw = String(invoiceFiledRaw || "").trim();
+  const filedNums = collect7501InvoiceNumbers(xlRows);
+  const txtNorms = [...new Set(
+    (txtInvoices || []).map(inv => normalizeInvoiceNumber(inv)).filter(n => n && n !== "(blank)")
+  )];
+  if (!txtNorms.length || filedRaw === "—" || (!filedRaw && !filedNums.length)) return null;
+
+  const matchesFiled = (norm) =>
+    filedNums.includes(norm) || invoiceNumberMatches(norm, filedRaw, filedNums);
+
+  const missing = txtNorms.filter(norm => !matchesFiled(norm));
+  if (!missing.length) return null;
+  if (missing.length === txtNorms.length) {
+    return { txt: invoiceSummary, filed: filedRaw };
+  }
+  return { txt: `Missing from 7501: ${missing.join(", ")}`, filed: filedRaw };
+}
+
+function aggGroupKey(origin, hts, mid, invoice) {
+  return `${(origin || "").trim().toUpperCase()}|${htsNormalize(hts)}|${(mid || "").trim()}|${normalizeInvoiceNumber(invoice)}`;
+}
+
 function parseInditexTxt(buf) {
   // Decode UTF-16 little-endian
   const decoder = new TextDecoder("utf-16le");
@@ -2372,6 +2822,7 @@ function parseInditexTxt(buf) {
       }
       row[h] = v;
     });
+    row.INVOICE_NUMBER = row.INVOICE_NUMBER ?? row.INVOICE_NO ?? row["INVOICE NUMBER"] ?? row["Invoice Number"] ?? "";
     rows.push(row);
   }
   return rows;
@@ -2485,12 +2936,14 @@ function allocateCharges(rows, valueKey, totalInvoice, freight, insurance) {
 function aggregateMethodB(txt) {
   const groups = new Map();
   for (const r of txt) {
-    const key = `${(r.ORIGIN||"").trim()}|${(r.DESTINATION_HS||"").trim()}|${(r.MID||"").trim()}`;
+    const inv = normalizeInvoiceNumber(r.INVOICE_NUMBER);
+    const key = aggGroupKey(r.ORIGIN, r.DESTINATION_HS, r.MID, inv);
     if (!groups.has(key)) {
       groups.set(key, {
-        ORIGIN: (r.ORIGIN||"").trim(),
-        DESTINATION_HS: (r.DESTINATION_HS||"").trim(),
-        MID: (r.MID||"").trim(),
+        ORIGIN: (r.ORIGIN || "").trim(),
+        DESTINATION_HS: (r.DESTINATION_HS || "").trim(),
+        MID: (r.MID || "").trim(),
+        INVOICE_NUMBER: inv,
         INVOICE_VALUE: 0, QUANTITY: 0, NET_WEIGHT_KG: 0, RAW_LINES: 0,
       });
     }
@@ -2500,8 +2953,9 @@ function aggregateMethodB(txt) {
     g.NET_WEIGHT_KG += Number(r.TOT_NET_WEIGHT) || 0;
     g.RAW_LINES += 1;
   }
-  const arr = Array.from(groups.values()).sort((a,b) => {
-    return a.ORIGIN.localeCompare(b.ORIGIN) ||
+  const arr = Array.from(groups.values()).sort((a, b) => {
+    return String(a.INVOICE_NUMBER).localeCompare(String(b.INVOICE_NUMBER)) ||
+           a.ORIGIN.localeCompare(b.ORIGIN) ||
            a.DESTINATION_HS.localeCompare(b.DESTINATION_HS) ||
            a.MID.localeCompare(b.MID);
   });
@@ -2570,6 +3024,7 @@ function build7501Filed(xl) {
         HTS: r["29. CD HTS US Code"] || "",
         COO: r["27. CM Country Of Origin"] || "",
         MID: r["28. CM Manufacturer ID"] || "",
+        INVOICE_NO: normalizeInvoiceNumber(r["28. CM Invoice No"]),
         ENTERED_VALUE: r["32. CM Item Entered Value"],
         CHARGES: r["32. CM Item Charges"],
         MFN_RATE_STR: r["33. CD HTS US Rate"],
@@ -2604,26 +3059,30 @@ function build7501Filed(xl) {
 
 function compareAggToFiled(agg, filed, rules) {
   const filedByStrict = new Map();
+  const filedByStrictNoInv = new Map();
   const filedByLoose = new Map();   // COO|HTS → [filed indexes]
   filed.forEach((f, i) => {
-    const sk = `${f.COO}|${htsNormalize(f.HTS)}|${f.MID}`;
-    filedByStrict.set(sk, i);
+    const inv = normalizeInvoiceNumber(f.INVOICE_NO);
+    const sk = `${f.COO}|${htsNormalize(f.HTS)}|${f.MID}|${inv}`;
+    const skNoInv = `${f.COO}|${htsNormalize(f.HTS)}|${f.MID}`;
+    if (!filedByStrict.has(sk)) filedByStrict.set(sk, i);
+    if (!filedByStrictNoInv.has(skNoInv)) filedByStrictNoInv.set(skNoInv, i);
     const lk = `${f.COO}|${htsNormalize(f.HTS)}`;
     if (!filedByLoose.has(lk)) filedByLoose.set(lk, []);
     filedByLoose.get(lk).push(i);
   });
 
-  const aggByStrict = new Map();
-  agg.forEach((a, i) => aggByStrict.set(`${a.ORIGIN}|${htsNormalize(a.DESTINATION_HS)}|${a.MID}`, i));
-
   const usedFiledIdx = new Set();
   const out = [];
 
-  // Strict pass
+  // Strict pass (invoice-aware when available)
   for (const a of agg) {
-    const sk = `${a.ORIGIN}|${htsNormalize(a.DESTINATION_HS)}|${a.MID}`;
-    if (filedByStrict.has(sk)) {
-      const fi = filedByStrict.get(sk);
+    const inv = normalizeInvoiceNumber(a.INVOICE_NUMBER);
+    const sk = `${a.ORIGIN}|${htsNormalize(a.DESTINATION_HS)}|${a.MID}|${inv}`;
+    const skNoInv = `${a.ORIGIN}|${htsNormalize(a.DESTINATION_HS)}|${a.MID}`;
+    let fi = filedByStrict.get(sk);
+    if (fi == null) fi = filedByStrictNoInv.get(skNoInv);
+    if (fi != null && !usedFiledIdx.has(fi)) {
       const f = filed[fi];
       usedFiledIdx.add(fi);
       out.push(makeCompareRow(a, f, "STRICT", rules));
@@ -2674,6 +3133,8 @@ function makeCompareRow(a, f, matchType, rules) {
     HTS: a ? htsFormat(a.DESTINATION_HS) : (f ? htsFormat(f.HTS) : ""),
     MID_TXT: a ? a.MID : "",
     MID_75: f ? f.MID : "",
+    INVOICE_TXT: a ? (a.INVOICE_NUMBER || "") : "",
+    INVOICE_7501: f ? (f.INVOICE_NO || "") : "",
     INV_VALUE: a ? a.INVOICE_VALUE : null,
     ENTERED_VALUE_TXT: a ? a.ENTERED_VALUE : null,
     ENTERED_VALUE_75: f ? Number(f.ENTERED_VALUE) || null : null,
@@ -3317,6 +3778,89 @@ document.getElementById("userModalSave").addEventListener("click", async () => {
 });
 
 const RUNS_KEY = "inditex_audit_runs_v1";
+const RUNS_REFRESH_MS = 45000;
+const RUNS_PAGE_SIZE = 25;
+const FULL_RUN_CACHE_MAX = 8;
+
+let _runsRefreshAt = 0;
+let _rdPage = 0;
+let _rdSelectedIds = new Set();
+let _activeTab = "comparison";
+let _renderRunsTimer = null;
+let _inputsCollapsed = false;
+
+function setInputsCollapsed(collapsed) {
+  _inputsCollapsed = !!collapsed;
+  const body = document.getElementById("inputsCollapseBody");
+  const btn = document.getElementById("inputsCollapseBtn");
+  if (body) body.classList.toggle("is-collapsed", _inputsCollapsed);
+  if (btn) {
+    btn.textContent = _inputsCollapsed ? "Show inputs ▼" : "Hide ▲";
+    btn.setAttribute("aria-expanded", String(!_inputsCollapsed));
+  }
+}
+
+function toggleInputsCollapsed() {
+  setInputsCollapsed(!_inputsCollapsed);
+}
+
+function isSummaryRun(r) {
+  return !!(r && r._summaryOnly);
+}
+
+function isFullRun(r) {
+  return !!(r && r.state && ((r.state.filed && r.state.filed.length) || (r.state.agg && r.state.agg.length)) && !r._summaryOnly);
+}
+
+function summaryRowToRun(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    savedAt: row.saved_at,
+    findingsCount: row.findings_count ?? 0,
+    findingsCritical: row.findings_critical ?? 0,
+    findingsHigh: row.findings_high ?? 0,
+    inputs: {
+      freight: row.freight ?? 0,
+      insurance: row.insurance ?? 0,
+      txtName: row.txt_name || "",
+      xlsxName: row.xlsx_name || "",
+    },
+    state: {
+      ctx: {
+        entryNum: row.entry_num || "",
+        invoice: row.invoice_num || "",
+        importer: row.importer || "",
+        aggLines: row.agg_lines ?? 0,
+        enteredAgg: row.entered_value,
+        filedCH99: row.total_duty,
+      },
+      agg: [],
+    },
+    _summaryOnly: true,
+  };
+}
+
+function fullSnapshotToListRun(r) {
+  const ctx = r.state?.ctx || {};
+  return {
+    id: r.id,
+    name: r.name,
+    savedAt: r.savedAt,
+    findingsCount: r.findingsCount ?? 0,
+    findingsCritical: r.findingsCritical ?? 0,
+    findingsHigh: r.findingsHigh ?? 0,
+    inputs: { ...(r.inputs || {}) },
+    state: {
+      ctx: {
+        ...ctx,
+        aggLines: r.state?.agg?.length || ctx.aggLines || 0,
+      },
+      agg: [],
+    },
+    _summaryOnly: true,
+  };
+}
 
 // Robust storage shim — three backends in priority order:
 //   1. "postgres" via the local Flask server (auto-detected via /api/health)
@@ -3330,9 +3874,23 @@ const RUNS_KEY = "inditex_audit_runs_v1";
 const runStore = (() => {
   let backend = "localStorage";
   let memory = null;
-  let cache = [];   // used when backend === "postgres"
+  let cache = [];   // list rows (summaries in postgres mode, full in localStorage)
+  let fullCache = new Map();
   let apiBase = "";
   let serverInfo = null;
+
+  function trimFullCache() {
+    while (fullCache.size > FULL_RUN_CACHE_MAX) {
+      const first = fullCache.keys().next().value;
+      fullCache.delete(first);
+    }
+  }
+
+  function rememberFull(r) {
+    if (!r || !r.id) return;
+    fullCache.set(r.id, r);
+    trimFullCache();
+  }
 
   // Sync probe for localStorage availability
   try {
@@ -3369,20 +3927,67 @@ const runStore = (() => {
       }
     },
 
-    /** Re-pull the full run list from Postgres (no limit). */
+    /** Re-pull run list from Postgres (metadata only — full snapshots loaded on demand). */
     async refresh() {
       if (backend !== "postgres") return false;
       try {
-        const listRes = await authFetch(apiBase + "/runs");
+        const listRes = await authFetch(apiBase + "/runs/_summary");
         if (listRes.ok) {
-          cache = await listRes.json();
+          cache = (await listRes.json()).map(summaryRowToRun);
           if (serverInfo) serverInfo.run_count = cache.length;
+          _runsRefreshAt = Date.now();
           return true;
         }
       } catch (e) {
         console.warn("runStore.refresh failed:", e.message);
       }
       return false;
+    },
+
+    async fetchRun(id, { force = false } = {}) {
+      if (!force && fullCache.has(id)) return fullCache.get(id);
+      if (backend !== "postgres") {
+        const runs = JSON.parse(this.get() || "[]");
+        const r = runs.find(x => x.id === id);
+        if (r) rememberFull(r);
+        return r || null;
+      }
+      const res = await authFetch(apiBase + "/runs/" + encodeURIComponent(id));
+      if (!res.ok) throw new Error((await res.text()).slice(0, 120) || "fetch failed");
+      const r = await res.json();
+      rememberFull(r);
+      return r;
+    },
+
+    getCachedFull(id) {
+      return fullCache.get(id) || null;
+    },
+
+    async saveRun(r) {
+      if (!r || !r.id) return { ok: false };
+      if (backend === "postgres") {
+        const res = await authFetch(apiBase + "/runs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(r),
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          toast(`Database save failed for "${r.name}": ${t.slice(0, 120)}`, "error");
+          return { ok: false };
+        }
+        rememberFull(r);
+        const listItem = fullSnapshotToListRun(r);
+        const idx = cache.findIndex(x => x.id === r.id);
+        if (idx >= 0) cache[idx] = listItem;
+        else cache.unshift(listItem);
+        return { ok: true };
+      }
+      const runs = JSON.parse(this.get() || "[]");
+      const idx = runs.findIndex(x => x.id === r.id);
+      if (idx >= 0) runs[idx] = r;
+      else runs.unshift(r);
+      return this.set(JSON.stringify(runs));
     },
 
     // SYNC reads — backed by cache (postgres) or localStorage/memory
@@ -3412,18 +4017,16 @@ const runStore = (() => {
 
         const toPost = [];
         for (const r of runs) {
-          if (!r || !r.id) continue;
+          if (!r || !r.id || !isFullRun(r)) continue;
           const existing = cacheById.get(r.id);
           if (!existing) {
-            toPost.push(r);   // brand-new run
+            toPost.push(r);
           } else if (existing.savedAt !== r.savedAt || existing.name !== r.name) {
-            toPost.push(r);   // mutated run (renamed or re-saved)
+            toPost.push(r);
           }
         }
 
         if (toPost.length > 0) {
-          // POST each new/changed run. Fire-and-forget per request, but await all
-          // to keep error surfacing predictable.
           Promise.all(toPost.map(r =>
             authFetch(apiBase + "/runs", {
               method: "POST",
@@ -3436,7 +4039,15 @@ const runStore = (() => {
             }).catch(e => toast(`Database save failed: ${e.message}`, "error"))
           ));
         }
-        cache = runs;
+        for (const r of runs) {
+          if (isFullRun(r)) {
+            rememberFull(r);
+            const listItem = fullSnapshotToListRun(r);
+            const idx = cache.findIndex(x => x.id === r.id);
+            if (idx >= 0) cache[idx] = listItem;
+            else cache.unshift(listItem);
+          }
+        }
         return { ok: true, pruned: 0, posted: toPost.length };
       }
       if (backend === "memory") { memory = val; return { ok: true, pruned: 0 }; }
@@ -3477,10 +4088,36 @@ const runStore = (() => {
         await authFetch(apiBase + "/runs/" + encodeURIComponent(id), { method: "DELETE" })
           .catch(e => toast(`Database delete failed: ${e.message}`, "error"));
         cache = cache.filter(r => r.id !== id);
+        fullCache.delete(id);
         return;
       }
       const runs = JSON.parse(this.get() || "[]").filter(r => r.id !== id);
       this.set(JSON.stringify(runs));
+    },
+
+    async deleteRuns(ids) {
+      const idList = (ids || []).filter(Boolean);
+      if (!idList.length) return 0;
+      if (backend === "postgres") {
+        const res = await authFetch(apiBase + "/runs/_bulk_delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: idList }),
+        });
+        if (!res.ok) {
+          toast(`Bulk delete failed: ${(await res.text()).slice(0, 120)}`, "error");
+          return 0;
+        }
+        const body = await res.json();
+        const idSet = new Set(idList);
+        cache = cache.filter(r => !idSet.has(r.id));
+        idList.forEach(id => fullCache.delete(id));
+        return body.deleted ?? idList.length;
+      }
+      const idSet = new Set(idList);
+      const runs = JSON.parse(this.get() || "[]").filter(r => !idSet.has(r.id));
+      this.set(JSON.stringify(runs));
+      return idList.length;
     },
 
     // Postgres-aware rename
@@ -3505,6 +4142,7 @@ const runStore = (() => {
         await authFetch(apiBase + "/runs", { method: "DELETE" })
           .catch(e => toast(`Database clear failed: ${e.message}`, "error"));
         cache = [];
+        fullCache.clear();
         return;
       }
       if (backend === "memory") { memory = "[]"; return; }
@@ -3526,7 +4164,7 @@ function renderStorageBanner() {
     banner.id = "storageBanner";
     banner.style.cssText = "background: var(--marigold-50); border: 1px solid var(--marigold-100); border-left: 4px solid var(--marigold-500); padding: 10px 14px; margin: 0 0 14px 0; border-radius: 6px; font-size: 13px; color: var(--gray-800);";
     banner.innerHTML = `<strong style="color: var(--marigold-700);">⚠ In-memory only.</strong> Your browser blocks localStorage on <code>file://</code> URLs. Runs will be lost when you close this tab. Use <strong>Export all</strong> to save them as a JSON file and <strong>Import</strong> to load them back later.`;
-    const panel = document.getElementById("panel-runs");
+    const panel = document.getElementById("inputsCard");
     if (panel) panel.insertBefore(banner, panel.firstChild);
   }
 }
@@ -3559,7 +4197,7 @@ function saveRunsToStorage(runs) {
   return result;
 }
 
-function snapshotCurrentRun(name) {
+function snapshotCurrentRun(name, existingId) {
   if (!state.cmp) return null;
   // Aggressively slimmed snapshot — saves only the source-of-truth and rebuilds
   // everything derived (cmp, findings) on load.
@@ -3569,8 +4207,7 @@ function snapshotCurrentRun(name) {
   //   - cmp / findings: dropped (rebuilt via compareAggToFiled + buildFindings on load)
   //   - filed: redundant string fields stripped (CH99_HTS_LIST, MFN_RATE_STR, COTTON_RATE)
   const RAW_KEEP = [
-    // MANUFACTURER_NAME dropped on save (30+ bytes per row, not searched in Raw Lines tab)
-    "TXT_LINE","CUSTOMS_SKU","ORIGIN","DESTINATION_HS","MID",
+    "TXT_LINE","TXT_SOURCE","INVOICE_NUMBER","CUSTOMS_SKU","ORIGIN","DESTINATION_HS","MID",
     "QUANTITY","UNIT_PRICE","AMOUNT","TOT_NET_WEIGHT",
     "ALLOC_FREIGHT","ALLOC_INSURANCE","ENTERED_VALUE",
     "MFN_RATE_PCT","MFN_DUTY_EXP","CH99_EXP","CH99_DUTY_EXP",
@@ -3603,6 +4240,7 @@ function snapshotCurrentRun(name) {
   }
   const slimFiled = state.filed.map(r => ({
     ITEM: r.ITEM, HTS: r.HTS, COO: r.COO, MID: r.MID,
+    INVOICE_NO: r.INVOICE_NO,
     ENTERED_VALUE: r.ENTERED_VALUE,
     MFN_RATE_PCT: r.MFN_RATE_PCT, MFN_DUTY: r.MFN_DUTY,
     SPECIFIC_DUTY: r.SPECIFIC_DUTY,
@@ -3619,17 +4257,18 @@ function snapshotCurrentRun(name) {
   const findingsHigh     = state.findings?.filter(f => f.sev === "High").length || 0;
 
   return {
-    id: "run_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+    id: existingId || ("run_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8)),
     name: name || defaultRunName(),
     savedAt: new Date().toISOString(),
-    schemaVersion: 4,
+    schemaVersion: 5,
     rawDropped,            // tells renderRaw on load why raw is empty
     rawRowCount: state.raw?.length || 0,   // for the empty-state message
     findingsCount,
     findingsCritical,
     findingsHigh,
     inputs: {
-      txtName: state.txtName, xlsxName: state.xlsxName,
+      ...txtInputsSummary(),
+      xlsxName: state.xlsxName,
       freight: parseFloat(document.getElementById("freight").value) || 0,
       insurance: parseFloat(document.getElementById("insurance").value) || 0,
     },
@@ -3658,9 +4297,15 @@ function rehydrateRun(r) {
   if (raw && raw.length > 0 && !("CUSTOMS_SKU" in raw[0]) && ("SKU_SALES_UNIT" in raw[0])) {
     raw = raw.map(row => ({ ...row, CUSTOMS_SKU: row.SKU_SALES_UNIT }));
   }
-  if (!cmp) {
-    // Schema v3 — rebuild cmp from agg + filed + date-filtered rules
-    cmp = compareAggToFiled(r.state.agg, r.state.filed, effectiveRules);
+  let agg = r.state.agg || [];
+  const aggNeedsInvoiceKey = agg.length && raw.length && (r.schemaVersion == null || r.schemaVersion < 5 || agg[0].INVOICE_NUMBER == null);
+  // v4 and older: re-aggregate from raw when invoice number was not part of the agg key
+  if (aggNeedsInvoiceKey) {
+    agg = aggregateMethodB(raw);
+  }
+  if (!cmp || aggNeedsInvoiceKey) {
+    // Schema v3+ — rebuild cmp from agg + filed + date-filtered rules
+    cmp = compareAggToFiled(agg, r.state.filed, effectiveRules);
   } else if (cmp[0] && "CH99_EXPECTED_CODES" in cmp[0]) {
     // Schema v2 — codes-only Ch99 expected, re-expand to full layer objects
     cmp = cmp.map(row => {
@@ -3676,7 +4321,7 @@ function rehydrateRun(r) {
   if (!findings) {
     findings = buildFindings(cmp, ctx);
   }
-  return { ...r.state, raw, cmp, findings };
+  return { ...r.state, raw, agg, cmp, findings };
 }
 
 function recomputeRawDuties(raw, filed, effectiveRules) {
@@ -3708,31 +4353,70 @@ function recomputeRawDuties(raw, filed, effectiveRules) {
   });
 }
 
-function recomputeSavedRun(r) {
-  const ctx = { ...(r.state?.ctx || {}) };
-  const effectiveRules = ctx.applicableDate ? rulesInEffectOn(state.rules, ctx.applicableDate) : state.rules;
-  let raw = r.state?.raw || [];
-  const filed = r.state?.filed || [];
-  const agg = r.state?.agg || [];
+function reallocateSavedRunData(r, freight, insurance) {
+  const agg = (r.state?.agg || []).map(a => ({ ...a }));
+  const raw = (r.state?.raw || []).map(row => ({ ...row }));
+  const totalInvoice = raw.length
+    ? raw.reduce((s, row) => s + (Number(row.AMOUNT) || 0), 0)
+    : agg.reduce((s, row) => s + (Number(row.INVOICE_VALUE) || 0), 0);
+  const newAgg = agg.length
+    ? allocateCharges(agg, "INVOICE_VALUE", totalInvoice, freight, insurance)
+    : agg;
+  const newRaw = raw.length
+    ? allocateCharges(raw, "AMOUNT", totalInvoice, freight, insurance)
+    : raw;
+  return { newAgg, newRaw };
+}
+
+function recomputeSavedRun(r, options = {}) {
+  const freight = options.freight ?? r.inputs?.freight ?? 0;
+  const insurance = options.insurance ?? r.inputs?.insurance ?? 0;
+  const filed = options.filed ?? r.state?.filed ?? [];
+  const { newAgg, newRaw } = reallocateSavedRunData(r, freight, insurance);
+  let agg = newAgg;
+  let raw = newRaw;
+  const totalInvoice = raw.length
+    ? raw.reduce((s, row) => s + (Number(row.AMOUNT) || 0), 0)
+    : agg.reduce((s, row) => s + (Number(row.INVOICE_VALUE) || 0), 0);
+  const effectiveRules = (r.state?.ctx?.applicableDate)
+    ? rulesInEffectOn(state.rules, r.state.ctx.applicableDate)
+    : state.rules;
   if (raw.length && filed.length) {
     raw = recomputeRawDuties(raw, filed, effectiveRules);
   }
   const cmp = compareAggToFiled(agg, filed, effectiveRules);
+  const ctx = {
+    ...(r.state?.ctx || {}),
+    freight,
+    insurance,
+    totalInvoice,
+    enteredAgg: agg.reduce((s, row) => s + (Number(row.ENTERED_VALUE) || 0), 0),
+    enteredFiled: filed.reduce((s, row) => s + (Number(row.ENTERED_VALUE) || 0), 0),
+    aggLines: agg.length,
+    filedLines: filed.length,
+    txtLines: raw.length || r.state?.ctx?.txtLines || 0,
+    strictMatched: cmp.filter(x => x.MATCH === "STRICT").length,
+    looseMatched: cmp.filter(x => x.MATCH && x.MATCH.startsWith("LOOSE")).length,
+    noMatch: cmp.filter(x => x.MATCH && x.MATCH.startsWith("NO MATCH")).length,
+    midMismatch: cmp.filter(x => x.MID_CHECK === "MISMATCH").length,
+    ch99Mismatch: cmp.filter(x => x.CH99_CHECK === "MISMATCH" || x.CH99_CHECK === "MISSING").length,
+    effectiveRulesCount: effectiveRules.length,
+    totalRulesCount: state.rules.length,
+  };
   const findings = buildFindings(cmp, ctx);
-  ctx.strictMatched = cmp.filter(x => x.MATCH === "STRICT").length;
-  ctx.looseMatched = cmp.filter(x => x.MATCH && x.MATCH.startsWith("LOOSE")).length;
-  ctx.noMatch = cmp.filter(x => x.MATCH && x.MATCH.startsWith("NO MATCH")).length;
-  ctx.midMismatch = cmp.filter(x => x.MID_CHECK === "MISMATCH").length;
-  ctx.ch99Mismatch = cmp.filter(x => x.CH99_CHECK === "MISMATCH" || x.CH99_CHECK === "MISSING").length;
-  ctx.effectiveRulesCount = effectiveRules.length;
-  ctx.totalRulesCount = state.rules.length;
   return {
     ...r,
     savedAt: new Date().toISOString(),
     findingsCount: findings.length,
     findingsCritical: findings.filter(f => f.sev === "Critical").length,
     findingsHigh: findings.filter(f => f.sev === "High").length,
-    state: { raw, agg, filed, ctx },
+    inputs: {
+      ...(r.inputs || {}),
+      freight,
+      insurance,
+      ...(options.inputsPatch || {}),
+    },
+    state: { raw, agg, filed, ctx, cmp, findings },
   };
 }
 
@@ -3745,8 +4429,21 @@ async function rerunAllSavedAudits() {
   if (!confirm(`Re-run ${runs.length} saved audit(s) with the current HTS table and Chapter 99 rules?`)) return;
   const statusEl = document.getElementById("rerunAllStatus");
   if (statusEl) statusEl.textContent = "Recomputing…";
-  const updated = runs.map(recomputeSavedRun);
-  saveRunsToStorage(updated);
+  const updated = [];
+  for (let i = 0; i < runs.length; i++) {
+    let r = runs[i];
+    if (isSummaryRun(r)) {
+      try { r = await runStore.fetchRun(r.id); }
+      catch (e) { console.warn("rerun fetch failed", r.id, e); continue; }
+    }
+    updated.push(recomputeSavedRun(r));
+    if (statusEl && runs.length > 5) statusEl.textContent = `Recomputing ${i + 1}/${runs.length}…`;
+  }
+  if (runStore.backend === "postgres") {
+    for (const r of updated) await runStore.saveRun(r);
+  } else {
+    saveRunsToStorage(updated);
+  }
   const activeId = state.activeRunId;
   if (activeId && updated.some(r => r.id === activeId)) {
     loadRunById(activeId);
@@ -3764,10 +4461,23 @@ function defaultRunName() {
   return `Entry ${c.entryNum || "—"} · Invoice ${c.invoice || "—"} · ${today}`;
 }
 
-function saveCurrentRun(customName) {
+function saveCurrentRun(customName, existingId) {
   if (!state.cmp) { toast("No audit to save — run one first.", "error"); return false; }
+  const snap = snapshotCurrentRun(customName, existingId || state.activeRunId);
+  if (runStore.backend === "postgres") {
+    runStore.saveRun(snap).then(result => {
+      if (result.ok) {
+        state.activeRunId = snap.id;
+        setActiveBadge(snap.name);
+        _logActivity("saved", snap);
+        scheduleRenderRuns(true);
+        _syncDashPill();
+        toast(`Saved: ${snap.name} → Database`, "success");
+      }
+    });
+    return true;
+  }
   const runs = loadRunsFromStorage();
-  const snap = snapshotCurrentRun(customName);
   runs.unshift(snap);
   const result = saveRunsToStorage(runs);
   state.activeRunId = snap.id;
@@ -3874,40 +4584,92 @@ async function toggleView(name) {
   await openView(name);
 }
 
-function loadRunById(id) {
-  const runs = loadRunsFromStorage();
-  const r = runs.find(x => x.id === id);
-  if (!r) { toast("Run not found.", "error"); return; }
-  // Hydrate state (with rehydration of slimmed fields)
-  const fullState = rehydrateRun(r);
-  state.raw = fullState.raw || [];
-  state.agg = fullState.agg;
-  state.filed = fullState.filed;
-  state.cmp = fullState.cmp;
-  state.findings = fullState.findings;
-  state.ctx = fullState.ctx;
-  state.activeRunId = r.id;
-  state.isLoadedRun = true;   // flag so renderRaw can show "raw not in saved run"
-  state.rawDropped = !!r.rawDropped;       // saved snapshot dropped raw to fit budget
-  state.rawRowCount = r.rawRowCount || 0;  // original raw row count (for messaging)
-  // Restore input fields
-  document.getElementById("freight").value = r.inputs.freight ?? 0;
-  document.getElementById("insurance").value = r.inputs.insurance ?? 0;
-  // Reset filter selects that are populated once
-  ["rawFilterCOO","rawFilterHTS","aggFilterCOO","filedFilterCOO","stackFilterCOO"].forEach(sid => {
+let _loadRunSeq = 0;
+
+function clearUploadedFiles() {
+  state.txtFiles = [];
+  state.txtBuffer = null;
+  state.txtName = null;
+  state.xlsxBuffer = null;
+  state.xlsxName = null;
+  state.rerunTxtFiles = [];
+  state.rerunTxtBuffer = null;
+  state.rerunTxtName = null;
+  state.rerunXlsxBuffer = null;
+  state.rerunXlsxName = null;
+  state.savedInputMeta = null;
+  const txtFile = document.getElementById("txtFile");
+  const xlsxFile = document.getElementById("xlsxFile");
+  if (txtFile) txtFile.value = "";
+  if (xlsxFile) xlsxFile.value = "";
+  const rerunTxtFile = document.getElementById("rerunTxtFile");
+  const rerunXlsxFile = document.getElementById("rerunXlsxFile");
+  if (rerunTxtFile) rerunTxtFile.value = "";
+  if (rerunXlsxFile) rerunXlsxFile.value = "";
+}
+
+function restoreSavedRunInputs(r) {
+  clearUploadedFiles();
+  const inputs = r?.inputs || {};
+  state.savedInputMeta = {
+    txtName: inputs.txtName || "",
+    xlsxName: inputs.xlsxName || "",
+    txtFiles: inputs.txtFiles || [],
+  };
+  renderTxtFilesList();
+  syncSourceFileUi();
+}
+
+function resetAuditFilterSelects() {
+  ["rawFilterCOO", "rawFilterHTS", "aggFilterCOO", "filedFilterCOO", "stackFilterCOO"].forEach(sid => {
     const sel = document.getElementById(sid);
     if (sel) {
       while (sel.options.length > 1) sel.remove(1);
       sel.value = "";
     }
   });
-  setActiveBadge(r.name);
-  _logActivity("loaded", r);
-  closeDashOverlay();
-  render();
-  toast("Audit loaded: " + r.name, "success");
-  // Switch to Comparison tab
-  document.querySelector('.tab[data-tab="comparison"]').click();
+}
+
+function loadRunById(id) {
+  return loadRunByIdAsync(id);
+}
+
+async function loadRunByIdAsync(id) {
+  const seq = ++_loadRunSeq;
+  try {
+    toast("Loading run…", "info");
+    let r = null;
+    if (runStore.backend === "postgres") {
+      r = await runStore.fetchRun(id, { force: true });
+    } else {
+      r = runStore.getCachedFull(id);
+      if (!r) {
+        const listed = loadRunsFromStorage().find(x => x.id === id);
+        if (listed && isFullRun(listed)) r = listed;
+      }
+      if (!r || isSummaryRun(r)) r = await runStore.fetchRun(id);
+    }
+    if (seq !== _loadRunSeq) return;
+    if (!r) { toast("Run not found.", "error"); return; }
+
+    const fullState = rehydrateRun(r);
+    applyRehydratedToState(r, fullState);
+    state.activeRunId = r.id;
+    restoreSavedRunInputs(r);
+    resetAuditFilterSelects();
+    setActiveBadge(r.name);
+    _logActivity("loaded", r);
+    _rdSelectedId = id;
+    closeDashOverlay();
+    setInputsCollapsed(true);
+    document.querySelector('.tab[data-tab="comparison"]')?.click();
+    render({ activeTab: "comparison", renderAll: true });
+    scheduleRenderRuns();
+    toast("Audit loaded: " + r.name, "success");
+  } catch (e) {
+    if (seq !== _loadRunSeq) return;
+    toast("Failed to load run: " + e.message, "error");
+  }
 }
 
 async function deleteRunById(id) {
@@ -3917,11 +4679,12 @@ async function deleteRunById(id) {
   if (r) _logActivity("deleted", r);
   invalidateMfnCache();
   await runStore.deleteRun(id);
+  _rdSelectedIds.delete(id);
   if (state.activeRunId === id) {
     state.activeRunId = null;
     setActiveBadge(null);
   }
-  renderRuns();
+  scheduleRenderRuns(true);
   toast("Deleted.", "success");
 }
 
@@ -3936,12 +4699,34 @@ async function renameRun(id, newName) {
   renderRuns();
 }
 
+async function deleteSelectedRuns() {
+  const ids = [..._rdSelectedIds];
+  if (!ids.length) { toast("Select runs to delete.", "error"); return; }
+  if (!confirm(`Delete ${ids.length} selected run(s)? This can't be undone.`)) return;
+  const runs = loadRunsFromStorage();
+  for (const id of ids) {
+    const r = runs.find(x => x.id === id);
+    if (r) _logActivity("deleted", r);
+  }
+  invalidateMfnCache();
+  const deleted = await runStore.deleteRuns(ids);
+  _rdSelectedIds.clear();
+  if (state.activeRunId && ids.includes(state.activeRunId)) {
+    state.activeRunId = null;
+    setActiveBadge(null);
+  }
+  scheduleRenderRuns(true);
+  toast(`Deleted ${deleted} run(s).`, "success");
+}
+
 async function clearAllRuns() {
   if (!confirm("Delete ALL saved runs? This can't be undone.")) return;
+  invalidateMfnCache();
   await runStore.clearAll();
+  _rdSelectedIds.clear();
   state.activeRunId = null;
   setActiveBadge(null);
-  renderRuns();
+  scheduleRenderRuns(true);
   toast("All runs cleared.", "success");
 }
 
@@ -3962,8 +4747,7 @@ function startNewRun() {
   }
 
   // Clear all audit state
-  state.txtBuffer  = null; state.txtName  = null;
-  state.xlsxBuffer = null; state.xlsxName = null;
+  clearUploadedFiles();
   state.raw = null; state.agg = null; state.filed = null;
   state.cmp = null; state.findings = null; state.ctx = null;
   state.activeRunId  = null;
@@ -3971,15 +4755,8 @@ function startNewRun() {
   state.rawDropped   = false;
   state.rawRowCount  = 0;
 
-  // Reset file-zone labels
-  const txtZone  = document.getElementById("txtZone");
-  const xlsxZone = document.getElementById("xlsxZone");
-  txtZone.classList.remove("has-file");
-  xlsxZone.classList.remove("has-file");
-  document.getElementById("txtName").textContent  = "Click to choose .txt";
-  document.getElementById("xlsxName").textContent = "Click to choose .xlsx";
-  document.getElementById("txtFile").value  = "";
-  document.getElementById("xlsxFile").value = "";
+  renderTxtFilesList();
+  syncSourceFileUi();
 
   // Reset numeric inputs
   document.getElementById("freight").value  = "0.00";
@@ -3999,8 +4776,9 @@ function startNewRun() {
   document.getElementById("results").style.display = "none";
   document.getElementById("mismatchBanner").style.display = "none";
 
-  // Return to Saved Runs tab so the user can see history
-  document.querySelector('.tab[data-tab="runs"]').click();
+  // Return to comparison tab; expand inputs for the next upload
+  setInputsCollapsed(false);
+  document.querySelector('.tab[data-tab="comparison"]')?.click();
 
   // Scroll to top so the file-upload inputs are visible
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -4104,11 +4882,20 @@ async function refreshServerActivity() {
   }
 }
 
-async function refreshDashboardData() {
+async function refreshDashboardData(force = false) {
   if (runStore.backend === "postgres") {
-    await runStore.refresh();
-    await refreshServerActivity();
+    if (force || Date.now() - _runsRefreshAt > RUNS_REFRESH_MS) {
+      await runStore.refresh();
+    }
+    if (force || _serverActivityCache === null) {
+      await refreshServerActivity();
+    }
   }
+}
+
+function scheduleRenderRuns(forceRefresh = false) {
+  clearTimeout(_renderRunsTimer);
+  _renderRunsTimer = setTimeout(() => { renderRuns(forceRefresh); }, 120);
 }
 
 function serverActivityToFeedItem(row) {
@@ -4266,7 +5053,7 @@ function rdDetailPanel(r) {
         <div class="rdp-hd">
           <div>
             <div class="rdp-id">${escapeHtml(r.name)}</div>
-            <div class="rdp-co">Saved ${new Date(r.savedAt).toLocaleString()} · TXT: ${escapeHtml(r.inputs?.txtName || "—")}</div>
+            <div class="rdp-co">Saved ${new Date(r.savedAt).toLocaleString()} · TXT: ${escapeHtml(r.inputs?.txtName || "—")}${(r.state?.ctx?.txtFileCount || r.inputs?.txtFiles?.length || 0) > 1 ? ` (${r.state?.ctx?.txtFileCount || r.inputs.txtFiles.length} files)` : ""}</div>
           </div>
           <button class="rdp-close-btn rdp-close" title="Close">×</button>
         </div>
@@ -4274,7 +5061,7 @@ function rdDetailPanel(r) {
           <div class="rdp-mc"><div class="rdp-mk">Entry #</div><div class="rdp-mv">${escapeHtml(String(ctx.entryNum || "—"))}</div></div>
           <div class="rdp-mc"><div class="rdp-mk">Invoice</div><div class="rdp-mv">${escapeHtml(String(ctx.invoice || "—"))}</div></div>
           <div class="rdp-mc"><div class="rdp-mk">Importer</div><div class="rdp-mv" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(ctx.importer || "—")}</div></div>
-          <div class="rdp-mc"><div class="rdp-mk">Import Date</div><div class="rdp-mv">${escapeHtml(ctx.importDate || ctx.entryDate || "—")}</div></div>
+          <div class="rdp-mc"><div class="rdp-mk">Freight / Insurance</div><div class="rdp-mv">${fmtUSD(r.inputs?.freight ?? 0)} / ${fmtUSD(r.inputs?.insurance ?? 0)}${((r.inputs?.freight ?? 0) === 0 && (r.inputs?.insurance ?? 0) === 0) ? ' <span style="color:var(--marigold-700);">(both $0)</span>' : ""}</div></div>
           <div class="rdp-mc"><div class="rdp-mk">Lines (Agg)</div><div class="rdp-mv">${aggLines.toLocaleString()}</div></div>
           <div class="rdp-mc"><div class="rdp-mk">Findings</div><div class="rdp-mv">${sevHtml}</div></div>
         </div>
@@ -4323,7 +5110,7 @@ async function renderDashboard() {
       <div class="empty" style="margin:64px 0;">
         <div class="icon">📊</div>
         <h3>No saved runs yet</h3>
-        <p>Run an audit and save it from the <strong>Saved Runs</strong> tab to see analytics here.</p>
+        <p>Run an audit and save it to see analytics here. Use <strong>Dashboard</strong> in the header to browse all saved runs.</p>
       </div>`;
     return;
   }
@@ -4799,7 +5586,7 @@ async function renderDashboard() {
       ${renderDashPanel(
         "runs",
         "Audit Runs",
-        `${filtered.length} of ${runs.length} runs · click a row to expand details`,
+        `${filtered.length} of ${runs.length} runs · click a row to load · ▼ for details`,
         `<span class="dash-panel-badge">${runs.length}</span>`,
         `
         <div class="dash-panel-toolbar">
@@ -4861,7 +5648,16 @@ async function renderDashboard() {
     a.addEventListener("click", e => { e.stopPropagation(); loadRunById(a.dataset.rdLoad); });
   });
   dashList.querySelectorAll("tr[data-rd-id]").forEach(tr => {
-    tr.addEventListener("click", () => { _rdSelectedId=(_rdSelectedId===tr.dataset.rdId)?null:tr.dataset.rdId; renderDashboard(); });
+    tr.addEventListener("click", () => loadRunById(tr.dataset.rdId));
+  });
+  dashList.querySelectorAll("td.tog").forEach(td => {
+    td.addEventListener("click", e => {
+      e.stopPropagation();
+      const tr = td.closest("tr[data-rd-id]");
+      if (!tr) return;
+      _rdSelectedId = (_rdSelectedId === tr.dataset.rdId) ? null : tr.dataset.rdId;
+      renderDashboard();
+    });
   });
   const rsEl = dashList.querySelector("#rdRunsSearch");
   if (rsEl) { rsEl.addEventListener("input", e=>{_rdSearch=e.target.value;_rdSelectedId=null;renderDashboard();}); rsEl.addEventListener("click",e=>e.stopPropagation()); }
@@ -4904,11 +5700,16 @@ async function renderDashboard() {
 
 
 // ── renderRuns — operational view (Saved Runs tab) ────────────────────────
-async function renderRuns() {
-  await refreshDashboardData();
+async function renderRuns(forceRefresh = false) {
+  await refreshDashboardData(forceRefresh);
   const runs = loadRunsFromStorage();
-  document.getElementById("pillRuns").textContent = runs.length;
-  document.getElementById("saveRunBtn").disabled = !state.cmp;
+  const saveBtn = document.getElementById("saveRunBtn");
+  if (saveBtn) saveBtn.disabled = !state.cmp;
+  const pillDash = document.getElementById("pillDash");
+  if (pillDash) pillDash.textContent = runs.length;
+
+  const list = document.getElementById("runsList");
+  if (!list) return;
 
   // ── Storage status bar ─────────────────────────────────────────────
   const statusEl = document.getElementById("storageStatus");
@@ -4965,8 +5766,6 @@ async function renderRuns() {
     }
   }
 
-  const list = document.getElementById("runsList");
-
   if (runs.length === 0) {
     list.innerHTML = `
       <div class="empty" style="margin:32px 0;">
@@ -5014,6 +5813,13 @@ async function renderRuns() {
         || (ctx.invoice  || "").toLowerCase().includes(q);
     });
   }
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / RUNS_PAGE_SIZE));
+  if (_rdPage >= totalPages) _rdPage = Math.max(0, totalPages - 1);
+  const pageStart = _rdPage * RUNS_PAGE_SIZE;
+  const pageRows = filtered.slice(pageStart, pageStart + RUNS_PAGE_SIZE);
+  const pageSelectedOnPage = pageRows.filter(r => _rdSelectedIds.has(r.id)).length;
+  const allPageSelected = pageRows.length > 0 && pageSelectedOnPage === pageRows.length;
 
   // ── Activity feed (full server log — not capped to run count) ───────
   const feedItems = buildActivityFeedItems(runs);
@@ -5141,8 +5947,10 @@ async function renderRuns() {
           .sort((a, b) => b.lines - a.lines);
       }
 
-      // ── Part B: Cross-run MID frequency (from all saved runs' agg) ─────
+      // ── Part B: Cross-run MID frequency (skip heavy pass for large libraries) ─────
+      const skipCrossMfr = runs.length > 30;
       const midCrossMap = new Map();
+      if (!skipCrossMfr) {
       for (const r of runs) {
         const agg = r.state?.agg || [];
         for (const a of agg) {
@@ -5153,6 +5961,7 @@ async function renderRuns() {
           g.lines++;
           g.value += Number(a.INVOICE_VALUE) || 0;
         }
+      }
       }
       const crossRows = Array.from(midCrossMap.entries())
         .map(([mid, g]) => ({ mid, entries: g.entries.size, lines: g.lines, value: g.value }))
@@ -5192,7 +6001,9 @@ async function renderRuns() {
             }).join("")}</tbody>
           </table></div>`;
 
-      const crossHtml = crossRows.length === 0
+      const crossHtml = skipCrossMfr
+        ? `<div class="rd-mfr-empty">${runs.length} saved runs — cross-run MID rollup hidden for performance. Open <strong>Dashboard</strong> for analytics.</div>`
+        : crossRows.length === 0
         ? `<div class="rd-mfr-empty">No saved runs yet — save an audit run to see cross-run manufacturer history.</div>`
         : `<div class="rd-mfr-tbl-wrap"><table class="rd-mfr-tbl">
             <thead><tr>
@@ -5270,7 +6081,7 @@ async function renderRuns() {
       ${renderDashPanel(
         "runs",
         "Audit Runs",
-        `${filtered.length} of ${runs.length} runs · click a row to expand details`,
+        `${filtered.length} of ${runs.length} runs · page ${_rdPage + 1}/${totalPages} · click a row to load · ▼ for details`,
         `<span class="dash-panel-badge">${runs.length}</span>`,
         `
         <div class="dash-panel-toolbar">
@@ -5282,11 +6093,14 @@ async function renderRuns() {
             <option value="high"   ${_rdFilter === "high"   ? "selected" : ""}>Has High</option>
             <option value="recent" ${_rdFilter === "recent" ? "selected" : ""}>Last 7 Days</option>
           </select>
+          <button type="button" class="btn btn-secondary" id="rdRunsPrev" style="font-size:12px;padding:6px 10px;" ${_rdPage <= 0 ? "disabled" : ""}>← Prev</button>
+          <button type="button" class="btn btn-secondary" id="rdRunsNext" style="font-size:12px;padding:6px 10px;" ${_rdPage >= totalPages - 1 ? "disabled" : ""}>Next →</button>
         </div>
         <div class="dash-panel-list runs-tbl-wrap">
           <table class="runs-tbl">
             <thead>
               <tr>
+                <th style="width:32px;"><input type="checkbox" id="rdSelectPage" ${allPageSelected ? "checked" : ""} title="Select all on this page" /></th>
                 <th>Company</th>
                 <th>Run</th>
                 <th>Status</th>
@@ -5299,9 +6113,9 @@ async function renderRuns() {
               </tr>
             </thead>
             <tbody>
-              ${filtered.length === 0
-                ? `<tr><td colspan="9"><div class="dash-panel-empty">No runs match this filter or search.</div></td></tr>`
-                : filtered.map(r => {
+              ${pageRows.length === 0
+                ? `<tr><td colspan="10"><div class="dash-panel-empty">No runs match this filter or search.</div></td></tr>`
+                : pageRows.map(r => {
                     const ctx      = r.state?.ctx || {};
                     const aggLines = r.state?.agg?.length || ctx.aggLines || 0;
                     const duty     = (ctx.filedMFN||0) + (ctx.filedCH99||0) + (ctx.filedMPF||0) + (ctx.filedCotton||0);
@@ -5313,7 +6127,9 @@ async function renderRuns() {
                       : matchPct === 100 ? "var(--green-700)"
                       : matchPct >= 80   ? "var(--gray-700)"
                       : "var(--red-700)";
+                    const isChecked = _rdSelectedIds.has(r.id);
                     return `<tr class="${isSel ? "sel-row" : ""}" data-rd-id="${escapeHtml(r.id)}">
+                      <td onclick="event.stopPropagation();"><input type="checkbox" class="rd-run-check" data-rd-id="${escapeHtml(r.id)}" ${isChecked ? "checked" : ""} /></td>
                       <td class="sm">${escapeHtml(ctx.importer || "—")}</td>
                       <td>
                         <span class="run-link">${escapeHtml(r.name)}</span>
@@ -5337,6 +6153,9 @@ async function renderRuns() {
     </div>
   </div><!-- /runs-dash -->`;
 
+  const delSelBtn = document.getElementById("deleteSelectedRunsBtn");
+  if (delSelBtn) delSelBtn.disabled = _rdSelectedIds.size === 0;
+
   // ── Wire events ────────────────────────────────────────────────────
   // Status card filter clicks
   list.querySelectorAll("[data-rd-filter]").forEach(el => {
@@ -5344,7 +6163,8 @@ async function renderRuns() {
       e.stopPropagation();
       _rdFilter = el.dataset.rdFilter;
       _rdSelectedId = null;
-      renderRuns();
+      _rdPage = 0;
+      scheduleRenderRuns();
     });
   });
 
@@ -5353,12 +6173,46 @@ async function renderRuns() {
     a.addEventListener("click", e => { e.stopPropagation(); loadRunById(a.dataset.rdLoad); });
   });
 
-  // Table row expand/collapse
+  // Table row — click loads audit; ▼ toggles inline details
   list.querySelectorAll("tr[data-rd-id]").forEach(tr => {
-    tr.addEventListener("click", () => {
+    tr.addEventListener("click", () => loadRunById(tr.dataset.rdId));
+  });
+  list.querySelectorAll("td.tog").forEach(td => {
+    td.addEventListener("click", e => {
+      e.stopPropagation();
+      const tr = td.closest("tr[data-rd-id]");
+      if (!tr) return;
       _rdSelectedId = (_rdSelectedId === tr.dataset.rdId) ? null : tr.dataset.rdId;
-      renderRuns();
+      scheduleRenderRuns();
     });
+  });
+
+  list.querySelectorAll(".rd-run-check").forEach(cb => {
+    cb.addEventListener("change", e => {
+      e.stopPropagation();
+      if (cb.checked) _rdSelectedIds.add(cb.dataset.rdId);
+      else _rdSelectedIds.delete(cb.dataset.rdId);
+      scheduleRenderRuns();
+    });
+  });
+  const selectPage = list.querySelector("#rdSelectPage");
+  if (selectPage) {
+    selectPage.addEventListener("change", e => {
+      e.stopPropagation();
+      for (const r of pageRows) {
+        if (selectPage.checked) _rdSelectedIds.add(r.id);
+        else _rdSelectedIds.delete(r.id);
+      }
+      scheduleRenderRuns();
+    });
+  }
+  list.querySelector("#rdRunsPrev")?.addEventListener("click", e => {
+    e.stopPropagation();
+    if (_rdPage > 0) { _rdPage--; scheduleRenderRuns(); }
+  });
+  list.querySelector("#rdRunsNext")?.addEventListener("click", e => {
+    e.stopPropagation();
+    if (_rdPage < totalPages - 1) { _rdPage++; scheduleRenderRuns(); }
   });
 
   // Search input (table)
@@ -5367,7 +6221,8 @@ async function renderRuns() {
     runsSearchEl.addEventListener("input", e => {
       _rdSearch = e.target.value;
       _rdSelectedId = null;
-      renderRuns();
+      _rdPage = 0;
+      scheduleRenderRuns();
     });
     runsSearchEl.addEventListener("click", e => e.stopPropagation());
   }
@@ -5378,7 +6233,8 @@ async function renderRuns() {
     runsFilterEl.addEventListener("change", e => {
       _rdFilter = e.target.value;
       _rdSelectedId = null;
-      renderRuns();
+      _rdPage = 0;
+      scheduleRenderRuns();
     });
     runsFilterEl.addEventListener("click", e => e.stopPropagation());
   }
@@ -5420,7 +6276,7 @@ async function renderRuns() {
     b.addEventListener("click", e => { e.stopPropagation(); deleteRunById(b.dataset.rdId); });
   });
   list.querySelectorAll(".rdp-close-btn").forEach(b => {
-    b.addEventListener("click", e => { e.stopPropagation(); _rdSelectedId = null; renderRuns(); });
+    b.addEventListener("click", e => { e.stopPropagation(); _rdSelectedId = null; scheduleRenderRuns(); });
   });
   wireDashPanels(list);
 }
@@ -5520,7 +6376,7 @@ function getCriticalAggLines() {
 function buildAggKeyToLineMap() {
   const m = new Map();
   for (const a of state.agg || []) {
-    m.set(`${(a.ORIGIN || "").trim()}|${htsNormalize(a.DESTINATION_HS)}|${a.MID}`, a.AGG_LINE);
+    m.set(aggGroupKey(a.ORIGIN, a.DESTINATION_HS, a.MID, a.INVOICE_NUMBER), a.AGG_LINE);
   }
   return m;
 }
@@ -5599,7 +6455,7 @@ const AUDIT_CSV_STACK_HEADERS = [
   "reciprocal_layers", "ieepa_universal", "ieepa_china", "section_301", "ch99_expected_total", "ch99_filed", "ch99_delta",
 ];
 const AUDIT_CSV_RAW_HEADERS = [
-  "txt_line", "customs_sku", "coo", "hts", "mid", "agg_line", "quantity", "unit_price", "invoice_amount",
+  "txt_line", "txt_source", "invoice", "customs_sku", "coo", "hts", "mid", "agg_line", "quantity", "unit_price", "invoice_amount",
   "entered_value", "mfn_pct", "mfn_duty", "ch99_codes", "ch99_duty", "mpf", "cotton_fee", "total_duty_fees",
 ];
 
@@ -5613,7 +6469,7 @@ function getFilteredComparisonRows(respectFilters) {
     if (filterMatch && !(r.MATCH || "").startsWith(filterMatch)) return false;
     if (filterCh99 && r.CH99_CHECK !== filterCh99) return false;
     if (search) {
-      const blob = `${r.COO} ${r.HTS} ${r.MID_TXT} ${r.MID_75} ${r.ITEM} ${r.AGG_LINE} ${r.CH99_FILED.join(",")}`.toLowerCase();
+      const blob = `${r.COO} ${r.HTS} ${r.INVOICE_TXT} ${r.INVOICE_7501} ${r.MID_TXT} ${r.MID_75} ${r.ITEM} ${r.AGG_LINE} ${r.CH99_FILED.join(",")}`.toLowerCase();
       if (!blob.includes(search)) return false;
     }
     return true;
@@ -5628,6 +6484,8 @@ function mapComparisonCsvRows(rows) {
     hts: r.HTS,
     mid_txt: r.MID_TXT || "",
     mid_7501: r.MID_75 || "",
+    invoice_txt: r.INVOICE_TXT || "",
+    invoice_7501: r.INVOICE_7501 || "",
     mfn_pct_filed: r.MFN_RATE_PCT ?? "",
     mfn_pct_table: r.MFN_RATE_TABLE ?? "",
     entered_txt: r.ENTERED_VALUE_TXT ?? "",
@@ -5651,7 +6509,7 @@ function getFilteredRawSourceRows(respectFilters) {
     if (fCoo && (r.ORIGIN || "").trim() !== fCoo) return false;
     if (fHts && (r.DESTINATION_HS || "").trim() !== fHts) return false;
     if (search) {
-      const blob = `${r.CUSTOMS_SKU || ""} ${r.ORIGIN} ${r.DESTINATION_HS} ${r.MID} ${r.MANUFACTURER_NAME || ""}`.toLowerCase();
+      const blob = `${r.CUSTOMS_SKU || ""} ${r.ORIGIN} ${r.DESTINATION_HS} ${r.MID} ${r.INVOICE_NUMBER || ""} ${r.TXT_SOURCE || ""} ${r.MANUFACTURER_NAME || ""}`.toLowerCase();
       if (!blob.includes(search)) return false;
     }
     return true;
@@ -5662,11 +6520,13 @@ function mapRawCsvRows(rawRows) {
   const aggKeyMap = buildAggKeyToLineMap();
   return rawRows.map(r => ({
     txt_line: r.TXT_LINE,
+    txt_source: r.TXT_SOURCE || "",
+    invoice: r.INVOICE_NUMBER || "",
     customs_sku: r.CUSTOMS_SKU || "",
     coo: r.ORIGIN,
     hts: htsFormat(r.DESTINATION_HS),
     mid: r.MID,
-    agg_line: aggKeyMap.get(`${(r.ORIGIN || "").trim()}|${htsNormalize(r.DESTINATION_HS)}|${r.MID}`) ?? "",
+    agg_line: aggKeyMap.get(aggGroupKey(r.ORIGIN, r.DESTINATION_HS, r.MID, r.INVOICE_NUMBER)) ?? "",
     quantity: r.QUANTITY,
     unit_price: r.UNIT_PRICE,
     invoice_amount: r.AMOUNT,
@@ -5689,7 +6549,7 @@ function getFilteredAggRows(respectFilters) {
   return rows.filter(r => {
     if (fCoo && r.ORIGIN !== fCoo) return false;
     if (search) {
-      const blob = `${r.ORIGIN} ${r.DESTINATION_HS} ${r.MID}`.toLowerCase();
+      const blob = `${r.ORIGIN} ${r.DESTINATION_HS} ${r.MID} ${r.INVOICE_NUMBER || ""}`.toLowerCase();
       if (!blob.includes(search)) return false;
     }
     return true;
@@ -5701,6 +6561,7 @@ function mapAggCsvRows(rows) {
     agg_line: r.AGG_LINE,
     coo: r.ORIGIN,
     hts: htsFormat(r.DESTINATION_HS),
+    invoice: r.INVOICE_NUMBER || "",
     mid: r.MID,
     raw_lines: r.RAW_LINES,
     quantity: r.QUANTITY,
@@ -5720,7 +6581,7 @@ function getFilteredFiledRows(respectFilters) {
   return rows.filter(r => {
     if (fCoo && r.COO !== fCoo) return false;
     if (search) {
-      const blob = `${r.COO} ${r.HTS} ${r.MID} ${r.ITEM} ${r.CH99_HTS || ""}`.toLowerCase();
+      const blob = `${r.COO} ${r.HTS} ${r.MID} ${r.INVOICE_NO || ""} ${r.ITEM} ${r.CH99_HTS || ""}`.toLowerCase();
       if (!blob.includes(search)) return false;
     }
     return true;
@@ -5732,6 +6593,7 @@ function mapFiledCsvRows(rows) {
     item: r.ITEM,
     coo: r.COO,
     hts: htsFormat(r.HTS),
+    invoice: r.INVOICE_NO || "",
     mid: r.MID,
     entered_value: r.ENTERED_VALUE,
     mfn_pct: r.MFN_RATE_PCT,
@@ -5770,7 +6632,7 @@ function getAuditCsvSection(sectionId, respectFilters) {
         id: "comparison",
         label: "Comparison",
         filename: `${base}_comparison.csv`,
-        headers: ["agg_line", "item_7501", "coo", "hts", "mid_txt", "mid_7501", "mfn_pct_filed", "mfn_pct_table",
+        headers: ["agg_line", "item_7501", "coo", "hts", "invoice_txt", "invoice_7501", "mid_txt", "mid_7501", "mfn_pct_filed", "mfn_pct_table",
           "entered_txt", "entered_7501", "entered_delta", "ch99_expected", "ch99_filed", "match", "mid_check", "ch99_check"],
         rows: mapComparisonCsvRows(getFilteredComparisonRows(respectFilters)),
       };
@@ -5806,7 +6668,7 @@ function getAuditCsvSection(sectionId, respectFilters) {
         id: "aggregated",
         label: "Aggregated",
         filename: `${base}_aggregated.csv`,
-        headers: ["agg_line", "coo", "hts", "mid", "raw_lines", "quantity", "net_weight_kg", "invoice_value",
+        headers: ["agg_line", "coo", "hts", "invoice", "mid", "raw_lines", "quantity", "net_weight_kg", "invoice_value",
           "freight_alloc", "insurance_alloc", "entered_value"],
         rows: mapAggCsvRows(getFilteredAggRows(respectFilters)),
       };
@@ -5815,7 +6677,7 @@ function getAuditCsvSection(sectionId, respectFilters) {
         id: "filed",
         label: "7501 Filed",
         filename: `${base}_7501_filed.csv`,
-        headers: ["item", "coo", "hts", "mid", "entered_value", "mfn_pct", "mfn_duty", "ch99_duty", "ch99_codes", "mpf", "cotton_fee", "description"],
+        headers: ["item", "coo", "hts", "invoice", "mid", "entered_value", "mfn_pct", "mfn_duty", "ch99_duty", "ch99_codes", "mpf", "cotton_fee", "description"],
         rows: mapFiledCsvRows(getFilteredFiledRows(respectFilters)),
       };
     case "findings":
@@ -5932,6 +6794,13 @@ async function exportAuditCsvZip() {
   toast(`Exported all grids (${cmpCount} comparison rows + 7 CSV files) as ZIP.`, "success");
 }
 
+document.getElementById("inputsCollapseHd")?.addEventListener("click", () => toggleInputsCollapsed());
+document.getElementById("inputsCollapseBtn")?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleInputsCollapsed();
+});
+document.getElementById("openDashboardFromAudit")?.addEventListener("click", () => toggleView("dashboard"));
+
 // Wire Runs toolbar
 document.getElementById("saveRunBtn").addEventListener("click", () => {
   const customName = document.getElementById("runNameInput").value.trim();
@@ -5939,24 +6808,57 @@ document.getElementById("saveRunBtn").addEventListener("click", () => {
   document.getElementById("runNameInput").value = "";
 });
 document.getElementById("clearRunsBtn").addEventListener("click", clearAllRuns);
+document.getElementById("deleteSelectedRunsBtn")?.addEventListener("click", deleteSelectedRuns);
+document.getElementById("rerunAuditBtn")?.addEventListener("click", () => rerunLoadedAudit());
+document.getElementById("rerunTxtFile")?.addEventListener("change", async e => {
+  const files = [...(e.target.files || [])];
+  if (!files.length) return;
+  state.rerunTxtFiles = [];
+  for (const f of files) {
+    state.rerunTxtFiles.push({
+      id: "rerun_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+      name: f.name,
+      buffer: await f.arrayBuffer(),
+    });
+  }
+  state.rerunTxtBuffer = null;
+  syncSourceFileUi();
+});
+document.getElementById("rerunXlsxFile")?.addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  state.rerunXlsxBuffer = await file.arrayBuffer();
+  state.rerunXlsxName = file.name;
+  syncSourceFileUi();
+});
 document.getElementById("exportAuditCsvBtn")?.addEventListener("click", () => exportAuditCsvZip());
 document.addEventListener("click", e => {
   const btn = e.target.closest("[data-csv-export]");
   if (!btn || btn.disabled) return;
   exportAuditCsvSection(btn.dataset.csvExport);
 });
-document.getElementById("exportRunsBtn").addEventListener("click", () => {
+document.getElementById("exportRunsBtn").addEventListener("click", async () => {
   const runs = loadRunsFromStorage();
   if (runs.length === 0) { toast("No runs to export.", "error"); return; }
-  const blob = new Blob([JSON.stringify(runs, null, 2)], { type: "application/json" });
+  toast("Preparing export…", "info");
+  const full = [];
+  for (const r of runs) {
+    if (isSummaryRun(r)) {
+      try { full.push(await runStore.fetchRun(r.id)); }
+      catch (err) { console.warn("export skip", r.id, err); }
+    } else {
+      full.push(r);
+    }
+  }
+  const blob = new Blob([JSON.stringify(full, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = `inditex_audit_runs_${new Date().toISOString().slice(0,10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  trackActivity("export_runs", { count: runs.length }, "run");
-  toast(`Exported ${runs.length} run${runs.length === 1 ? "" : "s"}.`, "success");
+  trackActivity("export_runs", { count: full.length }, "run");
+  toast(`Exported ${full.length} run${full.length === 1 ? "" : "s"}.`, "success");
 });
 document.getElementById("importRunsBtn").addEventListener("click", () => {
   document.getElementById("importRunsFile").click();
@@ -6058,14 +6960,188 @@ async function probeServerBuild() {
   _syncDashPill();
 })();
 
-function runAudit() {
+function syncRerunPanel() {
+  const panel = document.getElementById("rerunPanel");
+  const warn = document.getElementById("rerunFiWarn");
+  if (!panel) return;
+  const show = !!(state.cmp && state.cmp.length);
+  panel.style.display = show ? "" : "none";
+  syncSourceFileUi();
+  if (!show) return;
+  const freight = parseFloat(document.getElementById("freight")?.value) || state.ctx?.freight || 0;
+  const insurance = parseFloat(document.getElementById("insurance")?.value) || 0;
+  const rf = document.getElementById("rerunFreight");
+  const ri = document.getElementById("rerunInsurance");
+  if (rf && document.activeElement !== rf) rf.value = freight;
+  if (ri && document.activeElement !== ri) ri.value = insurance;
+  if (warn) {
+    const f = parseFloat(rf?.value) || 0;
+    const i = parseFloat(ri?.value) || 0;
+    if (f === 0 && i === 0) {
+      warn.style.display = "";
+      warn.textContent = "Freight and insurance are $0 — entered values will match invoice amounts. Add charges before re-running if this entry should include them.";
+    } else {
+      warn.style.display = "none";
+    }
+  }
+}
+
+function applyRehydratedToState(r, fullState) {
+  state.raw = fullState.raw || [];
+  state.agg = fullState.agg;
+  state.filed = fullState.filed;
+  state.cmp = fullState.cmp;
+  state.findings = fullState.findings;
+  state.ctx = fullState.ctx;
+  state.isLoadedRun = true;
+  state.rawDropped = !!r.rawDropped;
+  state.rawRowCount = r.rawRowCount || 0;
+  document.getElementById("freight").value = r.inputs?.freight ?? 0;
+  document.getElementById("insurance").value = r.inputs?.insurance ?? 0;
+  document.getElementById("emptyState").style.display = "none";
+  document.getElementById("results").style.display = "";
+}
+
+async function rerunLoadedAudit() {
+  if (!state.cmp || !state.cmp.length) {
+    toast("Load or run an audit first.", "error");
+    return;
+  }
+  const freight = parseFloat(document.getElementById("rerunFreight")?.value) || 0;
+  const insurance = parseFloat(document.getElementById("rerunInsurance")?.value) || 0;
+  document.getElementById("freight").value = freight;
+  document.getElementById("insurance").value = insurance;
+
   try {
-    const freight   = parseFloat(document.getElementById("freight").value)   || 0;
-    const insurance = parseFloat(document.getElementById("insurance").value) || 0;
+    toast("Re-running audit…");
+
+    if (state.rerunTxtFiles?.length && (state.rerunXlsxBuffer || state.xlsxBuffer)) {
+      state.txtFiles = [...state.rerunTxtFiles];
+      if (state.rerunXlsxBuffer) {
+        state.xlsxBuffer = state.rerunXlsxBuffer;
+        state.xlsxName = state.rerunXlsxName || state.xlsxName;
+      }
+      runAudit({ skipFiConfirm: true, preserveRunId: state.activeRunId });
+      return;
+    }
+    if ((state.rerunTxtFiles?.length || state.rerunTxtBuffer) && !state.raw?.length && !state.rerunXlsxBuffer) {
+      toast("Replace TXT requires raw lines in the saved run, or upload a new 7501 as well.", "error");
+      return;
+    }
+
+    let filed = state.filed;
+    let ctx = { ...(state.ctx || {}) };
+    let agg = state.agg;
+    let raw = state.raw || [];
+
+    if (state.rerunXlsxBuffer) {
+      const xl = parse7501Xlsx(state.rerunXlsxBuffer);
+      filed = build7501Filed(xl);
+      const entryDateRaw = xl.rows[0]?.["7. CS Entry Date"];
+      const importDateRaw = xl.rows[0]?.["11. CS Import Date"];
+      const applicable = resolveApplicableDate(entryDateRaw, importDateRaw);
+      ctx.applicableDate = applicable.date;
+      ctx.applicableDateSource = applicable.source;
+      state.xlsxName = state.rerunXlsxName || state.xlsxName;
+    }
+
+    if (state.rerunTxtFiles?.length) {
+      state.txtFiles = [...state.rerunTxtFiles];
+      raw = mergeTxtFiles(state.rerunTxtFiles);
+      agg = aggregateMethodB(raw);
+    } else if (state.rerunTxtBuffer) {
+      raw = parseInditexTxt(state.rerunTxtBuffer).map((r, i) => ({
+        ...r,
+        TXT_LINE: i + 1,
+        TXT_SOURCE: state.rerunTxtName || "txt",
+        INVOICE_NUMBER: normalizeInvoiceNumber(r.INVOICE_NUMBER),
+      }));
+      agg = aggregateMethodB(raw);
+      state.txtName = state.rerunTxtName || state.txtName;
+    }
+
+    const snap = {
+      id: state.activeRunId || ("run_" + Date.now()),
+      name: document.getElementById("runNameInput")?.value?.trim() || defaultRunName(),
+      inputs: {
+        ...txtInputsSummary(),
+        xlsxName: state.xlsxName,
+        freight,
+        insurance,
+      },
+      state: { raw, agg, filed, ctx },
+      rawDropped: state.rawDropped,
+      rawRowCount: state.rawRowCount,
+    };
+
+    const updated = recomputeSavedRun(snap, {
+      freight,
+      insurance,
+      filed,
+      inputsPatch: {
+        ...txtInputsSummary(),
+        xlsxName: state.xlsxName,
+      },
+    });
+    const fullState = rehydrateRun(updated);
+    applyRehydratedToState(updated, fullState);
+    state.rerunTxtFiles = null;
+    state.rerunTxtBuffer = null;
+    state.rerunXlsxBuffer = null;
+    state.rerunTxtName = null;
+    state.rerunXlsxName = null;
+    document.getElementById("rerunTxtFile").value = "";
+    document.getElementById("rerunXlsxFile").value = "";
+    state.savedInputMeta = {
+      ...txtInputsSummary(),
+      xlsxName: state.xlsxName || state.savedInputMeta?.xlsxName || "",
+    };
+
+    if (state.activeRunId) {
+      const saved = { ...updated, id: state.activeRunId, name: updated.name };
+      if (runStore.backend === "postgres") await runStore.saveRun(saved);
+      else {
+        const runs = loadRunsFromStorage().filter(r => r.id !== state.activeRunId);
+        runs.unshift(saved);
+        saveRunsToStorage(runs);
+      }
+    }
+
+    render({ activeTab: _activeTab, renderAll: true });
+    syncRerunPanel();
+    toast("Audit re-run complete — freight/insurance updated.", "success");
+  } catch (e) {
+    toast("Re-run failed: " + e.message, "error");
+  }
+}
+
+function buildTxtInvoiceContext(txt) {
+  const invoices = [...new Set(txt.map(r => r.INVOICE_NUMBER).filter(inv => inv && inv !== "(blank)"))];
+  const summary = txtInputsSummary();
+  return {
+    invoiceList: invoices,
+    invoice: invoices.length === 0 ? "—" : invoices.length <= 3 ? invoices.join(", ") : `${invoices.length} invoices`,
+    txtFileCount: state.txtFiles.length || (state.txtBuffer ? 1 : 0),
+    txtFileNames: summary.txtName || "—",
+  };
+}
+
+function runAudit(options = {}) {
+  try {
+    const freight   = options.freight ?? (parseFloat(document.getElementById("freight").value) || 0);
+    const insurance = options.insurance ?? (parseFloat(document.getElementById("insurance").value) || 0);
+    if (!options.skipFiConfirm && freight === 0 && insurance === 0) {
+      if (!confirm("Freight and insurance are both $0 — entered values will equal invoice amounts. Continue?")) return;
+    }
 
     toast("Parsing files…");
-    const txt = parseInditexTxt(state.txtBuffer);
-    const xl  = parse7501Xlsx(state.xlsxBuffer);
+    const txt = options.txtRows ?? getMergedTxtRows();
+    const xlsxBuf = options.xlsxBuffer ?? state.xlsxBuffer;
+    if (!txt.length || !xlsxBuf) {
+      toast("Upload at least one TXT and the 7501 XLSX first.", "error");
+      return;
+    }
+    const xl  = parse7501Xlsx(xlsxBuf);
 
     const totalInvoice = txt.reduce((s, r) => s + (Number(r.AMOUNT)||0), 0);
 
@@ -6141,7 +7217,7 @@ function runAudit() {
       noMatch:       cmp.filter(r => r.MATCH && r.MATCH.startsWith("NO MATCH")).length,
       midMismatch:   cmp.filter(r => r.MID_CHECK === "MISMATCH").length,
       ch99Mismatch:  cmp.filter(r => r.CH99_CHECK === "MISMATCH" || r.CH99_CHECK === "MISSING").length,
-      invoice:       txt[0]?.INVOICE_NUMBER ?? "—",
+      ...buildTxtInvoiceContext(txt),
       invoiceFiled:  xl.rows[0]?.["28. CM Invoice No"] ?? "—",
       entryNum:      xl.rows[0]?.["1. CS Entry Number"] ?? "—",
       importer:      xl.rows[0]?.["26. CS Importer Name"] ?? "—",
@@ -6158,15 +7234,10 @@ function runAudit() {
     // ── Cross-file sanity: do the TXT invoice and the 7501 invoice agree? ──
     // 7501 invoice strings are usually formatted as "001/03-41378" (sequence/series-invoice).
     // TXT INVOICE_NUMBER is the bare invoice number, e.g. "41378".
-    // Mismatch ⇒ user almost certainly uploaded a TXT and 7501 from different shipments.
-    const txtInv = String(ctx.invoice || "").trim();
-    const filedInv = String(ctx.invoiceFiled || "").trim();
-    if (txtInv && filedInv && txtInv !== "—" && filedInv !== "—") {
-      const filedHasTxt = filedInv.includes(txtInv) || txtInv.includes(filedInv.split("/").pop());
-      if (!filedHasTxt) {
-        ctx.invoiceMismatch = { txt: txtInv, filed: filedInv };
-      }
-    }
+    // Fuzzy scrubbing matches these; mismatch still flags wrong shipment pairing.
+    ctx.invoiceMismatch = detectInvoiceMismatch(
+      ctx.invoiceList, ctx.invoice, ctx.invoiceFiled, xl.rows
+    );
 
     const findings = buildFindings(cmp, ctx);
 
@@ -6179,6 +7250,10 @@ function runAudit() {
     state.isLoadedRun = false;   // fresh audit — raw is available
     state.rawDropped = false;
     state.rawRowCount = raw.length;
+    state.savedInputMeta = {
+      ...txtInputsSummary(),
+      xlsxName: state.xlsxName || "",
+    };
 
     trackActivity("run_audit", {
       entry_num: ctx.entryNum,
@@ -6188,10 +7263,18 @@ function runAudit() {
       findings_count: findings.length,
     }, "run");
 
-    render();
-    // Auto-save the run with a default name
-    saveCurrentRun(null);
-    toast("Audit complete — saved to your runs list", "success");
+    render({ activeTab: "comparison", renderAll: true });
+    setInputsCollapsed(true);
+    document.querySelector('.tab[data-tab="comparison"]')?.click();
+    syncRerunPanel();
+    if (options.preserveRunId) {
+      state.activeRunId = options.preserveRunId;
+      saveCurrentRun(null, options.preserveRunId);
+      toast("Audit re-run complete — saved run updated.", "success");
+    } else {
+      saveCurrentRun(null);
+      toast("Audit complete — saved to your runs list", "success");
+    }
   } catch (e) {
     console.error(e);
     toast("Error: " + e.message, "error");
@@ -6201,11 +7284,17 @@ function runAudit() {
 // ============================================================
 //  Rendering
 // ============================================================
-function render() {
+function render(options = {}) {
+  if (!state.ctx || !state.cmp) return;
+  const tab = options.activeTab || _activeTab;
+  const renderAll = !!options.renderAll;
+
   document.getElementById("emptyState").style.display = "none";
   document.getElementById("results").style.display = "";
   document.getElementById("metaInfo").textContent =
-    `Entry ${state.ctx.entryNum} · Invoice ${state.ctx.invoice} · ${state.ctx.importer}`;
+    `Entry ${state.ctx.entryNum} · Invoice ${state.ctx.invoice}` +
+    (state.ctx.txtFileCount > 1 ? ` · ${state.ctx.txtFileCount} TXT files` : "") +
+    ` · ${state.ctx.importer}`;
 
   // Mismatch banner: TXT invoice and 7501 invoice came from different shipments
   const banner = document.getElementById("mismatchBanner");
@@ -6223,14 +7312,14 @@ function render() {
 
   renderKpis();
   renderRecon();
-  renderComparison();
-  renderStack();
-  renderRaw();
-  renderAgg();
-  renderFiled();
-  renderFindings();
-  renderMfrRollup();
-  renderHtsConsistency();
+  if (renderAll || tab === "comparison") renderComparison();
+  if (renderAll || tab === "stack") renderStack();
+  if (renderAll || tab === "raw") renderRaw();
+  if (renderAll || tab === "agg") renderAgg();
+  if (renderAll || tab === "filed") renderFiled();
+  if (renderAll || tab === "findings") renderFindings();
+  if (renderAll || tab === "mfr") renderMfrRollup();
+  if (renderAll || tab === "hts") renderHtsConsistency();
 
   const hasAudit = state.cmp && state.cmp.length > 0;
   const csvBtn = document.getElementById("exportAuditCsvBtn");
@@ -6244,19 +7333,21 @@ function render() {
     }
   });
 
+  const saveBtn = document.getElementById("saveRunBtn");
+  if (saveBtn) saveBtn.disabled = !hasAudit;
+
   document.getElementById("pillCmp").textContent     = state.cmp.length;
   document.getElementById("pillStack").textContent   = state.cmp.filter(r => r.ITEM != null).length;
   document.getElementById("pillRaw").textContent     = state.raw.length;
   document.getElementById("pillAgg").textContent     = state.agg.length;
   document.getElementById("pillFiled").textContent   = state.filed.length;
   document.getElementById("pillFindings").textContent = state.findings.length;
-  // Manufacturer pill = distinct MID count
   const mfrSet = new Set(state.cmp.map(r => r.MID_TXT || r.MID_75 || "(blank)"));
   document.getElementById("pillMfr").textContent = mfrSet.size;
-  // HTS pill = conflicts within this audit only
   const htsIntra = Number(document.getElementById("htsCountIntra")?.textContent || 0);
   const htsBase = Number(document.getElementById("htsCountBaseline")?.textContent || 0);
   document.getElementById("pillHts").textContent = htsIntra + htsBase;
+  syncRerunPanel();
 }
 
 function renderKpis() {
@@ -6561,7 +7652,7 @@ function renderComparison() {
     if (filterMatch && !(r.MATCH || "").startsWith(filterMatch)) return false;
     if (filterCh99 && r.CH99_CHECK !== filterCh99) return false;
     if (search) {
-      const blob = `${r.COO} ${r.HTS} ${r.MID_TXT} ${r.MID_75} ${r.ITEM} ${r.AGG_LINE} ${r.CH99_FILED.join(",")}`.toLowerCase();
+      const blob = `${r.COO} ${r.HTS} ${r.INVOICE_TXT} ${r.INVOICE_7501} ${r.MID_TXT} ${r.MID_75} ${r.ITEM} ${r.AGG_LINE} ${r.CH99_FILED.join(",")}`.toLowerCase();
       if (!blob.includes(search)) return false;
     }
     return true;
@@ -6575,6 +7666,7 @@ function renderComparison() {
       <th data-k="ITEM">7501 Item ${sortIndicator("cmpTable","ITEM")}</th>
       <th data-k="COO">COO ${sortIndicator("cmpTable","COO")}</th>
       <th data-k="HTS">HTS ${sortIndicator("cmpTable","HTS")}</th>
+      <th data-k="INVOICE_TXT">Invoice ${sortIndicator("cmpTable","INVOICE_TXT")}</th>
       <th>MID (TXT)</th>
       <th>MID (7501)</th>
       <th data-k="MFN_RATE_PCT">MFN % ${sortIndicator("cmpTable","MFN_RATE_PCT")}</th>
@@ -6625,6 +7717,7 @@ function renderComparison() {
           <td class="num">${r.ITEM ?? "—"}</td>
           <td class="mono">${r.COO}</td>
           <td class="mono">${r.HTS}</td>
+          <td class="mono">${r.INVOICE_TXT || "—"}</td>
           <td class="mono">${r.MID_TXT || "—"}</td>
           <td class="mono">${r.MID_75 || "—"}</td>
           <td class="num">${(() => {
@@ -6700,7 +7793,7 @@ function renderRaw() {
     if (fCoo && (r.ORIGIN||"").trim() !== fCoo) return false;
     if (fHts && (r.DESTINATION_HS||"").trim() !== fHts) return false;
     if (search) {
-      const blob = `${r.CUSTOMS_SKU||""} ${r.ORIGIN} ${r.DESTINATION_HS} ${r.MID} ${r.MANUFACTURER_NAME||""}`.toLowerCase();
+      const blob = `${r.CUSTOMS_SKU||""} ${r.ORIGIN} ${r.DESTINATION_HS} ${r.MID} ${r.INVOICE_NUMBER||""} ${r.TXT_SOURCE||""} ${r.MANUFACTURER_NAME||""}`.toLowerCase();
       if (!blob.includes(search)) return false;
     }
     return true;
@@ -6710,6 +7803,8 @@ function renderRaw() {
   document.getElementById("rawTable").innerHTML = `
     <thead><tr>
       <th data-k="TXT_LINE"># ${sortIndicator("rawTable","TXT_LINE")}</th>
+      <th data-k="TXT_SOURCE">Source ${sortIndicator("rawTable","TXT_SOURCE")}</th>
+      <th data-k="INVOICE_NUMBER">Invoice ${sortIndicator("rawTable","INVOICE_NUMBER")}</th>
       <th data-k="CUSTOMS_SKU" style="min-width: 160px;">Customs SKU ${sortIndicator("rawTable","CUSTOMS_SKU")}</th>
       <th data-k="ORIGIN">COO ${sortIndicator("rawTable","ORIGIN")}</th>
       <th data-k="DESTINATION_HS">HTS ${sortIndicator("rawTable","DESTINATION_HS")}</th>
@@ -6730,6 +7825,8 @@ function renderRaw() {
       ${sorted.map(r => `
         <tr>
           <td class="num">${r.TXT_LINE}</td>
+          <td class="mono" style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(r.TXT_SOURCE || "")}">${escapeHtml(r.TXT_SOURCE || "—")}</td>
+          <td class="mono">${r.INVOICE_NUMBER || "—"}</td>
           <td class="mono" style="font-weight:600;color:var(--primary-700);">${r.CUSTOMS_SKU || "—"}</td>
           <td class="mono">${r.ORIGIN}</td>
           <td class="mono">${htsFormat(r.DESTINATION_HS)}</td>
@@ -6763,7 +7860,7 @@ function renderAgg() {
   const filtered = state.agg.filter(r => {
     if (fCoo && r.ORIGIN !== fCoo) return false;
     if (search) {
-      const blob = `${r.ORIGIN} ${r.DESTINATION_HS} ${r.MID}`.toLowerCase();
+      const blob = `${r.ORIGIN} ${r.DESTINATION_HS} ${r.MID} ${r.INVOICE_NUMBER || ""}`.toLowerCase();
       if (!blob.includes(search)) return false;
     }
     return true;
@@ -6774,6 +7871,7 @@ function renderAgg() {
       <th data-k="AGG_LINE">Agg # ${sortIndicator("aggTable","AGG_LINE")}</th>
       <th data-k="ORIGIN">COO ${sortIndicator("aggTable","ORIGIN")}</th>
       <th data-k="DESTINATION_HS">HTS ${sortIndicator("aggTable","DESTINATION_HS")}</th>
+      <th data-k="INVOICE_NUMBER">Invoice ${sortIndicator("aggTable","INVOICE_NUMBER")}</th>
       <th data-k="MID">MID ${sortIndicator("aggTable","MID")}</th>
       <th data-k="RAW_LINES" class="num">Raw lines ${sortIndicator("aggTable","RAW_LINES")}</th>
       <th data-k="QUANTITY" class="num">Qty ${sortIndicator("aggTable","QUANTITY")}</th>
@@ -6789,6 +7887,7 @@ function renderAgg() {
           <td class="num">${r.AGG_LINE}</td>
           <td class="mono">${r.ORIGIN}</td>
           <td class="mono">${htsFormat(r.DESTINATION_HS)}</td>
+          <td class="mono">${r.INVOICE_NUMBER || "—"}</td>
           <td class="mono">${r.MID}</td>
           <td class="num">${r.RAW_LINES}</td>
           <td class="num">${fmtInt(r.QUANTITY)}</td>
@@ -6815,7 +7914,7 @@ function renderFiled() {
   const filtered = state.filed.filter(r => {
     if (fCoo && r.COO !== fCoo) return false;
     if (search) {
-      const blob = `${r.COO} ${r.HTS} ${r.MID} ${r.ITEM} ${r.CH99_HTS || ""}`.toLowerCase();
+      const blob = `${r.COO} ${r.HTS} ${r.MID} ${r.INVOICE_NO || ""} ${r.ITEM} ${r.CH99_HTS || ""}`.toLowerCase();
       if (!blob.includes(search)) return false;
     }
     return true;
@@ -6826,6 +7925,7 @@ function renderFiled() {
       <th data-k="ITEM">Item ${sortIndicator("filedTable","ITEM")}</th>
       <th data-k="COO">COO ${sortIndicator("filedTable","COO")}</th>
       <th data-k="HTS">HTS ${sortIndicator("filedTable","HTS")}</th>
+      <th data-k="INVOICE_NO">Invoice ${sortIndicator("filedTable","INVOICE_NO")}</th>
       <th data-k="MID">MID ${sortIndicator("filedTable","MID")}</th>
       <th data-k="ENTERED_VALUE" class="num">Entered $ ${sortIndicator("filedTable","ENTERED_VALUE")}</th>
       <th data-k="MFN_RATE_PCT" class="num">MFN % ${sortIndicator("filedTable","MFN_RATE_PCT")}</th>
@@ -6842,6 +7942,7 @@ function renderFiled() {
           <td class="num">${r.ITEM}</td>
           <td class="mono">${r.COO}</td>
           <td class="mono">${htsFormat(r.HTS)}</td>
+          <td class="mono">${r.INVOICE_NO || "—"}</td>
           <td class="mono">${r.MID}</td>
           <td class="num">${fmtUSD(r.ENTERED_VALUE)}</td>
           <td class="num">${fmtPct(r.MFN_RATE_PCT)}</td>
@@ -7461,8 +8562,12 @@ function renderAdminRules() {
 document.querySelectorAll(".tab").forEach(btn => {
   btn.addEventListener("click", () => {
     const target = btn.dataset.tab;
+    _activeTab = target;
     document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b === btn));
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + target));
+    if (state.cmp) {
+      render({ activeTab: target });
+    }
   });
 });
 

@@ -596,6 +596,7 @@ def get_runs_summary():
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT id, name, entry_num, invoice_num, importer,
+                       txt_name, xlsx_name, freight, insurance,
                        agg_lines, entered_value, total_duty,
                        findings_count, findings_critical, findings_high,
                        saved_at, created_at, updated_at
@@ -761,6 +762,37 @@ def delete_run(run_id: str):
             dict(row) if row else {},
         )
         return jsonify({"ok": True, "id": run_id})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/runs/_bulk_delete", methods=["POST"])
+@require_auth
+def bulk_delete_runs():
+    """Delete multiple runs by id list."""
+    try:
+        body = request.get_json(force=True) or {}
+        ids = body.get("ids") or []
+        if not isinstance(ids, list) or not ids:
+            return jsonify({"error": "ids must be a non-empty array"}), 400
+        ids = [str(i) for i in ids if i]
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM audit_runs WHERE id = ANY(%s)",
+                (ids,),
+            )
+            deleted = cur.rowcount
+        conn.commit()
+        conn.close()
+        _log_activity(
+            request.current_user.get("sub"),
+            "bulk_delete_runs",
+            "run",
+            None,
+            {"deleted": deleted, "requested": len(ids)},
+        )
+        return jsonify({"ok": True, "deleted": deleted})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
