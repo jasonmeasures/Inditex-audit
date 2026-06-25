@@ -10,7 +10,7 @@ Validated against Inditex / Zara entry 113-3957214-9 (Jan 2026): 44/44 lines rec
 
 | Doc | Audience |
 |-----|----------|
-| **[USER_MANUAL.md](USER_MANUAL.md)** | **Start here** — sign-in, audit workflow, Dashboard, Reference, CSV export, re-run |
+| **[USER_MANUAL.md](USER_MANUAL.md)** | **Start here** — sign-in, Dashboard, audit workflow, review sign-off, Reference, re-run |
 | **[SETUP.md](SETUP.md)** | First-time install (Postgres, venv, `./start.sh`) |
 | **[BUILD.md](BUILD.md)** | Architecture and extension guide for developers |
 
@@ -31,7 +31,7 @@ brew services start postgresql@16
 ./start.sh
 ```
 
-Open **http://localhost:5252**, sign in, upload TXT + 7501, click **Run Audit**.
+Open **http://localhost:5252**, sign in — you land on the **Dashboard**. Use **+ New Run** to start an audit.
 
 For playground/production, deploys ship through **klearnow/kn-playground** (`applications/inditex-audit-main/`) — merge to `master` triggers the **Inditex Audit Deploy** workflow.
 
@@ -39,30 +39,28 @@ For playground/production, deploys ship through **klearnow/kn-playground** (`app
 
 ## What’s in the app
 
-### Audit view
+### Dashboard (default home)
 
-- Multi-TXT upload (multiple invoices per run)
-- Collapsible **Inputs** panel; auto-collapse after run
-- Fuzzy invoice matching between TXT and 7501 (audit still runs on mismatch)
+Opens automatically after sign-in and page refresh. Portfolio analytics, **By Importer** rollup (EIN grouping), runs table with **Issues** preview and **Review** status, expand-row detail and sign-off, filters (including **EU cap affected**). Click a row to load the full audit view.
+
+### Audit view (+ New Run)
+
+- Multi-TXT upload, collapsible **Inputs**, fuzzy invoice matching
 - Review tabs: Comparison, Ch99 Stack, Raw, Aggregated, 7501 Filed, Findings, Manufacturer, HTS Consistency
-- **Export all (ZIP)** and per-tab **↓ CSV** (respects active filters)
-- Save runs to Postgres; browse/load from **Dashboard** (not a tab on the audit page)
-- **Update & re-run** on loaded saves (freight/insurance, optional file replace)
-- **EU cap branching** for ES/PT/BG — `9903.02.19` vs `9903.02.20` driven by **7501 column 33** MFN rate (≥15% → `.19`, &lt;15% → `.20`)
-- **Section 232 stacks** — accepts broker-filed `9903.81.*` / `9903.85.*` and `9903.01.33` exclusion on the same CM item (Info finding, not Critical)
-- **232 split adjunct** — separate CM-item 232 lines paired to parent as `232 SPLIT (7501 adjunct)`
-
-### Dashboard
-
-Portfolio analytics, **By Importer** rollup (grouped by CS Importer ID / EIN), runs list (click row to load), import/export JSON, checkbox **bulk delete**, **EU cap affected** filter for re-run checklist
+- **Export all (ZIP)** and per-tab **↓ CSV**
+- **Reviewer sign-off bar** on loaded runs (same statuses as Dashboard)
+- Save runs to Postgres; prior runs open from **Dashboard** only
+- **Update & re-run** on loaded saves
+- **EU reciprocal** for ES/PT/BG — `9903.02.19` vs `9903.02.20` from **7501 column 33** (≥15% → `.19`, &lt;15% → `.20`), with **rate-determination date** per 19 CFR 141.68/141.69 (IT Date → release)
+- **Section 232 stacks** and **232 split adjunct** handling
 
 ### Reference (authenticated)
 
-Global HTS Classification Table (MFN for duty projection; EU cap branch still uses filed col 33 first), Chapter 99 rules, sources & verification (EU cap + Section 232 callouts), **Re-run all saved audits** (admin — recomputes comparison/findings from stored snapshots)
+Global HTS table, Chapter 99 rules, sources & verification, **Recent Activity**, **Run data management** (admin: import/export/clear JSON), **Re-run all saved audits** (admin)
 
 ### Admin
 
-User management, activity log, reference data upload/edit
+User management, activity log (also summarized under Reference → Recent Activity)
 
 ---
 
@@ -71,8 +69,10 @@ User management, activity log, reference data upload/edit
 | File | Purpose |
 |------|---------|
 | `inditex_audit_dashboard.html` | Single-file UI + audit engine |
-| `inditex_audit_server.py` | Flask API, Postgres, auth, reference config |
+| `inditex_audit_server.py` | Flask API, Postgres, auth, reference config, review sign-off |
 | `start.sh` | Start Postgres + server + open browser |
+| `verify_eu_reciprocal_rules.py` | Regression tests for EU reciprocal / rate-date logic |
+| `scripts/eu_reciprocal_backfill_audit.py` | Read-only audit of historical EU cap verdicts |
 | `requirements.txt` | Python dependencies |
 | `.env.example` | Environment variable template |
 | `deploy.sh` | Elastic Beanstalk deploy (infra/terraform required) |
@@ -104,13 +104,24 @@ Authenticated routes (Bearer token unless noted):
 |------|-----------|
 | Health | `GET /api/health` |
 | Auth | `POST /api/auth/login`, `POST /api/auth/logout` |
-| Runs | `GET/POST /api/runs`, `GET/PUT/DELETE /api/runs/<id>`, `POST /api/runs/_bulk_delete`, `GET /api/runs/_summary` |
+| Runs | `GET/POST /api/runs`, `GET/PUT/DELETE /api/runs/<id>`, `PATCH /api/runs/<id>/review`, `POST /api/runs/_bulk_delete`, `GET /api/runs/_summary`, `GET /api/runs/_portfolio` |
 | Reference | `GET /api/reference`, `GET/PUT /api/reference/hts`, `PUT /api/reference/ch99-rules` |
 | Users | `GET/POST /api/users`, `PUT /api/users/<u>/password`, `DELETE /api/users/<u>` |
 | Activity | `GET/POST /api/activity`, `GET /api/activity/summary` |
 | Analytics | `GET /api/analytics/mfn-consistency` |
 
+Review sign-off statuses: `pending`, `in_progress`, `reviewed`, `needs_deeper_review`, `broker_contacted`, `data_issue`, `waived`.
+
 Full detail in [BUILD.md](BUILD.md).
+
+---
+
+## Verification scripts
+
+```bash
+python3 verify_eu_reciprocal_rules.py
+python3 scripts/eu_reciprocal_backfill_audit.py   # read-only; requires Postgres
+```
 
 ---
 
