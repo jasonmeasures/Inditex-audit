@@ -1,194 +1,150 @@
-# Setting up the 7501 Audit Dashboard for persistent saves
+# Setting up the 7501 Audit Dashboard
 
-This walks through getting the dashboard running with a local Postgres backend so your saved audit runs persist forever. About 10 minutes from start to finish.
+Get Postgres + the Flask server running so saved audits, sign-in, Reference data, and Dashboard analytics work. About 10 minutes first time.
 
-## What you need before starting
-
-1. **A folder** containing both files together:
-   - `inditex_audit_dashboard.html`
-   - `inditex_audit_server.py`
-2. **Homebrew** installed on your Mac. Check by opening Terminal and running:
-   ```bash
-   brew --version
-   ```
-   If that prints a version, you're good. If not, install it from https://brew.sh first.
+**After setup, read [USER_MANUAL.md](USER_MANUAL.md)** for how to run audits, use Dashboard, and manage reference data.
 
 ---
 
-## Step 1 — Install Postgres (one-time, ~3 minutes)
+## What you need
 
-In Terminal:
+1. This repo on your Mac (or Linux)
+2. **Homebrew** — `brew --version` should print a version ([brew.sh](https://brew.sh) if not)
+3. **Python 3.10+**
+
+---
+
+## Step 1 — PostgreSQL (one-time)
 
 ```bash
 brew install postgresql@16
-```
-
-When it finishes, start it:
-
-```bash
 brew services start postgresql@16
+brew services list | grep postgresql   # should show "started"
 ```
 
-Confirm it's running:
-
-```bash
-brew services list | grep postgresql
-```
-
-You should see `postgresql@16  started`.
-
-That's it for Postgres. You never need to touch it again — the audit server creates its own database on first run.
+The audit server creates the `inditex_audit` database and tables on first run.
 
 ---
 
-## Step 2 — Install Python dependencies (one-time, ~30 seconds)
+## Step 2 — Python environment (one-time)
 
-Still in Terminal:
-
-```bash
-pip3 install flask psycopg2-binary
-```
-
-If `pip3` says "command not found," your Mac doesn't have Python yet. Run:
+From the repo root:
 
 ```bash
-brew install python
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
 ```
 
-Then retry the `pip3 install` line.
+Dependencies: Flask, psycopg2, PyJWT, flask-cors, python-dotenv.
 
 ---
 
-## Step 3 — Run the audit server
+## Step 3 — Admin account (one-time)
 
-In Terminal, navigate to the folder where you keep `inditex_audit_dashboard.html` and `inditex_audit_server.py`. Example, if they're in your Downloads folder:
+Sign-in is required for Dashboard and Reference. Seed the first admin:
 
 ```bash
-cd ~/Downloads
+cp .env.example .env
 ```
 
-Then start the server:
+Edit `.env` and set at minimum:
+
+```
+INITIAL_ADMIN_PASSWORD=your-secure-password
+JWT_SECRET=some-long-random-string
+```
+
+On first server start, user `admin` (or `INITIAL_ADMIN_USERNAME`) is created if the users table is empty. Add more users later under **Users** (admin only).
+
+---
+
+## Step 4 — Start the app
+
+**Recommended:**
 
 ```bash
+./start.sh
+```
+
+This starts Postgres if needed, launches Flask on port 5252, waits for `/api/health`, and opens your browser.
+
+**Manual:**
+
+```bash
+source .venv/bin/activate
 python3 inditex_audit_server.py
 ```
 
-You should see output like:
+Then open **http://localhost:5252**.
 
-```
-📊 Inditex Audit Server
-   Database: postgres://YOUR_USER@localhost:5432/inditex_audit
-   Dashboard: /Users/YOUR_USER/Downloads/inditex_audit_dashboard.html
-  • Database 'inditex_audit' not found, creating...
-  • Created database 'inditex_audit'
-  • Schema ready (table: audit_runs)
-
-🚀 Open http://localhost:5252 in your browser
-   (Ctrl-C to stop)
-```
-
-The "creating database" line only appears once. Every future startup will skip it.
-
-**Leave this Terminal window open.** Closing it stops the server.
+> **Important:** Do not open `inditex_audit_dashboard.html` from Finder (`file://`). Auth, Postgres saves, and Reference sync only work over HTTP from the server.
 
 ---
 
-## Step 4 — Open the dashboard the right way
+## Step 5 — Sign in and verify
 
-Open your browser and go to:
-
-```
-http://localhost:5252
-```
-
-**Important:** don't open the .html file directly from Finder anymore. The dashboard only sees the Postgres backend when it's loaded over `http://localhost:5252`, not from a `file://` URL.
-
-Go to the **Saved Runs** tab. The Storage indicator at the top should now read:
-
-```
-Storage: Database · connected
-```
-
-You should also see the red "Browser storage is full" banner disappear.
-
----
-
-## Step 5 — Recover your previous saves (if you want them)
-
-Before the switch you had 2 runs visible in browser localStorage. To bring them across:
-
-1. On the dashboard, click **Export to JSON** in the Saved Runs tab. That downloads a `.json` file with whatever runs are currently in localStorage.
-2. Click **Clear browser storage** (in the red banner, or from "Clear all" if the banner's already gone). This evicts the fat legacy snapshots stuck in localStorage.
-3. Click **Import** and select the `.json` you just downloaded. The dashboard POSTs each run to the Postgres server individually.
-
-After that the runs live in Postgres, not localStorage, and they're durable.
+1. Sign in with your admin credentials
+2. Top bar should show your username
+3. **Dashboard** opens (may be empty until you save a run)
+4. Optional: upload HTS Classification Table under **Reference** (admin)
 
 ---
 
 ## Daily use
 
-Every time you sit down to use the dashboard:
+```bash
+cd /path/to/Inditex-audit-main
+./start.sh
+```
 
-1. Open Terminal.
-2. `cd` to the folder with the files (e.g. `cd ~/Downloads`).
-3. Run `python3 inditex_audit_server.py`.
-4. Open `http://localhost:5252` in your browser.
+Sign in → run audit → **Save run** → browse history on **Dashboard**.
 
-If you want it always-on, you can let it run in the background — Postgres uses near-zero CPU when idle and the Flask server is about 30 MB of RAM.
+---
+
+## Migrating old browser-only saves
+
+If you previously used the HTML file without the server:
+
+1. Open the old session (or re-import if you have a JSON export)
+2. Go to **Dashboard** → **Export all** (`.json`)
+3. Start the server, sign in, **Dashboard** → **Import** → select the JSON
 
 ---
 
 ## Troubleshooting
 
-**"Storage: browser localStorage" still shows after Step 4.**
-The dashboard is connecting to `file://` not `http://localhost:5252`. Close the tab and type `http://localhost:5252` directly into the address bar.
+| Problem | Fix |
+|---------|-----|
+| Sign-in fails | Check `INITIAL_ADMIN_PASSWORD` was set before first start; or reset via `psql` / create user as admin |
+| `Storage: browser localStorage` | Use `http://localhost:5252`, not `file://` |
+| `could not connect to server` | `brew services start postgresql@16` |
+| Port 5252 in use | `PORT=5500 ./start.sh` |
+| `.venv not found` | Run Step 2 |
+| `Module not found` | `.venv/bin/pip install -r requirements.txt` |
 
-**"could not connect to server" when starting the audit server.**
-Postgres isn't running. Run `brew services start postgresql@16` and try again.
-
-**"role 'YOUR_USER' does not exist" or auth errors.**
-Postgres uses your Mac username by default. If you installed Postgres differently in the past, set the user explicitly:
-
-```bash
-PGUSER=postgres python3 inditex_audit_server.py
-```
-
-**Port 5252 already in use.**
-Something else is using that port. Pick another:
+### Peek at the database
 
 ```bash
-PORT=5500 python3 inditex_audit_server.py
+psql -d inditex_audit -c "SELECT id, name, entry_num, findings_count, saved_at FROM audit_runs ORDER BY saved_at DESC LIMIT 20;"
 ```
 
-Then open `http://localhost:5500`.
-
-**"Module not found: flask" or similar.**
-The `pip3 install` from Step 2 didn't actually run, or you have multiple Python versions. Try:
-
-```bash
-python3 -m pip install flask psycopg2-binary
-```
-
----
-
-## What's in the database
-
-If you ever want to peek directly:
-
-```bash
-psql -d inditex_audit -c "SELECT id, name, entry_num, agg_lines, findings_count, saved_at FROM audit_runs ORDER BY saved_at DESC;"
-```
-
-To wipe everything and start over:
+### Reset all saved runs
 
 ```bash
 psql -d inditex_audit -c "TRUNCATE audit_runs;"
 ```
 
-To delete the database entirely:
+---
 
-```bash
-dropdb inditex_audit
-```
+## Playground / production
 
-The audit server will recreate it on next startup.
+Local `./deploy.sh` targets Elastic Beanstalk and requires Terraform init in `terraform/envs/dev`.
+
+**Standard team workflow:** sync app files to `klearnow/kn-playground` → open PR to `master` → merge → **Inditex Audit Deploy** workflow updates playground prod. See repo README.
+
+---
+
+## Next steps
+
+- **[USER_MANUAL.md](USER_MANUAL.md)** — full product guide
+- **[BUILD.md](BUILD.md)** — architecture for developers

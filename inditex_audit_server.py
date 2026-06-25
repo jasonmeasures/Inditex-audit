@@ -51,6 +51,7 @@ INITIAL_ADMIN_USERNAME = os.environ.get("INITIAL_ADMIN_USERNAME", "admin")
 INITIAL_ADMIN_PASSWORD = os.environ.get("INITIAL_ADMIN_PASSWORD", "")
 
 DASHBOARD_PATH = Path(__file__).parent / "inditex_audit_dashboard.html"
+APP_BUILD_ID = "2026.06.25-hts-cross"
 
 # ---------------------------------------------------------------------------
 # Database helpers
@@ -101,6 +102,7 @@ def _ensure_schema(conn: psycopg2.extensions.connection) -> None:
         entry_num         TEXT,
         invoice_num       TEXT,
         importer          TEXT,
+        importer_ein      TEXT,
         agg_lines         INTEGER,
         entered_value     NUMERIC,
         total_duty        NUMERIC,
@@ -121,6 +123,53 @@ def _ensure_schema(conn: psycopg2.extensions.connection) -> None:
     """
     with conn.cursor() as cur:
         cur.execute(ddl)
+        cur.execute("ALTER TABLE audit_runs ADD COLUMN IF NOT EXISTS importer_ein TEXT;")
+        cur.execute("ALTER TABLE audit_runs ADD COLUMN IF NOT EXISTS review_status TEXT DEFAULT 'pending';")
+        cur.execute("ALTER TABLE audit_runs ADD COLUMN IF NOT EXISTS review_note TEXT;")
+        cur.execute("ALTER TABLE audit_runs ADD COLUMN IF NOT EXISTS reviewed_by TEXT;")
+        cur.execute("ALTER TABLE audit_runs ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP WITH TIME ZONE;")
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS audit_runs_importer_ein_idx
+                ON audit_runs (importer_ein);
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS audit_runs_review_status_idx
+                ON audit_runs (review_status);
+        """)
+        cur.execute("""
+            UPDATE audit_runs ar
+            SET entered_value = COALESCE(
+                    NULLIF(ar.entered_value, 0),
+                    NULLIF((ar.data->'state'->'ctx'->>'enteredFiled')::numeric, 0),
+                    NULLIF((ar.data->'state'->'ctx'->>'enteredAgg')::numeric, 0),
+                    (
+                        SELECT COALESCE(SUM(NULLIF(elem->>'ENTERED_VALUE', '')::numeric), 0)
+                        FROM jsonb_array_elements(COALESCE(ar.data->'state'->'filed', '[]'::jsonb)) AS elem
+                    )
+                ),
+                total_duty = COALESCE(
+                    NULLIF(ar.total_duty, 0),
+                    COALESCE((ar.data->'state'->'ctx'->>'filedMFN')::numeric, 0)
+                    + COALESCE((ar.data->'state'->'ctx'->>'filedCH99')::numeric, 0)
+                    + COALESCE((ar.data->'state'->'ctx'->>'filedMPF')::numeric, 0)
+                    + COALESCE((ar.data->'state'->'ctx'->>'filedCotton')::numeric, 0),
+                    (
+                        SELECT COALESCE(SUM(
+                            COALESCE(NULLIF(elem->>'MFN_DUTY', '')::numeric, 0)
+                            + COALESCE(NULLIF(elem->>'CH99_DUTY_FILED', '')::numeric, 0)
+                            + COALESCE(NULLIF(elem->>'MPF_FILED', '')::numeric, 0)
+                            + COALESCE(NULLIF(elem->>'COTTON_FEE', '')::numeric, 0)
+                        ), 0)
+                        FROM jsonb_array_elements(COALESCE(ar.data->'state'->'filed', '[]'::jsonb)) AS elem
+                    )
+                ),
+                importer_ein = COALESCE(
+                    NULLIF(TRIM(ar.importer_ein), ''),
+                    NULLIF(TRIM(BOTH '"' FROM TRIM(ar.data->'state'->'ctx'->>'importerEin')), ''),
+                    NULLIF(TRIM(BOTH '"' FROM TRIM(ar.data->'state'->'ctx'->>'importerId')), '')
+                )
+            WHERE ar.data->'state' IS NOT NULL;
+        """)
     conn.commit()
     print("  • Schema ready (table: audit_runs)")
 
@@ -141,6 +190,25 @@ def _ensure_users_schema(conn: psycopg2.extensions.connection) -> None:
         cur.execute(ddl)
     conn.commit()
     print("  • Schema ready (table: users)")
+
+
+def _ensure_reference_schema(conn: psycopg2.extensions.connection) -> None:
+    """Global reference data (HTS table, Ch99 rules) shared across all audit runs."""
+    ddl = """
+    CREATE TABLE IF NOT EXISTS reference_config (
+        id                  TEXT PRIMARY KEY,
+        filename            TEXT,
+        payload             BYTEA,
+        code_count          INTEGER,
+        json_data           JSONB,
+        updated_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_by          TEXT
+    );
+    """
+    with conn.cursor() as cur:
+        cur.execute(ddl)
+    conn.commit()
+    print("  • Schema ready (table: reference_config)")
 
 
 def _ensure_activity_schema(conn: psycopg2.extensions.connection) -> None:
@@ -225,17 +293,84 @@ def get_conn() -> psycopg2.extensions.connection:
 # Snapshot extraction helpers
 # ---------------------------------------------------------------------------
 
+def _ctx_numeric(ctx: dict, key: str):
+    if not ctx:
+        return None
+    return _to_numeric(ctx.get(key))
+
+
+def _filed_sum(snapshot: dict, field: str) -> float:
+    """Sum a numeric field across state.filed lines when ctx totals are missing."""
+    filed = (snapshot.get("state") or {}).get("filed") or []
+    total = 0.0
+    found = False
+    for row in filed:
+        if not isinstance(row, dict):
+            continue
+        val = _to_numeric(row.get(field))
+        if val is not None:
+            total += val
+            found = True
+    return total if found else 0.0
+
+
+def _metrics_from_snapshot(snapshot: dict) -> dict:
+    """Derive dashboard metrics from ctx with filed-line fallbacks."""
+    state = snapshot.get("state") or {}
+    ctx = state.get("ctx") or {}
+
+    filed_mfn = _ctx_numeric(ctx, "filedMFN")
+    if not filed_mfn:
+        filed_mfn = _filed_sum(snapshot, "MFN_DUTY")
+
+    filed_ch99 = _ctx_numeric(ctx, "filedCH99")
+    if not filed_ch99:
+        filed_ch99 = _filed_sum(snapshot, "CH99_DUTY_FILED")
+
+    filed_mpf = _ctx_numeric(ctx, "filedMPF")
+    if not filed_mpf:
+        filed_mpf = _filed_sum(snapshot, "MPF_FILED")
+
+    filed_cotton = _ctx_numeric(ctx, "filedCotton")
+    if not filed_cotton:
+        filed_cotton = _filed_sum(snapshot, "COTTON_FEE")
+
+    entered = _ctx_numeric(ctx, "enteredFiled") or _ctx_numeric(ctx, "enteredAgg")
+    if not entered:
+        entered = _filed_sum(snapshot, "ENTERED_VALUE")
+
+    component_sum = (filed_mfn or 0) + (filed_ch99 or 0) + (filed_mpf or 0) + (filed_cotton or 0)
+    total_duty = component_sum if component_sum else None
+
+    return {
+        "entered_value": entered,
+        "filed_mfn": filed_mfn or 0.0,
+        "filed_ch99": filed_ch99 or 0.0,
+        "filed_mpf": filed_mpf or 0.0,
+        "filed_cotton": filed_cotton or 0.0,
+        "total_duty": total_duty,
+        "strict_matched": _to_int(ctx.get("strictMatched")) or 0,
+        "loose_matched": _to_int(ctx.get("looseMatched")) or 0,
+        "no_match": _to_int(ctx.get("noMatch")) or 0,
+    }
+
+
 def _extract_fields(snapshot: dict) -> dict:
     """Pull denormalized columns out of a v4 snapshot dict."""
     inputs = snapshot.get("inputs", {})
     state  = snapshot.get("state", {})
     ctx    = state.get("ctx", {})
+    metrics = _metrics_from_snapshot(snapshot)
 
     saved_at_raw = snapshot.get("savedAt")
     try:
         saved_at = datetime.fromisoformat(saved_at_raw.replace("Z", "+00:00")) if saved_at_raw else None
     except (ValueError, AttributeError):
         saved_at = None
+
+    total_duty = metrics["total_duty"]
+    if total_duty is None:
+        total_duty = 0.0
 
     return {
         "id":                snapshot.get("id"),
@@ -248,9 +383,10 @@ def _extract_fields(snapshot: dict) -> dict:
         "entry_num":         ctx.get("entryNum"),
         "invoice_num":       ctx.get("invoice"),
         "importer":          ctx.get("importer"),
+        "importer_ein":      ctx.get("importerEin") or ctx.get("importerId"),
         "agg_lines":         _to_int(snapshot.get("aggLines") or len(state.get("agg", []))),
-        "entered_value":     _to_numeric(ctx.get("enteredAgg")),
-        "total_duty":        _to_numeric(ctx.get("filedCH99")),  # Block 37
+        "entered_value":     metrics["entered_value"],
+        "total_duty":        total_duty,
         "findings_count":    _to_int(snapshot.get("findingsCount")),
         "findings_critical": _to_int(snapshot.get("findingsCritical")),
         "findings_high":     _to_int(snapshot.get("findingsHigh")),
@@ -346,6 +482,7 @@ def index():
         resp = send_file(str(DASHBOARD_PATH), mimetype="text/html")
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
         resp.headers["Pragma"] = "no-cache"
+        resp.headers["X-App-Build"] = APP_BUILD_ID
         return resp
     return Response(
         "<h1>Dashboard not found</h1>"
@@ -575,7 +712,80 @@ def get_runs_summary():
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT id, name, entry_num, invoice_num, importer,
-                       agg_lines, entered_value, total_duty,
+                       COALESCE(
+                         NULLIF(TRIM(BOTH '"' FROM TRIM(importer_ein)), ''),
+                         NULLIF(TRIM(BOTH '"' FROM TRIM(data->'state'->'ctx'->>'importerEin')), ''),
+                         NULLIF(TRIM(BOTH '"' FROM TRIM(data->'state'->'ctx'->>'importerId')), '')
+                       ) AS importer_ein,
+                       txt_name, xlsx_name, freight, insurance,
+                       agg_lines,
+                       COALESCE(
+                         NULLIF(entered_value, 0),
+                         NULLIF((data->'state'->'ctx'->>'enteredFiled')::numeric, 0),
+                         NULLIF((data->'state'->'ctx'->>'enteredAgg')::numeric, 0),
+                         (
+                           SELECT COALESCE(SUM(NULLIF(elem->>'ENTERED_VALUE', '')::numeric), 0)
+                           FROM jsonb_array_elements(COALESCE(data->'state'->'filed', '[]'::jsonb)) AS elem
+                         ),
+                         0
+                       ) AS entered_value,
+                       COALESCE(
+                         NULLIF((data->'state'->'ctx'->>'filedMFN')::numeric, 0),
+                         (
+                           SELECT COALESCE(SUM(NULLIF(elem->>'MFN_DUTY', '')::numeric), 0)
+                           FROM jsonb_array_elements(COALESCE(data->'state'->'filed', '[]'::jsonb)) AS elem
+                         ),
+                         0
+                       ) AS filed_mfn,
+                       COALESCE(
+                         NULLIF((data->'state'->'ctx'->>'filedCH99')::numeric, 0),
+                         (
+                           SELECT COALESCE(SUM(NULLIF(elem->>'CH99_DUTY_FILED', '')::numeric), 0)
+                           FROM jsonb_array_elements(COALESCE(data->'state'->'filed', '[]'::jsonb)) AS elem
+                         ),
+                         0
+                       ) AS filed_ch99,
+                       COALESCE(
+                         NULLIF((data->'state'->'ctx'->>'filedMPF')::numeric, 0),
+                         (
+                           SELECT COALESCE(SUM(NULLIF(elem->>'MPF_FILED', '')::numeric), 0)
+                           FROM jsonb_array_elements(COALESCE(data->'state'->'filed', '[]'::jsonb)) AS elem
+                         ),
+                         0
+                       ) AS filed_mpf,
+                       COALESCE(
+                         NULLIF((data->'state'->'ctx'->>'filedCotton')::numeric, 0),
+                         (
+                           SELECT COALESCE(SUM(NULLIF(elem->>'COTTON_FEE', '')::numeric), 0)
+                           FROM jsonb_array_elements(COALESCE(data->'state'->'filed', '[]'::jsonb)) AS elem
+                         ),
+                         0
+                       ) AS filed_cotton,
+                       COALESCE(
+                         NULLIF(total_duty, 0),
+                         COALESCE((data->'state'->'ctx'->>'filedMFN')::numeric, 0)
+                         + COALESCE((data->'state'->'ctx'->>'filedCH99')::numeric, 0)
+                         + COALESCE((data->'state'->'ctx'->>'filedMPF')::numeric, 0)
+                         + COALESCE((data->'state'->'ctx'->>'filedCotton')::numeric, 0),
+                         (
+                           SELECT COALESCE(SUM(
+                             COALESCE(NULLIF(elem->>'MFN_DUTY', '')::numeric, 0)
+                             + COALESCE(NULLIF(elem->>'CH99_DUTY_FILED', '')::numeric, 0)
+                             + COALESCE(NULLIF(elem->>'MPF_FILED', '')::numeric, 0)
+                             + COALESCE(NULLIF(elem->>'COTTON_FEE', '')::numeric, 0)
+                           ), 0)
+                           FROM jsonb_array_elements(COALESCE(data->'state'->'filed', '[]'::jsonb)) AS elem
+                         ),
+                         0
+                       ) AS total_duty,
+                       COALESCE((data->'state'->'ctx'->>'strictMatched')::int, 0) AS strict_matched,
+                       COALESCE((data->'state'->'ctx'->>'looseMatched')::int, 0) AS loose_matched,
+                       COALESCE((data->'state'->'ctx'->>'noMatch')::int, 0) AS no_match,
+                       COALESCE(NULLIF(TRIM(review_status), ''), 'pending') AS review_status,
+                       review_note,
+                       reviewed_by,
+                       reviewed_at,
+                       COALESCE(data->'findingsDigest', '[]'::jsonb) AS findings_digest,
                        findings_count, findings_critical, findings_high,
                        saved_at, created_at, updated_at
                 FROM audit_runs
@@ -587,6 +797,100 @@ def get_runs_summary():
             json.dumps([dict(r) for r in rows], default=str),
             mimetype="application/json",
         )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/runs/_portfolio", methods=["GET"])
+@require_auth
+def get_portfolio_stats():
+    """Cross-run COO rollup from filed lines in saved snapshots."""
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT
+                  COALESCE(NULLIF(TRIM(elem->>'COO'), ''), 'Unknown') AS coo,
+                  COUNT(*)::int AS lines,
+                  COALESCE(SUM(NULLIF(elem->>'ENTERED_VALUE', '')::numeric), 0) AS entered,
+                  COALESCE(SUM(
+                    COALESCE(NULLIF(elem->>'MFN_DUTY', '')::numeric, 0)
+                    + COALESCE(NULLIF(elem->>'CH99_DUTY_FILED', '')::numeric, 0)
+                    + COALESCE(NULLIF(elem->>'MPF_FILED', '')::numeric, 0)
+                    + COALESCE(NULLIF(elem->>'COTTON_FEE', '')::numeric, 0)
+                  ), 0) AS duty,
+                  COALESCE(SUM(NULLIF(elem->>'CH99_DUTY_FILED', '')::numeric), 0) AS ch99
+                FROM audit_runs ar,
+                     jsonb_array_elements(COALESCE(ar.data->'state'->'filed', '[]'::jsonb)) AS elem
+                GROUP BY 1
+                ORDER BY duty DESC
+            """)
+            rows = cur.fetchall()
+        conn.close()
+        return Response(
+            json.dumps([dict(r) for r in rows], default=str),
+            mimetype="application/json",
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+VALID_REVIEW_STATUSES = frozenset({
+    "pending",
+    "in_progress",
+    "reviewed",
+    "needs_deeper_review",
+    "broker_contacted",
+    "data_issue",
+    "waived",
+})
+
+
+@app.route("/api/runs/<run_id>/review", methods=["PATCH"])
+@require_auth
+def patch_run_review(run_id: str):
+    """Update reviewer workflow status for a saved run."""
+    try:
+        body = request.get_json(force=True) or {}
+        status = (body.get("status") or "").strip().lower()
+        if status not in VALID_REVIEW_STATUSES:
+            return jsonify({
+                "error": "invalid status",
+                "allowed": sorted(VALID_REVIEW_STATUSES),
+            }), 400
+        note = body.get("note")
+        if note is not None:
+            note = str(note).strip() or None
+        username = request.current_user.get("sub") or "unknown"
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT 1 FROM audit_runs WHERE id = %s", (run_id,))
+            if cur.fetchone() is None:
+                conn.close()
+                return jsonify({"error": "not found"}), 404
+            reviewed_at = datetime.now(timezone.utc) if status != "pending" else None
+            reviewed_by = username if status != "pending" else None
+            cur.execute("""
+                UPDATE audit_runs
+                SET review_status = %s,
+                    review_note = %s,
+                    reviewed_by = %s,
+                    reviewed_at = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+                RETURNING review_status, review_note, reviewed_by, reviewed_at
+            """, (status, note, reviewed_by, reviewed_at, run_id))
+            row = cur.fetchone()
+        conn.commit()
+        conn.close()
+        _log_activity(
+            username,
+            "review_run",
+            "run",
+            run_id,
+            {"status": status, "note": note},
+        )
+        return jsonify(dict(row))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -628,14 +932,14 @@ def upsert_run():
             cur.execute("""
                 INSERT INTO audit_runs (
                     id, name, saved_at, txt_name, xlsx_name,
-                    freight, insurance, entry_num, invoice_num, importer,
+                    freight, insurance, entry_num, invoice_num, importer, importer_ein,
                     agg_lines, entered_value, total_duty,
                     findings_count, findings_critical, findings_high,
                     data, created_at, updated_at
                 ) VALUES (
                     %(id)s, %(name)s, %(saved_at)s, %(txt_name)s, %(xlsx_name)s,
                     %(freight)s, %(insurance)s, %(entry_num)s, %(invoice_num)s,
-                    %(importer)s, %(agg_lines)s, %(entered_value)s, %(total_duty)s,
+                    %(importer)s, %(importer_ein)s, %(agg_lines)s, %(entered_value)s, %(total_duty)s,
                     %(findings_count)s, %(findings_critical)s, %(findings_high)s,
                     %(data)s, NOW(), NOW()
                 )
@@ -649,6 +953,7 @@ def upsert_run():
                     entry_num         = EXCLUDED.entry_num,
                     invoice_num       = EXCLUDED.invoice_num,
                     importer          = EXCLUDED.importer,
+                    importer_ein      = EXCLUDED.importer_ein,
                     agg_lines         = EXCLUDED.agg_lines,
                     entered_value     = EXCLUDED.entered_value,
                     total_duty        = EXCLUDED.total_duty,
@@ -744,6 +1049,37 @@ def delete_run(run_id: str):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/runs/_bulk_delete", methods=["POST"])
+@require_auth
+def bulk_delete_runs():
+    """Delete multiple runs by id list."""
+    try:
+        body = request.get_json(force=True) or {}
+        ids = body.get("ids") or []
+        if not isinstance(ids, list) or not ids:
+            return jsonify({"error": "ids must be a non-empty array"}), 400
+        ids = [str(i) for i in ids if i]
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM audit_runs WHERE id = ANY(%s)",
+                (ids,),
+            )
+            deleted = cur.rowcount
+        conn.commit()
+        conn.close()
+        _log_activity(
+            request.current_user.get("sub"),
+            "bulk_delete_runs",
+            "run",
+            None,
+            {"deleted": deleted, "requested": len(ids)},
+        )
+        return jsonify({"ok": True, "deleted": deleted})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/runs", methods=["DELETE"])
 @require_auth
 def delete_all_runs():
@@ -778,21 +1114,22 @@ def mfn_consistency():
     Cross-entry MFN rate consistency check.
 
     For every (COO, HTS) pair that appears in more than one saved run with
-    different MFN rates, return the full list of occurrences sorted by rate
-    spread (largest discrepancy first).  Useful for spotting broker
-    classification drift or reclassifications over time.
+    filed MFN rates differing by more than 1 percentage point, return the full
+    list of occurrences sorted by rate spread (largest discrepancy first).
     """
     try:
         conn = get_conn()
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 WITH filed_items AS (
-                    -- One row per filed item; cast MFN_RATE_PCT to numeric.
+                    -- One row per 7501 filed line item.
                     SELECT
                         r.id                                                AS run_id,
                         r.name                                              AS run_name,
                         r.entry_num,
                         r.saved_at,
+                        (item->>'ITEM')                                     AS item_no,
+                        (item->>'MID')                                      AS mid,
                         (item->>'COO')                                      AS coo,
                         (item->>'HTS')                                      AS hts,
                         (item->>'MFN_RATE_STR')                             AS mfn_rate_str,
@@ -803,16 +1140,6 @@ def mfn_consistency():
                       AND (item->>'HTS')          IS NOT NULL
                       AND (item->>'COO')          IS NOT NULL
                 ),
-                deduped AS (
-                    -- One representative row per (run, COO, HTS, rate) so that
-                    -- a single entry with 10 items at the same rate doesn't create
-                    -- 10 occurrence rows in the output.
-                    SELECT DISTINCT ON (run_id, coo, hts, mfn_rate_pct)
-                        run_id, run_name, entry_num, saved_at,
-                        coo, hts, mfn_rate_str, mfn_rate_pct
-                    FROM  filed_items
-                    ORDER BY run_id, coo, hts, mfn_rate_pct, mfn_rate_str NULLS LAST
-                ),
                 discrepancies AS (
                     SELECT
                         coo,
@@ -820,9 +1147,10 @@ def mfn_consistency():
                         count(DISTINCT mfn_rate_pct)                              AS rate_count,
                         array_agg(DISTINCT mfn_rate_pct ORDER BY mfn_rate_pct)    AS rates,
                         max(mfn_rate_pct) - min(mfn_rate_pct)                     AS rate_spread
-                    FROM  deduped
+                    FROM  filed_items
                     GROUP BY coo, hts
                     HAVING count(DISTINCT mfn_rate_pct) > 1
+                       AND max(mfn_rate_pct) - min(mfn_rate_pct) > 1.0
                 )
                 SELECT
                     d.coo,
@@ -835,14 +1163,18 @@ def mfn_consistency():
                             'run_id',    f.run_id,
                             'run_name',  f.run_name,
                             'entry_num', f.entry_num,
+                            'item',      f.item_no,
+                            'mid',       f.mid,
                             'rate',      f.mfn_rate_pct,
                             'rate_str',  f.mfn_rate_str,
                             'saved_at',  f.saved_at
                         )
-                        ORDER BY f.mfn_rate_pct, f.saved_at DESC
+                        ORDER BY f.mfn_rate_pct,
+                                 NULLIF(regexp_replace(f.item_no, '[^0-9]', '', 'g'), '')::int NULLS LAST,
+                                 f.saved_at DESC
                     )                                                              AS occurrences
                 FROM  discrepancies d
-                JOIN  deduped f ON f.coo = d.coo AND f.hts = d.hts
+                JOIN  filed_items f ON f.coo = d.coo AND f.hts = d.hts
                 GROUP BY d.coo, d.hts, d.rate_count, d.rates, d.rate_spread
                 ORDER BY d.rate_spread DESC, d.coo, d.hts
             """)
@@ -859,6 +1191,118 @@ def mfn_consistency():
                     occ["rate"] = float(occ["rate"])
             result.append(r)
         return Response(json.dumps(result, default=str), mimetype="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/analytics/hts-cross-consistency")
+@require_auth
+def hts_cross_consistency():
+    """
+    Cross-run HTS MFN consistency — same HTS digits filed at different rates
+    on different saved entries (>1 percentage point spread).
+    """
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                WITH filed_items AS (
+                    SELECT
+                        r.id                                                AS run_id,
+                        r.name                                              AS run_name,
+                        r.entry_num,
+                        r.saved_at,
+                        (item->>'ITEM')                                     AS item_no,
+                        (item->>'COO')                                      AS coo,
+                        (item->>'HTS')                                      AS hts_raw,
+                        regexp_replace(COALESCE(item->>'HTS', ''), '[^0-9]', '', 'g')
+                                                                            AS hts_digits,
+                        ROUND((item->>'MFN_RATE_PCT')::numeric, 4)          AS mfn_rate_pct
+                    FROM  audit_runs r,
+                          jsonb_array_elements(r.data->'state'->'filed') AS item
+                    WHERE (item->>'MFN_RATE_PCT') IS NOT NULL
+                      AND (item->>'HTS')          IS NOT NULL
+                      AND regexp_replace(COALESCE(item->>'HTS', ''), '[^0-9]', '', 'g') <> ''
+                ),
+                discrepancies AS (
+                    SELECT
+                        hts_digits,
+                        count(DISTINCT run_id)                                    AS run_count,
+                        count(DISTINCT mfn_rate_pct)                              AS rate_count,
+                        max(mfn_rate_pct) - min(mfn_rate_pct)                     AS rate_spread
+                    FROM  filed_items
+                    GROUP BY hts_digits
+                    HAVING count(DISTINCT run_id) >= 2
+                       AND count(DISTINCT mfn_rate_pct) > 1
+                       AND max(mfn_rate_pct) - min(mfn_rate_pct) > 1.0
+                )
+                SELECT
+                    d.hts_digits,
+                    (SELECT f.hts_raw
+                     FROM   filed_items f
+                     WHERE  f.hts_digits = d.hts_digits
+                     LIMIT  1)                                                  AS hts_display,
+                    d.run_count,
+                    d.rate_count,
+                    ROUND(d.rate_spread, 4)                                       AS rate_spread,
+                    json_agg(
+                        json_build_object(
+                            'run_id',    f.run_id,
+                            'run_name',  f.run_name,
+                            'entry_num', f.entry_num,
+                            'item',      f.item_no,
+                            'coo',       f.coo,
+                            'rate',      f.mfn_rate_pct,
+                            'saved_at',  f.saved_at
+                        )
+                        ORDER BY f.mfn_rate_pct,
+                                 NULLIF(regexp_replace(f.item_no, '[^0-9]', '', 'g'), '')::int NULLS LAST,
+                                 f.saved_at DESC
+                    )                                                             AS occurrences
+                FROM  discrepancies d
+                JOIN  filed_items f ON f.hts_digits = d.hts_digits
+                GROUP BY d.hts_digits, d.run_count, d.rate_count, d.rate_spread
+                ORDER BY d.rate_spread DESC, d.hts_digits
+            """)
+            rows = cur.fetchall()
+            cur.execute("""
+                WITH filed_items AS (
+                    SELECT
+                        r.id AS run_id,
+                        regexp_replace(COALESCE(item->>'HTS', ''), '[^0-9]', '', 'g') AS hts_digits,
+                        ROUND((item->>'MFN_RATE_PCT')::numeric, 4) AS mfn_rate_pct
+                    FROM  audit_runs r,
+                          jsonb_array_elements(r.data->'state'->'filed') AS item
+                    WHERE (item->>'MFN_RATE_PCT') IS NOT NULL
+                      AND (item->>'HTS')          IS NOT NULL
+                      AND regexp_replace(COALESCE(item->>'HTS', ''), '[^0-9]', '', 'g') <> ''
+                )
+                SELECT count(*) AS sub_threshold_hts_count
+                FROM (
+                    SELECT hts_digits
+                    FROM   filed_items
+                    GROUP  BY hts_digits
+                    HAVING count(DISTINCT run_id) >= 2
+                       AND count(DISTINCT mfn_rate_pct) > 1
+                       AND max(mfn_rate_pct) - min(mfn_rate_pct) <= 1.0
+                ) sub
+            """)
+            sub_row = cur.fetchone()
+        conn.close()
+        _log_activity(request.current_user.get("sub"), "view_hts_cross_analytics", "analytics")
+        result = []
+        for row in rows:
+            r = dict(row)
+            r["rate_spread"] = float(r["rate_spread"]) if r["rate_spread"] is not None else None
+            for occ in (r.get("occurrences") or []):
+                if occ.get("rate") is not None:
+                    occ["rate"] = float(occ["rate"])
+            result.append(r)
+        payload = {
+            "items": result,
+            "sub_threshold_hts_count": int((sub_row or {}).get("sub_threshold_hts_count") or 0),
+        }
+        return Response(json.dumps(payload, default=str), mimetype="application/json")
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -970,6 +1414,154 @@ def activity_summary():
 
 
 # ---------------------------------------------------------------------------
+# Routes — global reference data (admin write, all users read)
+# ---------------------------------------------------------------------------
+
+@app.route("/api/reference", methods=["GET"])
+@require_auth
+def get_reference():
+    """Metadata + Ch99 rules. HTS binary is fetched via GET /api/reference/hts."""
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM reference_config WHERE id IN ('hts_table', 'ch99_rules')")
+            rows = {r["id"]: dict(r) for r in cur.fetchall()}
+        conn.close()
+
+        hts_row = rows.get("hts_table")
+        rules_row = rows.get("ch99_rules")
+        hts_meta = None
+        if hts_row and hts_row.get("payload"):
+            hts_meta = {
+                "filename": hts_row.get("filename"),
+                "codeCount": hts_row.get("code_count"),
+                "updatedAt": hts_row.get("updated_at"),
+                "updatedBy": hts_row.get("updated_by"),
+            }
+        rules = rules_row.get("json_data") if rules_row else None
+        rules_meta = None
+        if rules_row and rules:
+            rules_meta = {
+                "count": len(rules) if isinstance(rules, list) else 0,
+                "updatedAt": rules_row.get("updated_at"),
+                "updatedBy": rules_row.get("updated_by"),
+            }
+        return Response(
+            json.dumps({
+                "hts": hts_meta,
+                "ch99Rules": rules,
+                "ch99RulesMeta": rules_meta,
+            }, default=str),
+            mimetype="application/json",
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/reference/hts", methods=["GET"])
+@require_auth
+def get_reference_hts():
+    """Download the stored HTS classification table (XLSX bytes)."""
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT filename, payload FROM reference_config WHERE id = 'hts_table'"
+            )
+            row = cur.fetchone()
+        conn.close()
+        if not row or not row.get("payload"):
+            return jsonify({"error": "HTS table not uploaded"}), 404
+        filename = row.get("filename") or "hts_classification_table.xlsx"
+        return Response(
+            row["payload"],
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/reference/hts", methods=["PUT"])
+@require_admin
+def put_reference_hts():
+    """Upload or replace the global HTS classification table."""
+    try:
+        upload = request.files.get("file")
+        if not upload:
+            return jsonify({"error": "multipart file field 'file' is required"}), 400
+        data = upload.read()
+        if not data:
+            return jsonify({"error": "empty file"}), 400
+        filename = upload.filename or "hts_table.xlsx"
+        code_count = request.form.get("codeCount")
+        try:
+            code_count = int(code_count) if code_count else None
+        except ValueError:
+            code_count = None
+        username = request.current_user.get("sub")
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO reference_config (id, filename, payload, code_count, updated_at, updated_by)
+                VALUES ('hts_table', %s, %s, %s, NOW(), %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    filename   = EXCLUDED.filename,
+                    payload    = EXCLUDED.payload,
+                    code_count = EXCLUDED.code_count,
+                    updated_at = NOW(),
+                    updated_by = EXCLUDED.updated_by
+            """, (filename, psycopg2.Binary(data), code_count, username))
+        conn.commit()
+        conn.close()
+        _log_activity(
+            username,
+            "upload_hts_table",
+            "reference",
+            "hts_table",
+            {"filename": filename, "code_count": code_count},
+        )
+        return jsonify({"ok": True, "filename": filename, "codeCount": code_count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/reference/ch99-rules", methods=["PUT"])
+@require_admin
+def put_reference_ch99_rules():
+    """Save the global Chapter 99 rules table."""
+    try:
+        body = request.get_json(force=True) or {}
+        rules = body.get("rules")
+        if not isinstance(rules, list):
+            return jsonify({"error": "body.rules must be an array"}), 400
+        username = request.current_user.get("sub")
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO reference_config (id, json_data, code_count, updated_at, updated_by)
+                VALUES ('ch99_rules', %s, %s, NOW(), %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    json_data  = EXCLUDED.json_data,
+                    code_count = EXCLUDED.code_count,
+                    updated_at = NOW(),
+                    updated_by = EXCLUDED.updated_by
+            """, (json.dumps(rules), len(rules), username))
+        conn.commit()
+        conn.close()
+        _log_activity(
+            username,
+            "save_ch99_rules",
+            "reference",
+            "ch99_rules",
+            {"rule_count": len(rules)},
+        )
+        return jsonify({"ok": True, "count": len(rules)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -985,6 +1577,7 @@ if __name__ == "__main__":
     _ensure_schema(conn)
     _ensure_users_schema(conn)
     _ensure_activity_schema(conn)
+    _ensure_reference_schema(conn)
     _seed_initial_admin(conn)
     conn.close()
 
