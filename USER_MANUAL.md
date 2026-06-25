@@ -172,7 +172,7 @@ Open **Reference** from the top bar (sign-in required). Reference data is **glob
 
 ### 9.1 HTS Classification Table (admin upload)
 
-Admins upload an `.xlsx` HTS table. MFN rates drive duty projection and HTS verification. **EU cap branching** still uses **7501 column 33 first**, then the HTS table as fallback.
+Admins upload an `.xlsx` HTS table. MFN rates drive duty projection, HTS verification, and **EU cap branching** (`9903.02.19` vs `9903.02.20`) from true HTSUS Column 1 rates. Filed 7501 column 33 is fallback only when the table has no match.
 
 ### 9.2 Chapter 99 rules (admin edit)
 
@@ -217,10 +217,12 @@ The Snapshot KPI **Ch99 rules as of** shows this date and its source (IT / relea
 
 Authority: EO 14326, CBP CSMS #65829726. For EU origin, reciprocal duty is capped at **15% landed**:
 
-| Filed Column 1 rate (col 33) | Expected Ch99 | Reciprocal duty |
-|------------------------------|---------------|-----------------|
+| HTSUS Column 1 (General) rate | Expected Ch99 | Reciprocal duty |
+|-------------------------------|---------------|-----------------|
 | **≥ 15%** | `9903.02.19` | 0% additional |
 | **&lt; 15%** (incl. Free) | `9903.02.20` | +15% additive on Ch99 line |
+
+The engine uses the **HTS Classification Table** for this branch when loaded (not filed 7501 column 33, which may show 0% or 15% under replacement-duty filing per CBP CSMS #66319804). Column 33 is fallback only when the table has no match. If the broker filed `9903.02.20` and col 33 shows exactly 15%, the engine treats that 15% as replacement duty — not statutory MFN — and expects `.20`.
 
 Example: perfume `3303.00.3000` with Col-1 **Free** → expect **`9903.02.20`** (broker was correct if they filed `.20`).
 
@@ -236,7 +238,7 @@ Example: perfume `3303.00.3000` with Col-1 **Free** → expect **`9903.02.20`** 
 
 ### 10.3 Section 232 (steel / aluminum)
 
-Extra Ch99 rows on the same CM item (`9903.01.33` + `9903.81.*`) are accepted as **Info**, not Critical. Separate CM-item 232 lines pair as **232 SPLIT (7501 adjunct)**.
+Extra Ch99 rows on the same CM item (`9903.01.33` + `9903.81.*`) are accepted as **Info**, not Critical. Separate CM-item 232 lines pair as **232 SPLIT (7501 adjunct)**. For **entered value**, adjunct CM items' col-32 values are rolled into the matched parent line before diffing against TXT agg (avoids false gaps when the broker splits value across primary + 232 items).
 
 ### 10.4 Section 301 (China)
 

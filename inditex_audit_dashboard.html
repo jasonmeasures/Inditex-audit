@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="app-build" content="2026.06.18-ref-hts" />
+<meta name="app-build" content="2026.06.25-hts-cross" />
 <title>7501 Audit</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -1465,7 +1465,7 @@
         <span id="adminHtsMeta" style="font-size:11px;color:var(--gray-400);max-width:480px;line-height:1.45;"></span>
       </div>
       <p class="ref-admin-only" style="font-size:12px;color:var(--gray-500);margin:0 0 16px 0;line-height:1.5;">
-        MFN rates from this table override broker-filed 7501 rates for duty projection. For EU cap logic (9903.02.19 vs 9903.02.20), the engine uses the <strong>7501 column 33 rate first</strong> (CBP ties the branch to the filed Column 1 / ad valorem equivalent rate).
+        MFN rates from this table drive duty projection and EU cap logic (9903.02.19 vs 9903.02.20). The branch uses the <strong>true HTSUS Column 1 (General) rate</strong> from this table — not the filed 7501 column 33 rate, which may be 0% or 15% under replacement-duty filing (CBP CSMS #65829726 / #66319804).
       </p>
       <div class="users-toolbar" style="padding:0 0 10px 0;border:none;background:transparent;">
         <div>
@@ -1572,8 +1572,8 @@
       <h4 class="subsection-title" style="margin-top: 22px;">Data Provenance</h4>
       <div class="ver-card">
         <div class="ver-grid">
-          <span class="lbl">MFN rates</span><span class="val" id="verifyMfnSource">Taken from the broker-filed 7501 extract column <span class="mono-inline">33. CD HTS US Rate</span> per item when no HTS table is loaded; otherwise the global HTS Classification Table drives EU-cap logic.</span>
-          <span class="lbl">Entered value</span><span class="val">TXT-side: AMOUNT − pro-rata freight − pro-rata insurance per Method B aggregation. 7501-side: filed value from column <span class="mono-inline">32. CM Item Entered Value</span>.</span>
+          <span class="lbl">MFN rates</span><span class="val" id="verifyMfnSource">The global <strong>HTS Classification Table</strong> is authoritative for duty projection and EU cap branching (9903.02.19 vs .20) when loaded; broker-filed 7501 column <span class="mono-inline">33. CD HTS US Rate</span> is fallback only when the table has no match.</span>
+          <span class="lbl">Entered value</span><span class="val">TXT-side: AMOUNT − pro-rata freight − pro-rata insurance per Method B aggregation. 7501-side: column <span class="mono-inline">32. CM Item Entered Value</span>, with Section 232 adjunct CM items rolled into their matched parent line.</span>
           <span class="lbl">MID / COO match</span><span class="val">Strict on COO + HTS + MID, then loose on COO + HTS only. Unmatched rows surface as NO MATCH findings.</span>
           <span class="lbl">Ch99 detection</span><span class="val">7501-side: any HTS starting with <span class="mono-inline">9903</span>. TXT-side: derived from global Ch99 rules + COO.</span>
           <span class="lbl">MPF</span><span class="val">0.3464% of entered value per 19 CFR 24.23(b)(1).</span>
@@ -1806,7 +1806,7 @@
         </div>
         <div style="padding: 14px 18px; border-top: 1px solid var(--gray-200); background: var(--gray-50); font-size: 12px; color: var(--gray-600); line-height: 1.6;">
           <strong>How to read this:</strong> each row is one filed line item. The four colored columns show every Chapter 99 layer that <em>should</em> apply per the rules engine, with the code, rate %, and computed $ amount.
-          <strong>MFN %</strong> drives EU cap logic (9903.02.19 vs 9903.02.20): for ES/PT/BG the engine uses the <strong>7501 column 33</strong> rate when present, then falls back to the HTS Classification Table. Free or sub-15% → 9903.02.20; ≥15% → 9903.02.19.
+          <strong>MFN %</strong> drives EU cap logic (9903.02.19 vs 9903.02.20): for ES/PT/BG the engine uses the <strong>HTSUS Column 1 rate</strong> from the HTS Classification Table when loaded (true statutory MFN), then falls back to 7501 column 33. Free or sub-15% → 9903.02.20; ≥15% → 9903.02.19.
           The <strong>Δ vs Filed</strong> column compares expected total Ch99 duty to what was filed on the 7501 — green within $1, amber within $5, red beyond.
         </div>
       </div>
@@ -1964,6 +1964,7 @@ const ANNEX_I_EFFECTIVE_STR  = "Aug 7, 2025 → Feb 24, 2026";
 // EU reciprocal (9903.02.19 / 9903.02.20) — EO 14326 / EO 14257 as amended, CBP CSMS #65829726,
 // replacement-duty filing per CSMS #65475725 / #65829726 / #66242844 (FRNs 90 FR 37963, 27851, 44638).
 // Col-1 ≥ 15% → 9903.02.19 (0% additional); Col-1 < 15% (incl. Free) → 9903.02.20 (+15% additive).
+// MFN branch uses true HTSUS Col-1 (HTS table via getMfnRateForEuCap), not filed 7501 col 33.
 // Rate-determination date per 19 U.S.C. 1315(a), 19 CFR 141.68 (release), 141.69(a) warehouse withdrawal,
 // 141.69(b) IT at port of original importation, 141.69(c) overcarried return.
 const EU_RECIPROCAL_START = ANNEX_I_EFFECTIVE_FROM;
@@ -2490,16 +2491,32 @@ function getMfnRate(hts, brokerRate) {
   return brokerRate != null && !isNaN(brokerRate) ? Number(brokerRate) : null;
 }
 
-// EU cap branch (9903.02.19 vs .20) must use the Column 1 rate on the entry (7501 col 33)
-// when available — CBP ties the branch to the filed ad valorem / ad valorem equivalent rate.
-// HTS table is fallback only when the 7501 rate is missing.
-function getMfnRateForEuCap(hts, brokerRate) {
-  if (brokerRate != null && !isNaN(brokerRate)) return Number(brokerRate);
+// EU cap branch (9903.02.19 vs .20) uses the true HTSUS Column 1 (General) rate applicable
+// to the goods (CBP CSMS #65829726) — not the filed 7501 col 33 rate, which may show 0%
+// or 15% under replacement-duty filing. HTS table wins when loaded; col 33 is fallback only.
+// When .20 is filed and col 33 is exactly 15%, that 15% is replacement duty — not statutory MFN.
+function filedEuCapCodeFromCh99(ch99Hts) {
+  const codes = String(ch99Hts || "")
+    .split(",")
+    .map(s => htsNormalize(s.trim()))
+    .filter(Boolean);
+  if (codes.includes(htsNormalize(EU_CAP_CODE_HIGH_MFN))) return EU_CAP_CODE_HIGH_MFN;
+  if (codes.includes(htsNormalize(EU_CAP_CODE_LOW_MFN))) return EU_CAP_CODE_LOW_MFN;
+  return null;
+}
+
+function getMfnRateForEuCap(hts, brokerRate, filedEuCapCode) {
   if (htsLookup) {
     const entry = htsLookup.get(htsNormalize(hts));
     if (entry != null) return entry.rate_pct;
   }
-  return null;
+  const br = brokerRate != null && !isNaN(brokerRate) ? Number(brokerRate) : null;
+  if (br != null && br >= EU_CAP_THRESHOLD_PCT) {
+    if (filedEuCapCode && htsNormalize(filedEuCapCode) === htsNormalize(EU_CAP_CODE_LOW_MFN)) {
+      return null;
+    }
+  }
+  return br;
 }
 
 function priorEuReciprocalLayer() {
@@ -2590,7 +2607,7 @@ function scanRunEuCap(r, rules) {
     const coo = (f.COO || "").trim().toUpperCase();
     if (!EU_COUNTRIES.has(coo)) continue;
     const filedCodes = parseFiledCh99Codes(f);
-    const mfn = getMfnRateForEuCap(f.HTS, f.MFN_RATE_PCT);
+    const mfn = getMfnRateForEuCap(f.HTS, f.MFN_RATE_PCT, filedEuCapCodeFromCh99(f.CH99_HTS));
     const exp = expectedChapter99(coo, f.HTS, mfn, effectiveRules, ch99Opts);
     const expCodes = exp.map(e => e.ch99);
     const touchesCap = filedCodes.some(isEuCapCh99Code) || expCodes.some(isEuCapCh99Code);
@@ -2818,9 +2835,27 @@ function applyHtsBuffer(buf, filename, persist = true) {
   htsLookup = parseHtsTable(new Uint8Array(buf));
   updateHtsUi();
   renderHtsVerification();
+  _referenceLoadPromise = Promise.resolve();
+  _findingsDigestCache.clear();
+  refreshActiveRunAfterReferenceChange();
   if (state.cmp) render();
   if (persist) persistReferenceLocal();
   return htsLookup.size;
+}
+
+function refreshActiveRunAfterReferenceChange() {
+  if (!state.activeRunId || !state.filed?.length) return;
+  const snap = {
+    id: state.activeRunId,
+    schemaVersion: 5,
+    inputs: {
+      freight: parseFloat(document.getElementById("freight")?.value) || state.ctx?.freight || 0,
+      insurance: parseFloat(document.getElementById("insurance")?.value) || state.ctx?.insurance || 0,
+    },
+    state: { raw: state.raw, agg: state.agg, filed: state.filed, ctx: state.ctx },
+  };
+  const fullState = rehydrateRun(snap);
+  applyRehydratedToState(snap, fullState);
 }
 
 function persistReferenceLocal() {
@@ -2894,7 +2929,15 @@ function normalizeEuCapRules(rules) {
   return rules;
 }
 
+let _referenceLoadPromise = null;
+
 async function loadReferenceFromServer() {
+  if (_referenceLoadPromise) return _referenceLoadPromise;
+  _referenceLoadPromise = loadReferenceFromServerOnce();
+  return _referenceLoadPromise;
+}
+
+async function loadReferenceFromServerOnce() {
   if (!auth.token) {
     loadReferenceLocal();
     return;
@@ -2918,9 +2961,11 @@ async function loadReferenceFromServer() {
     }
     updateHtsUi();
     persistReferenceLocal();
+    _findingsDigestCache.clear();
   } catch (e) {
     console.warn("Reference load failed, using local cache:", e.message);
     loadReferenceLocal();
+    _findingsDigestCache.clear();
   }
 }
 
@@ -3691,8 +3736,42 @@ function compareAggToFiled(agg, filed, rules, ch99Opts) {
   });
 
   pairSection232OrphanRows(out);
+  rollupSection232EnteredValues(out);
 
   return out.sort((a,b) => (a.AGG_LINE||999) - (b.AGG_LINE||999));
+}
+
+/** Filed entered $ for MID/entry totals — adjunct lines rolled into parent are excluded. */
+function cmpEnteredValue75ForTotals(r) {
+  if (!r || r.SECTION_232_ORPHAN) return 0;
+  return Number(r.ENTERED_VALUE_75) || 0;
+}
+
+/** Sum 232 split adjunct entered values into the matched parent compare row. */
+function rollupSection232EnteredValues(out) {
+  const childrenByParent = new Map();
+  for (const r of out) {
+    if (!r.SECTION_232_ORPHAN || r.PARENT_ITEM == null || r.PARENT_AGG_LINE == null) continue;
+    const key = `${r.PARENT_AGG_LINE}|${r.PARENT_ITEM}`;
+    if (!childrenByParent.has(key)) childrenByParent.set(key, []);
+    childrenByParent.get(key).push(r);
+  }
+  for (const r of out) {
+    if (r.SECTION_232_ORPHAN || r.AGG_LINE == null || r.ITEM == null) continue;
+    const children = childrenByParent.get(`${r.AGG_LINE}|${r.ITEM}`);
+    if (!children?.length) continue;
+    const primaryEv = Number(r.ENTERED_VALUE_75) || 0;
+    const adjunctEv = children.reduce((s, c) => s + (Number(c.ENTERED_VALUE_75) || 0), 0);
+    if (adjunctEv <= 0) continue;
+    r.ENTERED_VALUE_75_PRIMARY = primaryEv;
+    r.ENTERED_VALUE_75_ADJUNCT = adjunctEv;
+    r.ENTERED_VALUE_75_ADJUNCT_ITEMS = children.map(c => c.ITEM).filter(Boolean);
+    r.ENTERED_VALUE_75 = primaryEv + adjunctEv;
+    r.ENTERED_VALUE_232_ROLLUP = true;
+    if (r.ENTERED_VALUE_TXT != null) {
+      r.ENTERED_DIFF = r.ENTERED_VALUE_TXT - r.ENTERED_VALUE_75;
+    }
+  }
 }
 
 function pairSection232OrphanRows(out) {
@@ -3729,7 +3808,7 @@ function makeCompareRow(a, f, matchType, rules, ch99Opts) {
   const coo = (a ? a.ORIGIN : (f ? f.COO : "")).trim().toUpperCase();
   const brokerMfn = f ? f.MFN_RATE_PCT : null;
   const mfnForCh99 = EU_COUNTRIES.has(coo)
-    ? getMfnRateForEuCap(htsForLookup, brokerMfn)
+    ? getMfnRateForEuCap(htsForLookup, brokerMfn, filedEuCapCodeFromCh99(f?.CH99_HTS))
     : (MFN_RATE_TABLE !== null ? MFN_RATE_TABLE : brokerMfn);
   const row = {
     MATCH: matchType,
@@ -3810,7 +3889,7 @@ function buildFindings(cmp, ctx) {
     loc: `Item #${r.ITEM} (Agg #${r.AGG_LINE}) · ${r.COO} · ${r.HTS}`,
     desc: `Expected CH99: [${r.CH99_EXPECTED.map(e => e.ch99).join(", ") || "—"}] but filed: [${r.CH99_FILED.join(", ") || "—"}]`,
     rec: isEuCapCodeSwapMismatch(r.COO, r.CH99_EXPECTED.map(e => e.ch99), r.CH99_FILED)
-      ? `EU cap branch mismatch: Free/sub-15% Col-1 → ${EU_CAP_CODE_LOW_MFN}; Col-1 ≥ ${EU_CAP_THRESHOLD_PCT}% → ${EU_CAP_CODE_HIGH_MFN}. Engine uses 7501 column 33 for the branch. Re-run this entry after fixing rules/MFN source.`
+      ? `EU cap branch mismatch: Free/sub-15% HTSUS Col-1 → ${EU_CAP_CODE_LOW_MFN}; Col-1 ≥ ${EU_CAP_THRESHOLD_PCT}% → ${EU_CAP_CODE_HIGH_MFN}. Engine uses the HTS Classification Table rate (not filed col 33). Re-run this entry after fixing rules/MFN source.`
       : "Confirm tariff stack per rules; if rules changed, update the Chapter 99 Rules tab.",
   }));
   if (ch99Mismatches.length > CAP) {
@@ -3971,7 +4050,7 @@ function buildFindings(cmp, ctx) {
   // Tolerance bumped to $1 (was already $1 but firing on a lot of small rounding).
   // For high-volume cases, only flag diffs > 0.5% of the filed value AND > $5 absolute.
   const entered = cmp.filter(r => {
-    if (r.ENTERED_DIFF == null) return false;
+    if (r.SECTION_232_ORPHAN || r.ENTERED_DIFF == null) return false;
     const absDiff = Math.abs(r.ENTERED_DIFF);
     if (absDiff <= 1.0) return false;          // ignore pure rounding
     const filed = Math.abs(r.ENTERED_VALUE_75 || 0);
@@ -3980,13 +4059,18 @@ function buildFindings(cmp, ctx) {
     // Material if either >$5 absolute or >0.5% of filed value
     return absDiff > 5 || pctDiff > 0.005;
   });
-  entered.slice(0, CAP).forEach(r => out.push({
-    sev: Math.abs(r.ENTERED_DIFF) > 50 ? "High" : "Medium",
-    cat: "Entered value",
-    loc: `Agg #${r.AGG_LINE} / Item #${r.ITEM}`,
-    desc: `Computed entered value $${fmtNum(r.ENTERED_VALUE_TXT)} differs from filed $${fmtNum(r.ENTERED_VALUE_75)} by $${fmtNum(r.ENTERED_DIFF)}`,
-    rec: "Recheck freight/insurance allocation basis. Small diffs ≤ $1 are rounding.",
-  }));
+  entered.slice(0, CAP).forEach(r => {
+    const filedDesc = r.ENTERED_VALUE_232_ROLLUP
+      ? `$${fmtNum(r.ENTERED_VALUE_75)} filed (primary $${fmtNum(r.ENTERED_VALUE_75_PRIMARY)} + $${fmtNum(r.ENTERED_VALUE_75_ADJUNCT)} from 232 adjunct item(s) ${(r.ENTERED_VALUE_75_ADJUNCT_ITEMS || []).join(", ")})`
+      : `$${fmtNum(r.ENTERED_VALUE_75)} filed`;
+    out.push({
+      sev: Math.abs(r.ENTERED_DIFF) > 50 ? "High" : "Medium",
+      cat: "Entered value",
+      loc: `Agg #${r.AGG_LINE} / Item #${r.ITEM}`,
+      desc: `Computed entered value $${fmtNum(r.ENTERED_VALUE_TXT)} differs from ${filedDesc} by $${fmtNum(r.ENTERED_DIFF)}`,
+      rec: "Recheck freight/insurance allocation basis. Small diffs ≤ $1 are rounding.",
+    });
+  });
   if (entered.length > CAP) {
     const totalGap = entered.reduce((s, r) => s + Math.abs(r.ENTERED_DIFF), 0);
     out.push({
@@ -4523,6 +4607,7 @@ async function ensureFindingsDigest(r) {
     return r.findingsDigest;
   }
   try {
+    await loadReferenceFromServer();
     const full = await runStore.fetchRun(r.id);
     if (!full) return [];
     const hydrated = rehydrateRun(full);
@@ -4766,11 +4851,12 @@ const runStore = (() => {
 
     async saveRun(r) {
       if (!r || !r.id) return { ok: false };
+      const payload = stripDerivedRunState(r);
       if (backend === "postgres") {
         const res = await authFetch(apiBase + "/runs", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(r),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) {
           const t = await res.text();
@@ -5091,63 +5177,45 @@ function snapshotCurrentRun(name, existingId) {
   };
 }
 
-// Re-inflate a slimmed snapshot back to full state.
+// Re-inflate a slimmed snapshot and always rebuild cmp/findings from current rules + HTS table.
+// Never trust cmp/findings persisted on older saves — they go stale when rules/HTS logic changes.
 function rehydrateRun(r) {
-  const rules = state.rules;
-  const ctx = r.state.ctx || {};
-  // Use the applicable date stored in the snapshot to filter rules. Falls back
-  // to using all rules if no date was captured (older snapshots).
-  const effectiveRules = ctx.applicableDate ? rulesInEffectOn(rules, ctx.applicableDate) : rules;
-  const ch99Opts = buildCh99Opts(ctx);
-  // v1 snapshots have raw + full cmp; v2 dropped raw; v3 dropped cmp + findings too
-  let cmp = r.state.cmp;
-  let findings = r.state.findings;
-  // Backfill CUSTOMS_SKU on legacy runs (schema v4 saved before the SKU field switch)
-  // Those runs only carried SKU_SALES_UNIT — promote it so the Raw Lines column populates.
-  let raw = r.state.raw;
-  if (raw && raw.length > 0 && !("CUSTOMS_SKU" in raw[0]) && ("SKU_SALES_UNIT" in raw[0])) {
+  let run = { ...r, state: { ...(r.state || {}) } };
+  let raw = run.state.raw;
+  if (raw?.length && !("CUSTOMS_SKU" in raw[0]) && ("SKU_SALES_UNIT" in raw[0])) {
     raw = raw.map(row => ({ ...row, CUSTOMS_SKU: row.SKU_SALES_UNIT }));
+    run.state.raw = raw;
   }
-  let agg = r.state.agg || [];
-  const aggNeedsInvoiceKey = agg.length && raw.length && (r.schemaVersion == null || r.schemaVersion < 5 || agg[0].INVOICE_NUMBER == null);
-  // v4 and older: re-aggregate from raw when invoice number was not part of the agg key
+  const agg = run.state.agg || [];
+  const rawRows = run.state.raw || [];
+  const aggNeedsInvoiceKey = agg.length && rawRows.length
+    && (run.schemaVersion == null || run.schemaVersion < 5 || agg[0]?.INVOICE_NUMBER == null);
   if (aggNeedsInvoiceKey) {
-    agg = aggregateMethodB(raw);
+    run.state.agg = aggregateMethodB(rawRows);
   }
-  if (!cmp || aggNeedsInvoiceKey) {
-    // Schema v3+ — rebuild cmp from agg + filed + date-filtered rules
-    cmp = compareAggToFiled(agg, r.state.filed, effectiveRules, ch99Opts);
-  } else if (cmp[0] && "CH99_EXPECTED_CODES" in cmp[0]) {
-    // Schema v2 — codes-only Ch99 expected, re-expand to full layer objects
-    cmp = cmp.map(row => {
-      const codes = row.CH99_EXPECTED_CODES || [];
-      const CH99_EXPECTED = row.COO
-        ? expectedChapter99(row.COO, row.HTS, row.MFN_RATE_PCT, effectiveRules, ch99Opts)
-              .filter(e => codes.length === 0 || codes.includes(e.ch99))
-        : [];
-      const { CH99_EXPECTED_CODES, ...rest } = row;
-      return { ...rest, CH99_EXPECTED };
-    });
-  }
-  if (!findings) {
-    findings = buildFindings(cmp, ctx);
-  }
-  return { ...r.state, raw, agg, cmp, findings };
+  const freight = run.inputs?.freight ?? run.state.ctx?.freight ?? 0;
+  const insurance = run.inputs?.insurance ?? run.state.ctx?.insurance ?? 0;
+  return recomputeSavedRun(run, { freight, insurance }).state;
 }
 
 function recomputeRawDuties(raw, filed, effectiveRules, ch99Opts) {
   const mfnLookup = new Map();
+  const euCapLookup = new Map();
   for (const f of filed) {
-    if (f.MFN_RATE_PCT != null && f.COO && f.HTS) {
-      mfnLookup.set(`${f.COO.toUpperCase()}|${htsNormalize(f.HTS)}`, f.MFN_RATE_PCT);
+    if (f.COO && f.HTS) {
+      const key = `${f.COO.toUpperCase()}|${htsNormalize(f.HTS)}`;
+      if (f.MFN_RATE_PCT != null) mfnLookup.set(key, f.MFN_RATE_PCT);
+      const cap = filedEuCapCodeFromCh99(f.CH99_HTS);
+      if (cap) euCapLookup.set(key, cap);
     }
   }
   return raw.map(r => {
     const coo = (r.ORIGIN || "").toUpperCase();
     const hts = r.DESTINATION_HS || "";
-    const brokerMfn = mfnLookup.get(`${coo}|${htsNormalize(hts)}`) ?? null;
+    const key = `${coo}|${htsNormalize(hts)}`;
+    const brokerMfn = mfnLookup.get(key) ?? null;
     const mfn = EU_COUNTRIES.has(coo)
-      ? getMfnRateForEuCap(hts, brokerMfn)
+      ? getMfnRateForEuCap(hts, brokerMfn, euCapLookup.get(key))
       : getMfnRate(hts, brokerMfn);
     const exp = expectedChapter99(coo, hts, mfn, effectiveRules, ch99Opts);
     const mfnDuty = r.ENTERED_VALUE * (mfn || 0) / 100;
@@ -5180,6 +5248,12 @@ function reallocateSavedRunData(r, freight, insurance) {
     ? allocateCharges(raw, "AMOUNT", totalInvoice, freight, insurance)
     : raw;
   return { newAgg, newRaw };
+}
+
+function stripDerivedRunState(run) {
+  if (!run?.state) return run;
+  const { cmp, findings, ...state } = run.state;
+  return { ...run, state };
 }
 
 function recomputeSavedRun(r, options = {}) {
@@ -5231,11 +5305,14 @@ function recomputeSavedRun(r, options = {}) {
       insurance,
       ...(options.inputsPatch || {}),
     },
+    // cmp/findings are derived — kept in memory for the active session only;
+    // stripDerivedRunState() removes them before persisting to Postgres/localStorage.
     state: { raw, agg, filed, ctx, cmp, findings },
   };
 }
 
 async function rerunAllSavedAudits() {
+  await loadReferenceFromServer();
   const runs = loadRunsFromStorage();
   if (!runs.length) {
     toast("No saved runs to re-run.", "error");
@@ -5251,7 +5328,7 @@ async function rerunAllSavedAudits() {
       try { r = await runStore.fetchRun(r.id); }
       catch (e) { console.warn("rerun fetch failed", r.id, e); continue; }
     }
-    updated.push(recomputeSavedRun(r));
+    updated.push(stripDerivedRunState(recomputeSavedRun(r)));
     if (statusEl && runs.length > 5) statusEl.textContent = `Recomputing ${i + 1}/${runs.length}…`;
   }
   if (runStore.backend === "postgres") {
@@ -5523,6 +5600,7 @@ function loadRunById(id) {
 async function loadRunByIdAsync(id) {
   const seq = ++_loadRunSeq;
   try {
+    await loadReferenceFromServer();
     toast("Loading run…", "info");
     let r = null;
     if (runStore.backend === "postgres") {
@@ -5717,6 +5795,8 @@ let _rdSelectedId = null;
 let _rdSearch = "";
 let _rdActFilter = "all";
 let _mfnCache = null;       // cached result from /api/analytics/mfn-consistency
+let _htsCrossCache = null;  // cached result from /api/analytics/hts-cross-consistency
+let _htsCrossFetchGen = 0;
 let _mfnSort = "spread";    // "coo"|"hts"|"rate_count"|"spread"
 let _mfnSortDir = -1;       // -1 desc, 1 asc
 let _mfnSearch = "";
@@ -5825,7 +5905,36 @@ async function refreshDashboardData(force = false) {
     if (force || _portfolioCooCache === null) {
       await refreshPortfolioCoo(force);
     }
+    if (auth.token && (force || _mfnCache === null || _htsCrossCache === null)) {
+      await prefetchAnalyticsCaches(force);
+    }
   }
+}
+
+async function prefetchAnalyticsCaches(force = false) {
+  if (runStore.backend !== "postgres" || !auth.token) return;
+  const tasks = [];
+  if (force || _mfnCache === null) {
+    tasks.push(
+      authFetch("/api/analytics/mfn-consistency")
+        .then(function(r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+        .then(function(rows) { _mfnCache = rows; })
+        .catch(function(e) { console.warn("prefetch mfn-consistency:", e.message); })
+    );
+  }
+  if (force || _htsCrossCache === null) {
+    tasks.push(
+      authFetch("/api/analytics/hts-cross-consistency")
+        .then(function(r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+        .then(function(rows) { _htsCrossCache = rows; })
+        .catch(function(e) { console.warn("prefetch hts-cross-consistency:", e.message); })
+    );
+  }
+  if (tasks.length) await Promise.all(tasks);
+}
+
+function runsHaveFiledLines(runs) {
+  return (runs || []).some(r => Array.isArray(r.state?.filed) && r.state.filed.length > 0);
 }
 
 function scheduleRenderRuns(forceRefresh = false) {
@@ -7212,7 +7321,7 @@ async function renderDashboard() {
     ${renderDashPanel(
       "mfn",
       "MFN Rate Discrepancies (Database)",
-      "COO + HTS pairs where the filed MFN rate differs across all saved runs — server-side query over every saved entry",
+      "COO + HTS pairs where the filed MFN rate differs by more than 1% across saved runs — server-side query over every saved entry",
       `<span class="dash-panel-badge" id="dashMfnPill">—</span>`,
       `
       <div id="dashMfnMsg" style="font-size:13px;color:var(--gray-600);padding:0 0 8px;"></div>
@@ -7222,7 +7331,7 @@ async function renderDashboard() {
     ${renderDashPanel(
       "htsCross",
       "HTS Discrepancies Across Runs",
-      "Same HTS filed at different MFN rates on different saved entries",
+      "Same HTS filed at different MFN rates (>1% spread) on different saved entries (Postgres: server query over all filed lines)",
       `<span class="dash-panel-badge" id="dashHtsCrossPill">—</span>`,
       `
       <div id="dashHtsCrossEmpty" style="display:none;padding:14px 0;color:var(--gray-600);font-size:13px;"></div>
@@ -7549,7 +7658,7 @@ async function renderRuns(forceRefresh = false) {
           if (r.COO) g.cooSet.add(r.COO);
           if (r.HTS) g.htsSet.add(r.HTS);
           if (r.ENTERED_VALUE_TXT != null) g.entered_txt += r.ENTERED_VALUE_TXT;
-          if (r.ENTERED_VALUE_75  != null) g.entered_75  += r.ENTERED_VALUE_75;
+          g.entered_75 += cmpEnteredValue75ForTotals(r);
           if (r.MID_CHECK === "MISMATCH") g.midMismatches++;
           if (r.CH99_CHECK === "MISMATCH" || r.CH99_CHECK === "MISSING") g.ch99Issues++;
           if (r.CH99_CHECK === "PARTIAL") g.ch99Partials++;
@@ -7735,7 +7844,7 @@ function buildStackExportRows(respectFilters) {
     const ev = Number(f.ENTERED_VALUE) || 0;
     const coo = (f.COO || "").trim().toUpperCase();
     const mfn = EU_COUNTRIES.has(coo)
-      ? getMfnRateForEuCap(f.HTS, f.MFN_RATE_PCT)
+      ? getMfnRateForEuCap(f.HTS, f.MFN_RATE_PCT, filedEuCapCodeFromCh99(f.CH99_HTS))
       : getMfnRate(f.HTS, f.MFN_RATE_PCT);
     const exp = expectedChapter99(f.COO, f.HTS, mfn, dateRules, ch99Opts);
     const byCat = { "Reciprocal": [], "Reciprocal-EU": [], "IEEPA-Universal": [], "IEEPA-China": [], "Section-301": [], "Section-122": [] };
@@ -7821,7 +7930,7 @@ function buildMfrExportRows(respectFilters) {
     if (r.HTS) g.htsSet.add(r.HTS);
     if (r.COO) g.cooSet.add(r.COO);
     if (r.ENTERED_VALUE_TXT != null) g.entered_txt += r.ENTERED_VALUE_TXT;
-    if (r.ENTERED_VALUE_75 != null) g.entered_75 += r.ENTERED_VALUE_75;
+    g.entered_75 += cmpEnteredValue75ForTotals(r);
     if (r.MID_CHECK === "MISMATCH") g.mid_mismatches++;
     if (r.CH99_CHECK === "MISMATCH" || r.CH99_CHECK === "MISSING") g.ch99_issues++;
     if (r.CH99_CHECK === "PARTIAL") g.ch99_partials++;
@@ -8339,7 +8448,7 @@ document.getElementById("importRunsFile").addEventListener("change", async (e) =
 });
 
 // Initial bootstrap
-const APP_BUILD_ID = "2026.06.18-ref-hts";
+const APP_BUILD_ID = "2026.06.25-hts-cross";
 
 function showAppBuildBanner() {
   const el = document.getElementById("appBuildBanner");
@@ -8523,8 +8632,7 @@ async function rerunLoadedAudit() {
         xlsxName: state.xlsxName,
       },
     });
-    const fullState = rehydrateRun(updated);
-    applyRehydratedToState(updated, fullState);
+    applyRehydratedToState(updated, updated.state);
     state.rerunTxtFiles = null;
     state.rerunTxtBuffer = null;
     state.rerunXlsxBuffer = null;
@@ -8538,7 +8646,7 @@ async function rerunLoadedAudit() {
     };
 
     if (state.activeRunId) {
-      const saved = { ...updated, id: state.activeRunId, name: updated.name };
+      const saved = stripDerivedRunState({ ...updated, id: state.activeRunId, name: updated.name });
       if (runStore.backend === "postgres") await runStore.saveRun(saved);
       else {
         const runs = loadRunsFromStorage().filter(r => r.id !== state.activeRunId);
@@ -8610,18 +8718,23 @@ function runAudit(options = {}) {
 
     // Raw with computed duty (use filed MFN lookup)
     const mfnLookup = new Map();
+    const euCapLookup = new Map();
     for (const f of filed) {
-      if (f.MFN_RATE_PCT != null && f.COO && f.HTS) {
-        mfnLookup.set(`${f.COO.toUpperCase()}|${htsNormalize(f.HTS)}`, f.MFN_RATE_PCT);
+      if (f.COO && f.HTS) {
+        const key = `${f.COO.toUpperCase()}|${htsNormalize(f.HTS)}`;
+        if (f.MFN_RATE_PCT != null) mfnLookup.set(key, f.MFN_RATE_PCT);
+        const cap = filedEuCapCodeFromCh99(f.CH99_HTS);
+        if (cap) euCapLookup.set(key, cap);
       }
     }
     let raw = allocateCharges(txt, "AMOUNT", totalInvoice, freight, insurance);
     raw = raw.map(r => {
     const coo = (r.ORIGIN || "").toUpperCase();
     const hts = r.DESTINATION_HS || "";
-    const brokerMfn = mfnLookup.get(`${coo}|${htsNormalize(hts)}`) ?? null;
+    const key = `${coo}|${htsNormalize(hts)}`;
+    const brokerMfn = mfnLookup.get(key) ?? null;
     const mfn = EU_COUNTRIES.has(coo)
-      ? getMfnRateForEuCap(hts, brokerMfn)
+      ? getMfnRateForEuCap(hts, brokerMfn, euCapLookup.get(key))
       : getMfnRate(hts, brokerMfn);
       const exp = expectedChapter99(coo, hts, mfn, effectiveRules, ch99Opts);
       const mfnDuty = r.ENTERED_VALUE * (mfn || 0) / 100;
@@ -8941,7 +9054,7 @@ function renderStack() {
     const ev = Number(f.ENTERED_VALUE) || 0;
     const coo = (f.COO || "").trim().toUpperCase();
     const mfn = EU_COUNTRIES.has(coo)
-      ? getMfnRateForEuCap(f.HTS, f.MFN_RATE_PCT)
+      ? getMfnRateForEuCap(f.HTS, f.MFN_RATE_PCT, filedEuCapCodeFromCh99(f.CH99_HTS))
       : getMfnRate(f.HTS, f.MFN_RATE_PCT);
     // Use the applicable date from ctx to filter rules — Ch99 stack expectations
     // must reflect the tariff regime in force on the entry/import date.
@@ -9106,7 +9219,7 @@ function renderHtsVerification() {
 
   if (htsLookup && htsLookup.size > 0) {
     if (mfnEl) {
-      mfnEl.innerHTML = `Authoritative MFN rates from the global <strong>HTS Classification Table</strong> (<span class="mono-inline">${escapeHtml(htsName || "table")}</span>, ${htsLookup.size.toLocaleString()} codes). Broker-filed 7501 rates in column <span class="mono-inline">33. CD HTS US Rate</span> are shown for comparison. For <strong>EU cap branching</strong> (9903.02.19 vs .20), the filed 7501 rate wins when present; the table is fallback only. Other duty projection still prefers the table when loaded. Comparison tab marks divergences with a <span class="mfn-table-badge">tbl:</span> badge.`;
+      mfnEl.innerHTML = `Authoritative MFN rates from the global <strong>HTS Classification Table</strong> (<span class="mono-inline">${escapeHtml(htsName || "table")}</span>, ${htsLookup.size.toLocaleString()} codes). These drive duty projection and <strong>EU cap branching</strong> (9903.02.19 vs .20) — true HTSUS Column 1 rates, not filed col 33 (which may show 0% or 15% under replacement-duty filing). Broker-filed 7501 rates in column <span class="mono-inline">33. CD HTS US Rate</span> are shown for comparison. Comparison tab marks divergences with a <span class="mfn-table-badge">tbl:</span> badge.`;
     }
     const entryHts = new Set();
     for (const f of state.filed || []) {
@@ -9148,7 +9261,7 @@ function renderHtsVerification() {
     }
   } else {
     if (mfnEl) {
-      mfnEl.innerHTML = `Taken from the broker-filed 7501 extract column <span class="mono-inline">33. CD HTS US Rate</span> per item. Engine parses "16.5%", "Free", etc. and uses the resulting % for both per-line raw calc and EU cap logic. Upload or browse the <strong>HTS Classification Table</strong> under <strong>Reference</strong> in the top bar.`;
+      mfnEl.innerHTML = `No HTS Classification Table loaded — MFN rates fall back to the broker-filed 7501 column <span class="mono-inline">33. CD HTS US Rate</span> per item (including EU cap logic). Upload or browse the <strong>HTS Classification Table</strong> under <strong>Reference</strong> in the top bar for authoritative Column 1 rates.`;
     }
     if (htsCardEl) {
       htsCardEl.innerHTML = `
@@ -9212,7 +9325,8 @@ function renderComparison() {
         const filedSet = new Set(r.CH99_FILED.map(c => htsNormalize(c)));
         const filHas301 = r.CH99_FILED.some(c => /^99038[78]/.test(htsNormalize(c)));
         const expChips = r.CH99_EXPECTED.map(e => {
-          const amt = (r.ENTERED_VALUE_75 != null) ? r.ENTERED_VALUE_75 * (e.rate_pct||0)/100 : null;
+          const evForDuty = r.ENTERED_VALUE_75_PRIMARY ?? r.ENTERED_VALUE_75;
+          const amt = (evForDuty != null) ? evForDuty * (e.rate_pct||0)/100 : null;
           // For the fuzzy Section 301 marker, any 9903.88.* filed satisfies coverage.
           const inFiled = e.section301_fuzzy ? filHas301 : filedSet.has(htsNormalize(e.ch99));
           const chipTitle = e.section301_fuzzy
@@ -9243,7 +9357,13 @@ function renderComparison() {
             return `${broker}<span class="mfn-table-badge">tbl: ${fmtPct(r.MFN_RATE_TABLE)}</span>`;
           })()}</td>
           <td class="num">${fmtUSD(r.ENTERED_VALUE_TXT)}</td>
-          <td class="num">${fmtUSD(r.ENTERED_VALUE_75)}</td>
+          <td class="num">${(() => {
+            if (r.ENTERED_VALUE_75 == null) return "—";
+            if (r.ENTERED_VALUE_232_ROLLUP) {
+              return `${fmtUSD(r.ENTERED_VALUE_75)}<span class="mfn-table-badge" title="Primary CM item + 232 adjunct entered values">${fmtUSD(r.ENTERED_VALUE_75_PRIMARY)} + ${fmtUSD(r.ENTERED_VALUE_75_ADJUNCT)} 232</span>`;
+            }
+            return fmtUSD(r.ENTERED_VALUE_75);
+          })()}</td>
           <td class="num">${r.ENTERED_DIFF == null ? "—" : fmtUSD(r.ENTERED_DIFF)}</td>
           <td>${expChips || "<span class='muted'>—</span>"}</td>
           <td>${filedChips || "<span class='muted'>—</span>"}</td>
@@ -9526,7 +9646,7 @@ function renderMfrRollup() {
     if (r.HTS) g.htsSet.add(r.HTS);
     if (r.COO) g.cooSet.add(r.COO);
     if (r.ENTERED_VALUE_TXT != null) g.entered_txt += r.ENTERED_VALUE_TXT;
-    if (r.ENTERED_VALUE_75  != null) g.entered_75  += r.ENTERED_VALUE_75;
+    g.entered_75 += cmpEnteredValue75ForTotals(r);
     if (r.MID_CHECK === "MISMATCH")  g.midMismatches++;
     if (r.CH99_CHECK === "MISMATCH" || r.CH99_CHECK === "MISSING") g.ch99Issues++;
     if (r.CH99_CHECK === "PARTIAL")  g.ch99Partials++;
@@ -9618,11 +9738,19 @@ function renderMfrRollup() {
   `;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// HTS Consistency
-//   Audit tab: within this entry + vs. tariff baseline (this run only)
-//   Dashboard: cross-run HTS discrepancies + database MFN analytics
-// ─────────────────────────────────────────────────────────────────────────
+const MFN_CROSS_RUN_TOLERANCE_PCT = 1.0; // ignore cross-run MFN gaps ≤ 1 percentage point
+
+function mfnRateSpreadPct(rates) {
+  const nums = (rates || []).map(r => Number(r)).filter(n => !isNaN(n));
+  if (nums.length < 2) return 0;
+  return Math.max(...nums) - Math.min(...nums);
+}
+
+function isMaterialMfnSpread(rates) {
+  return mfnRateSpreadPct(rates) > MFN_CROSS_RUN_TOLERANCE_PCT;
+}
+
+// HTS Consistency — Audit tab (within entry) + Dashboard (cross-run + DB analytics)
 function computeHtsCrossConflicts() {
   const savedRuns = loadRunsFromStorage();
   const acrossMap = new Map();
@@ -9655,22 +9783,50 @@ function computeHtsCrossConflicts() {
         if (!ratesPerRun.has(k)) ratesPerRun.set(k, []);
         ratesPerRun.get(k).push(o);
       }
-      if (ratesPerRun.size > 1) crossConflicts.push({ hts, ratesPerRun, obs });
+      if (ratesPerRun.size > 1 && isMaterialMfnSpread([...ratesPerRun.keys()])) {
+        crossConflicts.push({ hts, ratesPerRun, obs });
+      }
     }
   }
   return { crossConflicts, runCount: savedRuns.length };
 }
 
-function renderHtsCrossRunsLayer(target) {
-  const tableId = target?.tableId || "dashHtsCrossTable";
-  const emptyId = target?.emptyId || "dashHtsCrossEmpty";
-  const pillId  = target?.pillId  || "dashHtsCrossPill";
-  const crossEl = document.getElementById(tableId);
-  const emptyEl = document.getElementById(emptyId);
-  const pillEl  = document.getElementById(pillId);
-  if (!crossEl) return;
+function normalizeHtsCrossPayload(data) {
+  if (Array.isArray(data)) return { items: data, sub_threshold_hts_count: 0 };
+  return {
+    items: data?.items || [],
+    sub_threshold_hts_count: Number(data?.sub_threshold_hts_count) || 0,
+  };
+}
 
-  const { crossConflicts, runCount } = computeHtsCrossConflicts();
+/** Server hts-cross-consistency rows → paintHtsCrossConflicts shape. */
+function htsCrossRowsToConflicts(rows) {
+  const items = Array.isArray(rows) ? rows : (rows?.items || []);
+  return items.map(function(row) {
+    const hts = htsFormat(row.hts_display || row.hts_digits || "");
+    const obs = (row.occurrences || []).map(function(occ) {
+      return {
+        runId: occ.run_id,
+        runName: occ.run_name || occ.run_id,
+        savedAt: occ.saved_at,
+        item: occ.item,
+        coo: occ.coo,
+        rate: Number(occ.rate),
+        entryNum: occ.entry_num || "—",
+      };
+    });
+    const ratesPerRun = new Map();
+    for (const o of obs) {
+      const k = Math.round(o.rate * 1000) / 1000;
+      if (!ratesPerRun.has(k)) ratesPerRun.set(k, []);
+      ratesPerRun.get(k).push(o);
+    }
+    return { hts, ratesPerRun, obs };
+  }).sort((a, b) => a.hts.localeCompare(b.hts));
+}
+
+function paintHtsCrossConflicts(crossConflicts, runCount, crossEl, emptyEl, pillEl, opts) {
+  const subThreshold = Number(opts?.subThresholdHtsCount) || 0;
   if (pillEl) pillEl.textContent = runCount < 2 ? "—" : String(crossConflicts.length);
 
   if (runCount < 2) {
@@ -9684,7 +9840,11 @@ function renderHtsCrossRunsLayer(target) {
   if (crossConflicts.length === 0) {
     if (emptyEl) {
       emptyEl.style.display = "";
-      emptyEl.textContent = `No HTS discrepancies across ${runCount} saved run(s). Rates are consistent. ✓`;
+      let msg = `No HTS discrepancies across ${runCount} saved run(s) with >1% rate spread. Rates are consistent. ✓`;
+      if (subThreshold > 0) {
+        msg += ` ${subThreshold} HTS code(s) differ by ≤1% across runs (e.g. 14.9% vs 15.0%) — not flagged.`;
+      }
+      emptyEl.textContent = msg;
     }
     crossEl.innerHTML = "";
     return;
@@ -9718,6 +9878,76 @@ function renderHtsCrossRunsLayer(target) {
           }).join("");
       }).join("")}
     </tbody>`;
+}
+
+function renderHtsCrossRunsLayer(target) {
+  const tableId = target?.tableId || "dashHtsCrossTable";
+  const emptyId = target?.emptyId || "dashHtsCrossEmpty";
+  const pillId  = target?.pillId  || "dashHtsCrossPill";
+  const crossEl = document.getElementById(tableId);
+  const emptyEl = document.getElementById(emptyId);
+  const pillEl  = document.getElementById(pillId);
+  if (!crossEl) return;
+
+  const runs = loadRunsFromStorage();
+  const runCount = runs.length;
+  const gen = ++_htsCrossFetchGen;
+
+  const paint = function(conflicts, subThreshold) {
+    if (gen !== _htsCrossFetchGen) return;
+    if (!document.getElementById(tableId)) return;
+    paintHtsCrossConflicts(conflicts, runCount, crossEl, emptyEl, pillEl, {
+      subThresholdHtsCount: subThreshold,
+    });
+  };
+
+  if (runStore.backend === "postgres" && auth.token) {
+    if (runCount < 2) {
+      paint([], 0);
+      return;
+    }
+    if (_htsCrossCache !== null) {
+      const norm = normalizeHtsCrossPayload(_htsCrossCache);
+      paint(htsCrossRowsToConflicts(norm.items), norm.sub_threshold_hts_count);
+      return;
+    }
+    if (emptyEl) {
+      emptyEl.style.display = "";
+      emptyEl.textContent = "Querying database…";
+    }
+    crossEl.innerHTML = "";
+    if (pillEl) pillEl.textContent = "…";
+    authFetch("/api/analytics/hts-cross-consistency")
+      .then(function(r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function(rows) {
+        _htsCrossCache = rows;
+        const norm = normalizeHtsCrossPayload(rows);
+        paint(htsCrossRowsToConflicts(norm.items), norm.sub_threshold_hts_count);
+      })
+      .catch(function(err) {
+        if (gen !== _htsCrossFetchGen) return;
+        if (emptyEl) {
+          emptyEl.style.display = "";
+          emptyEl.textContent = "Could not load cross-run HTS discrepancies: " + err.message;
+        }
+        crossEl.innerHTML = "";
+        if (pillEl) pillEl.textContent = "!";
+      });
+    return;
+  }
+
+  if (runCount >= 2 && !runsHaveFiledLines(runs)) {
+    if (pillEl) pillEl.textContent = "—";
+    if (emptyEl) {
+      emptyEl.style.display = "";
+      emptyEl.textContent = "Cross-run HTS comparison requires the database backend (saved runs are metadata-only). Start ./start.sh and sign in.";
+    }
+    crossEl.innerHTML = "";
+    return;
+  }
+
+  const { crossConflicts } = computeHtsCrossConflicts();
+  paint(crossConflicts, 0);
 }
 
 function renderHtsConsistency() {
@@ -9876,7 +10106,10 @@ function renderMfnDbLayer(target) {
     });
 }
 
-function invalidateMfnCache() { _mfnCache = null; }
+function invalidateMfnCache() {
+  _mfnCache = null;
+  _htsCrossCache = null;
+}
 
 function mfnPairKey(r) {
   return (r.coo || "") + "|" + (r.hts || "");

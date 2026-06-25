@@ -378,7 +378,7 @@ Other importers may use UTF-8 — add detection if you generalize.
 
 ### 7.2 Aggregation method
 
-"Method B" = group raw TXT rows by `(ORIGIN, DESTINATION_HS, MID)` and sum quantities, weights, and invoice value. The 7501 has one item per group.
+"Method B" = group raw TXT rows by `(ORIGIN, DESTINATION_HS, MID, invoice)` and sum quantities, weights, and invoice value. Entered-value comparison rolls Section 232 adjunct CM items into their matched parent line before diffing against TXT agg.
 
 ### 7.3 Freight & insurance allocation
 
@@ -388,7 +388,7 @@ Allocated pro-rata across rows by `INVOICE_VALUE` (or `AMOUNT` at the raw-line l
 
 `DEFAULT_CH99_RULES` holds 77 rules covering:
 - All 65 Annex I reciprocal codes (`9903.02.02`–`9903.02.71`) from EO 14326
-- EU cap logic (ES, PT) — `9903.02.19` if filed Col-1 MFN ≥ 15%, else `9903.02.20` at +15% (7501 col 33 drives branch; HTS table is fallback)
+- EU cap logic (ES, PT) — `9903.02.19` if HTSUS Col-1 MFN ≥ 15%, else `9903.02.20` at +15% (HTS table drives branch; 7501 col 33 is fallback)
 - IEEPA Universal baseline (`9903.01.25`, +10%) for EG, MA
 - China stack: `9903.88.15` (Section 301 List 4A +7.5%) + `9903.01.24` (IEEPA China +10%) + `9903.01.25` (IEEPA Universal +10%)
 - India stack: `9903.02.26` (+25% reciprocal) + `9903.01.84` (+25% Russia-oil penalty, eff Aug 27, 2025)

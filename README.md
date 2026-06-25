@@ -51,7 +51,7 @@ Opens automatically after sign-in and page refresh. Portfolio analytics, **By Im
 - **Reviewer sign-off bar** on loaded runs (same statuses as Dashboard)
 - Save runs to Postgres; prior runs open from **Dashboard** only
 - **Update & re-run** on loaded saves
-- **EU reciprocal** for ES/PT/BG — `9903.02.19` vs `9903.02.20` from **7501 column 33** (≥15% → `.19`, &lt;15% → `.20`), with **rate-determination date** per 19 CFR 141.68/141.69 (IT Date → release)
+- **EU reciprocal** for ES/PT/BG — `9903.02.19` vs `9903.02.20` from **HTSUS Column 1 rate** (HTS table when loaded; ≥15% → `.19`, &lt;15% → `.20`), with **rate-determination date** per 19 CFR 141.68/141.69 (IT Date → release)
 - **Section 232 stacks** and **232 split adjunct** handling
 
 ### Reference (authenticated)

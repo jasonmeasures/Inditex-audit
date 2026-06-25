@@ -51,7 +51,7 @@ INITIAL_ADMIN_USERNAME = os.environ.get("INITIAL_ADMIN_USERNAME", "admin")
 INITIAL_ADMIN_PASSWORD = os.environ.get("INITIAL_ADMIN_PASSWORD", "")
 
 DASHBOARD_PATH = Path(__file__).parent / "inditex_audit_dashboard.html"
-APP_BUILD_ID = "2026.06.18-ref-hts"
+APP_BUILD_ID = "2026.06.25-hts-cross"
 
 # ---------------------------------------------------------------------------
 # Database helpers
@@ -1114,9 +1114,8 @@ def mfn_consistency():
     Cross-entry MFN rate consistency check.
 
     For every (COO, HTS) pair that appears in more than one saved run with
-    different MFN rates, return the full list of occurrences sorted by rate
-    spread (largest discrepancy first).  Useful for spotting broker
-    classification drift or reclassifications over time.
+    filed MFN rates differing by more than 1 percentage point, return the full
+    list of occurrences sorted by rate spread (largest discrepancy first).
     """
     try:
         conn = get_conn()
@@ -1151,6 +1150,7 @@ def mfn_consistency():
                     FROM  filed_items
                     GROUP BY coo, hts
                     HAVING count(DISTINCT mfn_rate_pct) > 1
+                       AND max(mfn_rate_pct) - min(mfn_rate_pct) > 1.0
                 )
                 SELECT
                     d.coo,
@@ -1191,6 +1191,118 @@ def mfn_consistency():
                     occ["rate"] = float(occ["rate"])
             result.append(r)
         return Response(json.dumps(result, default=str), mimetype="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/analytics/hts-cross-consistency")
+@require_auth
+def hts_cross_consistency():
+    """
+    Cross-run HTS MFN consistency — same HTS digits filed at different rates
+    on different saved entries (>1 percentage point spread).
+    """
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                WITH filed_items AS (
+                    SELECT
+                        r.id                                                AS run_id,
+                        r.name                                              AS run_name,
+                        r.entry_num,
+                        r.saved_at,
+                        (item->>'ITEM')                                     AS item_no,
+                        (item->>'COO')                                      AS coo,
+                        (item->>'HTS')                                      AS hts_raw,
+                        regexp_replace(COALESCE(item->>'HTS', ''), '[^0-9]', '', 'g')
+                                                                            AS hts_digits,
+                        ROUND((item->>'MFN_RATE_PCT')::numeric, 4)          AS mfn_rate_pct
+                    FROM  audit_runs r,
+                          jsonb_array_elements(r.data->'state'->'filed') AS item
+                    WHERE (item->>'MFN_RATE_PCT') IS NOT NULL
+                      AND (item->>'HTS')          IS NOT NULL
+                      AND regexp_replace(COALESCE(item->>'HTS', ''), '[^0-9]', '', 'g') <> ''
+                ),
+                discrepancies AS (
+                    SELECT
+                        hts_digits,
+                        count(DISTINCT run_id)                                    AS run_count,
+                        count(DISTINCT mfn_rate_pct)                              AS rate_count,
+                        max(mfn_rate_pct) - min(mfn_rate_pct)                     AS rate_spread
+                    FROM  filed_items
+                    GROUP BY hts_digits
+                    HAVING count(DISTINCT run_id) >= 2
+                       AND count(DISTINCT mfn_rate_pct) > 1
+                       AND max(mfn_rate_pct) - min(mfn_rate_pct) > 1.0
+                )
+                SELECT
+                    d.hts_digits,
+                    (SELECT f.hts_raw
+                     FROM   filed_items f
+                     WHERE  f.hts_digits = d.hts_digits
+                     LIMIT  1)                                                  AS hts_display,
+                    d.run_count,
+                    d.rate_count,
+                    ROUND(d.rate_spread, 4)                                       AS rate_spread,
+                    json_agg(
+                        json_build_object(
+                            'run_id',    f.run_id,
+                            'run_name',  f.run_name,
+                            'entry_num', f.entry_num,
+                            'item',      f.item_no,
+                            'coo',       f.coo,
+                            'rate',      f.mfn_rate_pct,
+                            'saved_at',  f.saved_at
+                        )
+                        ORDER BY f.mfn_rate_pct,
+                                 NULLIF(regexp_replace(f.item_no, '[^0-9]', '', 'g'), '')::int NULLS LAST,
+                                 f.saved_at DESC
+                    )                                                             AS occurrences
+                FROM  discrepancies d
+                JOIN  filed_items f ON f.hts_digits = d.hts_digits
+                GROUP BY d.hts_digits, d.run_count, d.rate_count, d.rate_spread
+                ORDER BY d.rate_spread DESC, d.hts_digits
+            """)
+            rows = cur.fetchall()
+            cur.execute("""
+                WITH filed_items AS (
+                    SELECT
+                        r.id AS run_id,
+                        regexp_replace(COALESCE(item->>'HTS', ''), '[^0-9]', '', 'g') AS hts_digits,
+                        ROUND((item->>'MFN_RATE_PCT')::numeric, 4) AS mfn_rate_pct
+                    FROM  audit_runs r,
+                          jsonb_array_elements(r.data->'state'->'filed') AS item
+                    WHERE (item->>'MFN_RATE_PCT') IS NOT NULL
+                      AND (item->>'HTS')          IS NOT NULL
+                      AND regexp_replace(COALESCE(item->>'HTS', ''), '[^0-9]', '', 'g') <> ''
+                )
+                SELECT count(*) AS sub_threshold_hts_count
+                FROM (
+                    SELECT hts_digits
+                    FROM   filed_items
+                    GROUP  BY hts_digits
+                    HAVING count(DISTINCT run_id) >= 2
+                       AND count(DISTINCT mfn_rate_pct) > 1
+                       AND max(mfn_rate_pct) - min(mfn_rate_pct) <= 1.0
+                ) sub
+            """)
+            sub_row = cur.fetchone()
+        conn.close()
+        _log_activity(request.current_user.get("sub"), "view_hts_cross_analytics", "analytics")
+        result = []
+        for row in rows:
+            r = dict(row)
+            r["rate_spread"] = float(r["rate_spread"]) if r["rate_spread"] is not None else None
+            for occ in (r.get("occurrences") or []):
+                if occ.get("rate") is not None:
+                    occ["rate"] = float(occ["rate"])
+            result.append(r)
+        payload = {
+            "items": result,
+            "sub_threshold_hts_count": int((sub_row or {}).get("sub_threshold_hts_count") or 0),
+        }
+        return Response(json.dumps(payload, default=str), mimetype="application/json")
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Regression tests for EU reciprocal (9903.02.19 / 9903.02.20) and rate-determination date logic.
 
-Mirrors inditex_audit_dashboard.html helpers. Run: python3 verify_eu_reciprocal_rules.py
+MFN for the EU cap branch is the true HTSUS Column 1 rate (HTS table when loaded in the
+dashboard; broker col 33 is fallback only). Mirrors inditex_audit_dashboard.html helpers.
+Run: python3 verify_eu_reciprocal_rules.py
 """
 
 from __future__ import annotations
