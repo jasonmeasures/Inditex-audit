@@ -259,6 +259,34 @@
     text-decoration: underline;
   }
 
+  .audit-review-bar {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-left: 4px solid var(--primary-500);
+    border-radius: var(--radius-sm);
+  }
+  .audit-review-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .audit-review-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+  .audit-review-hint {
+    font-size: 12px;
+    color: var(--marigold-700);
+    margin-top: 6px;
+  }
+
   .view-header-row {
     display: flex;
     align-items: flex-start;
@@ -524,7 +552,22 @@
   th.col-cat-IEEPA-Universal { background: #E6F0F2 !important; color: #01435A !important; }
   th.col-cat-IEEPA-China     { background: #FFF5F4 !important; color: #B42B23 !important; }
   th.col-cat-Section-301     { background: #EDE9FE !important; color: #6D28D9 !important; }
+  th.col-cat-Section-122     { background: #E0F2FE !important; color: #0369A1 !important; }
+  th.col-cat-Section-232     { background: #FEF3C7 !important; color: #92400E !important; }
+  th.col-cat-232-Exclusion   { background: #F5F5F4 !important; color: #78716C !important; }
   th.col-total { background: var(--primary-900) !important; color: white !important; }
+  tfoot.stack-totals td, tfoot.imp-totals td {
+    background: var(--gray-100); font-weight: 700; font-size: 12px;
+    border-top: 2px solid var(--gray-300); color: var(--gray-900);
+  }
+  thead.thead-totals th, thead.thead-totals td {
+    background: var(--primary-50); font-weight: 700; font-size: 11px;
+    color: var(--primary-800); border-bottom: 2px solid var(--primary-200);
+    padding: 6px 12px; white-space: nowrap;
+  }
+  thead.thead-totals th.r, thead.thead-totals td.r { text-align: right; }
+  th .th-total-sub { display: block; font-size: 11px; font-weight: 700; color: var(--primary-700); margin-top: 2px; }
+  th.col-total .th-total-sub { color: rgba(255, 255, 255, 0.9); }
 
   /* ---------- Verification cards ---------- */
   .ver-card {
@@ -635,6 +678,7 @@
   /* Section divider */
   .dash-sec { display: flex; align-items: center; gap: 10px; margin: 18px 0 10px; }
   .dash-sec-lbl { font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+  .dash-sec-meta { font-size: 12px; font-weight: 600; color: var(--gray-700); white-space: nowrap; }
   .dash-sec-line { flex: 1; height: 1px; background: var(--gray-200); }
   /* Importer table */
   .imp-tbl-wrap { overflow-x: auto; background: white; border: 1px solid var(--gray-200); border-radius: var(--radius); margin-bottom: 14px; }
@@ -886,7 +930,36 @@
   .rdp-dv { text-align: right; color: var(--gray-700); }
   .rdp-dt  { color: var(--green-700); font-weight: 700; border-top: 1px solid var(--green-100); padding-top: 6px; margin-top: 4px; }
   .rdp-dtv { text-align: right; color: var(--green-700); font-weight: 700; border-top: 1px solid var(--green-100); padding-top: 6px; margin-top: 4px; }
-  .rdp-acts { display: flex; gap: 8px; margin-top: 14px; }
+  .rdp-acts { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .rdp-review {
+    background: var(--gray-50); border: 1px solid var(--gray-200);
+    border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 12px;
+  }
+  .rdp-review-hd { font-size: 10px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+  .rdp-review-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+  .rdp-review-row select, .rdp-review-row textarea { font-size: 12px; }
+  .rdp-review-row textarea { flex: 1; min-width: 200px; min-height: 52px; padding: 8px; border: 1px solid var(--gray-300); border-radius: var(--radius-sm); resize: vertical; }
+  .rdp-review-meta { font-size: 11px; color: var(--gray-500); margin-top: 6px; }
+  .rdp-issues { margin-bottom: 12px; }
+  .rdp-issues-hd { font-size: 10px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .rdp-issue {
+    border-left: 3px solid var(--gray-300); padding: 8px 10px; margin-bottom: 6px;
+    background: white; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 12px;
+  }
+  .rdp-issue.crit { border-left-color: var(--red-500); background: #FFF5F4; }
+  .rdp-issue.high { border-left-color: var(--marigold-500); background: #FFFBEB; }
+  .rdp-issue .ri-head { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; font-size: 11px; }
+  .rdp-issue .ri-sev { font-weight: 700; }
+  .rdp-issue .ri-loc { color: var(--gray-500); }
+  .rdp-issue .ri-desc { color: var(--gray-800); line-height: 1.45; }
+  .runs-issues-preview { font-size: 11px; color: var(--gray-600); line-height: 1.35; max-width: 240px; }
+  .runs-issues-preview .ri-line { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge-review-pending { background: var(--gray-100); color: var(--gray-600); }
+  .badge-review-progress { background: var(--primary-50); color: var(--primary-700); }
+  .badge-review-done { background: var(--green-50); color: var(--green-700); }
+  .badge-review-warn { background: var(--marigold-50); color: var(--marigold-700); }
+  .badge-review-info { background: #E8F4FC; color: #0369A1; }
+  .badge-review-danger { background: var(--red-50); color: var(--red-700); }
   /* Status / severity badges */
   .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; white-space: nowrap; }
   .badge-clean { background: var(--green-50);     color: var(--green-700);     border: 1px solid var(--green-100); }
@@ -1273,12 +1346,6 @@
         <h1>Runs Dashboard</h1>
         <p class="view-sub">Totals and activity across all saved audit runs</p>
       </div>
-      <div class="view-header-actions">
-        <button type="button" class="btn btn-secondary" id="importRunsBtn" style="padding:7px 14px;font-size:12px;">Import</button>
-        <button type="button" class="btn btn-secondary" id="exportRunsBtn" style="padding:7px 14px;font-size:12px;">Export all</button>
-        <button type="button" class="btn btn-danger" id="clearRunsBtn" style="padding:7px 14px;font-size:12px;">Clear all</button>
-        <input type="file" id="importRunsFile" accept=".json" style="display:none;" />
-      </div>
     </div>
   </div>
   <div class="dash-ov-body">
@@ -1378,12 +1445,14 @@
 <div class="dash-overlay" id="referenceOverlay">
   <div class="view-header">
     <h1>Reference Data</h1>
-    <p class="view-sub">Global HTS table, Chapter 99 rules, and sources &amp; verification reference</p>
+    <p class="view-sub">Global HTS table, Chapter 99 rules, recent activity, run data tools, and sources &amp; verification reference</p>
   </div>
   <div class="dash-ov-body">
     <div class="rd-info tip" style="margin-top:8px;">
       HTS and Chapter 99 rules are shared across all audits. Upload or edit here — not on individual runs. After changes, re-run saved audits so comparison results reflect the new reference data.
     </div>
+
+    <div id="refActivityMount"></div>
 
     <div style="background:white;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:20px 24px;margin-bottom:16px;">
       <h3 style="font-size:14px;font-weight:700;color:var(--primary-700);margin:0 0 12px 0;text-transform:uppercase;letter-spacing:.04em;">HTS Classification Table</h3>
@@ -1428,6 +1497,21 @@
     </div>
 
     <div class="ref-admin-only" style="background:white;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:20px 24px;margin-bottom:16px;">
+      <h3 style="font-size:14px;font-weight:700;color:var(--gray-800);margin:0 0 8px 0;">Run data management</h3>
+      <p style="font-size:13px;color:var(--gray-600);margin:0 0 14px 0;line-height:1.5;">
+        Backup, restore, or wipe all saved audit runs. <strong>Export all</strong> downloads full JSON snapshots.
+        <strong>Import</strong> adds runs from a prior export (skips duplicate IDs).
+        <strong>Clear all</strong> permanently deletes every saved run.
+      </p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button type="button" class="btn btn-secondary" id="importRunsBtn" style="padding:8px 16px;font-size:13px;">Import</button>
+        <button type="button" class="btn btn-secondary" id="exportRunsBtn" style="padding:8px 16px;font-size:13px;">Export all</button>
+        <button type="button" class="btn btn-danger" id="clearRunsBtn" style="padding:8px 16px;font-size:13px;">Clear all</button>
+        <input type="file" id="importRunsFile" accept=".json" style="display:none;" />
+      </div>
+    </div>
+
+    <div class="ref-admin-only" style="background:white;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:20px 24px;margin-bottom:16px;">
       <h3 style="font-size:14px;font-weight:700;color:var(--gray-800);margin:0 0 8px 0;">Re-run saved audits</h3>
       <p style="font-size:13px;color:var(--gray-600);margin:0 0 14px 0;line-height:1.5;">
         Recomputes every saved run using the current HTS table and Chapter 99 rules. Original TXT/XLSX files are not required — results are rebuilt from stored aggregation and 7501 data.
@@ -1446,11 +1530,21 @@
         <strong style="color: var(--red-700);">⚠ IEEPA & Reciprocal post-Feb 24, 2026.</strong> The Supreme Court struck down IEEPA tariffs on Feb 20, 2026 and CBP ceased collection on Feb 24, 2026. Section 122 (10%, codes 9903.03.01–9903.03.11) replaced IEEPA Universal through July 24, 2026. <strong>Entries filed before Feb 24, 2026 were assessed lawfully but are now refundable</strong> via the CBP CAPE tool (opened Apr 20, 2026).
       </div>
 
+      <h4 class="subsection-title" style="margin-top: 18px;">Section 122 — Post–Feb 24, 2026 Surcharge (9903.03.01)</h4>
+      <div class="ver-card">
+        <div class="ver-grid">
+          <span class="lbl">Authority</span><span class="val">Trade Act of 1974 § 122 — balance-of-payments temporary surcharge (Feb 2026 proclamation)</span>
+          <span class="lbl">Mechanism</span><span class="val">For entries on/after <strong>Feb 24, 2026</strong>, the engine expects <span class="mono-inline">9903.03.01</span> (+10%) on <strong>all countries</strong> in place of Annex I reciprocal and IEEPA layers. Expires <strong>Jul 24, 2026</strong> unless extended.</span>
+          <span class="lbl">Carve-outs</span><span class="val">Headings <span class="mono-inline">9903.03.02</span>–<span class="mono-inline">.11</span> (in-transit, USMCA, Section 232 non-stacking, etc.) are not modeled per HTS — broker carve-out codes may still show as mismatches until HTS-level logic is added.</span>
+          <span class="lbl">China</span><span class="val">Section 301 (<span class="mono-inline">9903.88.*</span>) still stacks with Section 122. IEEPA layers (<span class="mono-inline">9903.01.24</span> / <span class="mono-inline">.25</span>) end Feb 24, 2026.</span>
+        </div>
+      </div>
+
       <h4 class="subsection-title" style="margin-top: 18px;">EU Cap Logic — Why ES/PT Items Resolve to Either 9903.02.19 or 9903.02.20</h4>
       <div class="ver-card">
         <div class="ver-grid">
           <span class="lbl">Authority</span><span class="val">EO 14326 § 2(b) (Aug 5, 2025)</span>
-          <span class="lbl">Mechanism</span><span class="val">For an EU good, if the Column 1 (MFN) rate ≥ 15%, the additional ad valorem duty is <strong>0%</strong> (code 9903.02.19). If MFN &lt; 15%, the additional duty is set so the total reaches 15% — applied as an additive <strong>15%</strong> via code 9903.02.20.</span>
+          <span class="lbl">Mechanism</span><span class="val">For an EU good with entry date <strong>before Feb 24, 2026</strong>, if Column 1 (MFN) rate ≥ 15%, the additional ad valorem duty is <strong>0%</strong> (code 9903.02.19). If MFN &lt; 15%, the additional duty is set so the total reaches 15% — applied as an additive <strong>15%</strong> via code 9903.02.20. On/after Feb 24, 2026, EU reciprocal ends and Section 122 (<span class="mono-inline">9903.03.01</span>) applies instead.</span>
           <span class="lbl">Effect</span><span class="val">EU shipments pay a flat 15% landed reciprocal rate, never more.</span>
         </div>
       </div>
@@ -1607,6 +1701,20 @@
       <span class="audit-save-hint">Browse previous runs in <button type="button" id="openDashboardFromAudit">Dashboard</button></span>
     </div>
 
+    <div id="auditReviewBar" class="audit-review-bar" style="display:none;">
+      <div class="audit-review-top">
+        <span class="audit-review-label">Reviewer sign-off</span>
+        <span id="auditReviewBadge"></span>
+      </div>
+      <div class="rdp-review-row">
+        <select id="auditReviewStatus" class="audit-review-select" style="min-width:180px;padding:8px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);font-size:12px;"></select>
+        <textarea id="auditReviewNote" placeholder="Optional note (broker ticket #, data fix needed, etc.)" style="flex:1;min-width:200px;min-height:52px;padding:8px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);font-size:12px;resize:vertical;"></textarea>
+        <button type="button" class="btn btn-primary btn-sm" id="auditReviewSaveBtn">Save review</button>
+      </div>
+      <div id="auditReviewMeta" class="rdp-review-meta"></div>
+      <div id="auditReviewHint" class="audit-review-hint" style="display:none;">Save this run first to record reviewer sign-off.</div>
+    </div>
+
     <!-- Input mismatch banner (only shown when TXT and 7501 don't match) -->
     <div id="mismatchBanner" style="display:none;margin:0 0 20px 0;padding:16px 20px;background:#FEF3F2;border:1px solid #FECDCA;border-left:4px solid #B83227;border-radius:6px;">
       <div style="display:flex;align-items:flex-start;gap:12px;">
@@ -1686,6 +1794,7 @@
             <option value="IEEPA-Universal">IEEPA Universal</option>
             <option value="IEEPA-China">IEEPA CN/HK</option>
             <option value="Section-301">Section 301</option>
+            <option value="Section-122">Section 122</option>
             <option value="Section-232">Section 232 (filed)</option>
             <option value="232-Exclusion">232 Exclusion (filed)</option>
           </select>
@@ -1844,11 +1953,19 @@
 //   - China: 9903.88.15 (Section 301 List 4A) + 9903.01.24 (IEEPA China/HK) + 9903.01.25 (IEEPA Universal).
 //   - India: 9903.02.26 (Annex I reciprocal +25%) + 9903.01.84 (Russia penalty +25%, eff Aug 27, 2025).
 //   - Non-Annex I countries: 9903.01.25 (IEEPA Universal +10%).
+//   - On/after Feb 24, 2026: Annex I + IEEPA reciprocal layers end; Section 122
+//     (9903.03.01 +10%) applies to all countries through Jul 24, 2026.
 
 const ANNEX_I_EFFECTIVE_FROM = "2025-08-07";
 const ANNEX_I_EFFECTIVE_TO   = "2026-02-24";
 const ANNEX_I_AUTHORITY      = "EO 14326 (Jul 31, 2025)";
 const ANNEX_I_EFFECTIVE_STR  = "Aug 7, 2025 → Feb 24, 2026";
+
+const SECTION_122_CODE = "9903.03.01";
+const SECTION_122_FROM = "2026-02-24";
+const SECTION_122_TO   = "2026-07-24";
+const SECTION_122_AUTHORITY = "Trade Act of 1974 § 122 (Proclamation Feb 2026)";
+const SECTION_122_EFFECTIVE_STR = "Feb 24, 2026 → Jul 24, 2026";
 
 // Quick helper to keep the rule list scannable
 function annexI(coo, ch99, rate, country) {
@@ -2015,6 +2132,14 @@ const DEFAULT_CH99_RULES = [
     authority: "EO 14329 (Aug 6, 2025)", effective: "Aug 27, 2025 → Feb 24, 2026",
     effective_from: "2025-08-27", effective_to: "2026-02-24",
     notes: "India +25% penalty layered on Annex I reciprocal — stacks on 9903.02.26" },
+
+  // ── Section 122 temporary import surcharge (replaces IEEPA/Annex I reciprocal) ─
+  // coo "*" = all countries. Carve-outs 9903.03.02–.11 are not modeled per HTS.
+  { coo: "*", ch99: SECTION_122_CODE, rate: 10.0, category: "Section-122",
+    basis: "Section 122 balance-of-payments surcharge",
+    authority: SECTION_122_AUTHORITY, effective: SECTION_122_EFFECTIVE_STR,
+    effective_from: SECTION_122_FROM, effective_to: SECTION_122_TO,
+    notes: "10% ad valorem on products of any country — default line when no carve-out applies" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -2083,6 +2208,7 @@ const CH99_CATEGORIES = {
   "IEEPA-China":      { label: "IEEPA CN/HK",       color: "#B42B23", bg: "#FFF5F4", border: "#FFD0CE" },
   "IEEPA-India":      { label: "IEEPA India",       color: "#7A3E12", bg: "#FCF1E5", border: "#F3D3A8" },
   "Section-301":      { label: "Section 301",       color: "#6D28D9", bg: "#EDE9FE", border: "#DDD6FE" },
+  "Section-122":      { label: "Section 122",       color: "#0369A1", bg: "#E0F2FE", border: "#BAE6FD" },
   "Section-232":      { label: "Section 232",       color: "#92400E", bg: "#FEF3C7", border: "#FDE68A" },
   "232-Exclusion":    { label: "232 Exclusion",     color: "#78716C", bg: "#F5F5F4", border: "#E7E5E4" },
 };
@@ -2161,7 +2287,11 @@ function evaluateCh99Check(row) {
   } else if (!expHas301 && filHas301) section301Ok = false;
 
   const section232Ok = !has232Stack || filPart.section232.length > 0;
-  const otherOk = setsEqual(expNonRec, filNonRec) || (expNonRec.size === 0 && filNonRec.size === 0);
+  // Section 301 list membership is HTS-specific; when fuzzy coverage already matches,
+  // do not require the broker's 9903.88.0X to equal the engine display default (9903.88.15).
+  const otherOk = section301Ok
+    ? setsEqual(expPart.other, filPart.other) || (expPart.other.length === 0 && filPart.other.length === 0)
+    : setsEqual(expNonRec, filNonRec) || (expNonRec.size === 0 && filNonRec.size === 0);
 
   if (reciprocalOk && section301Ok && section232Ok && otherOk) {
     row.CH99_CHECK = "MATCH";
@@ -2661,19 +2791,35 @@ async function loadReferenceFromServer() {
     if (data.hts?.filename) {
       referenceMeta.htsUpdatedAt = data.hts.updatedAt || null;
       referenceMeta.htsUpdatedBy = data.hts.updatedBy || null;
-      const hres = await authFetch("/api/reference/hts");
-      if (hres.ok) {
-        const buf = await hres.arrayBuffer();
-        htsBuffer = buf;
-        htsName = data.hts.filename;
-        htsLookup = parseHtsTable(new Uint8Array(buf));
-      }
+      await loadHtsFromServer(data.hts.filename);
     }
     updateHtsUi();
     persistReferenceLocal();
   } catch (e) {
     console.warn("Reference load failed, using local cache:", e.message);
     loadReferenceLocal();
+  }
+}
+
+async function loadHtsFromServer(filename, { timeoutMs = 120000 } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const hres = await authFetch("/api/reference/hts", { signal: controller.signal });
+    if (!hres.ok) return false;
+    const buf = await hres.arrayBuffer();
+    htsBuffer = buf;
+    htsName = filename;
+    htsLookup = parseHtsTable(new Uint8Array(buf));
+    updateHtsUi();
+    persistReferenceLocal();
+    renderHtsVerification();
+    return true;
+  } catch (e) {
+    console.warn("HTS table download failed:", e.message);
+    return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -3246,42 +3392,62 @@ function aggregateMethodB(txt) {
   return arr;
 }
 
+function section122Layer(rules) {
+  const r = (rules || []).find(x => x.coo === "*" && x.category === "Section-122");
+  if (!r) return null;
+  return {
+    ch99: r.ch99,
+    rate_pct: r.rate,
+    category: "Section-122",
+    basis: r.basis,
+    notes: r.notes,
+    authority: r.authority || "—",
+    effective: r.effective || "—",
+  };
+}
+
+function collapseSection301Expected(out) {
+  const sec301Entries = out.filter(e => e.category === "Section-301");
+  if (sec301Entries.length === 0) return out;
+  const nonSec301 = out.filter(e => e.category !== "Section-301");
+  nonSec301.push({
+    ch99: "9903.88.15",
+    rate_pct: 7.5,
+    category: "Section-301",
+    section301_fuzzy: true,
+    basis: "Section 301 (List 1/2/3/4A — code varies by HTS)",
+    notes: "Engine cannot determine HTS-level list membership. Any 9903.88.01/02/03/15 satisfies coverage; broker classification is authoritative.",
+    authority: "USTR Section 301 (Trade Act of 1974)",
+    effective: "2018–2019 → present",
+  });
+  return nonSec301;
+}
+
 function expectedChapter99(country, hts, mfnPct, rules) {
   const c = (country || "").trim().toUpperCase();
   const out = [];
+  const s122 = section122Layer(rules);
+  const euReciprocalActive = (rules || []).some(r =>
+    r.coo === c && (r.category === "Reciprocal-EU" || r.category === "Reciprocal"));
+
   if (EU_COUNTRIES.has(c)) {
-    out.push(resolveEuReciprocalLayer(mfnPct, rules, c));
-    return out;
+    if (euReciprocalActive) {
+      out.push(resolveEuReciprocalLayer(mfnPct, rules, c));
+      return collapseSection301Expected(out);
+    }
+    if (s122) out.push(s122);
+    return collapseSection301Expected(out);
   }
+
   for (const r of rules) {
-    if (r.coo === c && !EU_COUNTRIES.has(r.coo)) {
+    if (r.coo === c && r.coo !== "*" && !EU_COUNTRIES.has(r.coo)) {
       out.push({ ch99: r.ch99, rate_pct: r.rate, category: r.category || "Reciprocal",
                  basis: r.basis, notes: r.notes,
                  authority: r.authority || "—", effective: r.effective || "—" });
     }
   }
-  // Section 301 lists are mutually exclusive — each HTS is on at most one list.
-  // The engine doesn't know HTS-level list membership, so collapse all four
-  // 9903.88.* entries into a single fuzzy marker. The comparison layer accepts
-  // any 9903.88.01/02/03/15 filed by the broker as satisfying coverage.
-  // 9903.88.15 (List 4A) is kept as the display code since it's the most common
-  // for apparel/footwear and is the default for the Ch99 Stack visualization.
-  const sec301Entries = out.filter(e => e.category === "Section-301");
-  if (sec301Entries.length > 0) {
-    const nonSec301 = out.filter(e => e.category !== "Section-301");
-    nonSec301.push({
-      ch99: "9903.88.15",
-      rate_pct: 7.5,
-      category: "Section-301",
-      section301_fuzzy: true,
-      basis: "Section 301 (List 1/2/3/4A — code varies by HTS)",
-      notes: "Engine cannot determine HTS-level list membership. Any 9903.88.01/02/03/15 satisfies coverage; broker classification is authoritative.",
-      authority: "USTR Section 301 (Trade Act of 1974)",
-      effective: "2018–2019 → present",
-    });
-    return nonSec301;
-  }
-  return out;
+  if (s122) out.push(s122);
+  return collapseSection301Expected(out);
 }
 
 function build7501Filed(xl) {
@@ -3760,6 +3926,11 @@ const auth = (() => {
       if (htsRefSection) htsRefSection.style.display = "";
       updateHtsRefStatus();
       applyReferencePermissions();
+      document.querySelector(".page")?.style.setProperty("display", "none");
+      if (typeof showDashboardShell === "function" && !document.getElementById("dashOverlay")?.classList.contains("open")) {
+        showDashboardShell();
+        if (typeof showDashboardLoading === "function") showDashboardLoading();
+      }
     } else {
       const usersBtn = document.getElementById("usersBtn");
       if (usersBtn) usersBtn.style.display = "none";
@@ -3769,6 +3940,7 @@ const auth = (() => {
       if (activityBtn) activityBtn.style.display = "none";
       const htsRefSection = document.getElementById("htsRefStatusSection");
       if (htsRefSection) htsRefSection.style.display = "none";
+      if (typeof showAuditPage === "function") showAuditPage();
     }
   }
 
@@ -3834,9 +4006,14 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
     await auth.login(username, password);
     document.getElementById("loginPassword").value = "";
     await runStore.init();
-    await loadReferenceFromServer();
-    loadRunsFromStorage();
-    renderStorageBanner();
+    await goHomeDashboard();
+    _syncDashPill();
+    loadReferenceFromServer()
+      .then(() => {
+        renderStorageBanner();
+        renderHtsVerification();
+      })
+      .catch(e => console.warn("Reference load after login failed:", e.message));
   } catch (e) {
     errEl.style.display = "block";
   } finally {
@@ -3853,7 +4030,7 @@ document.getElementById("loginUsername").addEventListener("keydown", e => {
 document.getElementById("logoutBtn").addEventListener("click", async () => {
   try { await authFetch("/api/auth/logout", { method: "POST" }); } catch (e) { /* ignore */ }
   auth.logout();
-  if (typeof closeAllViews === "function") closeAllViews();
+  if (typeof showAuditPage === "function") showAuditPage();
 });
 
 document.getElementById("activityUserFilter").addEventListener("change", () => loadActivityLog());
@@ -4084,10 +4261,34 @@ const RUNS_KEY = "inditex_audit_runs_v1";
 const RUNS_REFRESH_MS = 45000;
 const RUNS_PAGE_SIZE = 25;
 const FULL_RUN_CACHE_MAX = 8;
+const FINDINGS_DIGEST_LIMIT = 25;
+
+const REVIEW_STATUSES = {
+  pending:              { label: "Not reviewed",         badge: "badge-review-pending" },
+  in_progress:          { label: "In progress",          badge: "badge-review-progress" },
+  reviewed:             { label: "Reviewed",             badge: "badge-review-done" },
+  needs_deeper_review:  { label: "Needs deeper review",  badge: "badge-review-warn" },
+  broker_contacted:     { label: "Broker contacted",     badge: "badge-review-info" },
+  data_issue:           { label: "Data issue",           badge: "badge-review-danger" },
+  waived:               { label: "Waived / accepted",    badge: "badge-neutral" },
+};
 
 let _runsRefreshAt = 0;
 let _rdPage = 0;
 let _rdSelectedIds = new Set();
+let _rdReviewFilter = "all";
+let _findingsDigestCache = new Map();
+
+function runMatchesReviewFilter(r) {
+  if (_rdReviewFilter === "all") return true;
+  const st = r.reviewStatus || "pending";
+  if (_rdReviewFilter === "pending") return st === "pending" || st === "in_progress";
+  if (_rdReviewFilter === "reviewed") return st === "reviewed" || st === "waived";
+  if (_rdReviewFilter === "action") {
+    return st === "needs_deeper_review" || st === "broker_contacted" || st === "data_issue";
+  }
+  return st === _rdReviewFilter;
+}
 let _activeTab = "comparison";
 let _renderRunsTimer = null;
 let _inputsCollapsed = false;
@@ -4115,7 +4316,103 @@ function isFullRun(r) {
   return !!(r && r.state && ((r.state.filed && r.state.filed.length) || (r.state.agg && r.state.agg.length)) && !r._summaryOnly);
 }
 
+function buildFindingsDigest(findings) {
+  const list = findings || [];
+  const primary = list.filter(f => !f.isRollup);
+  const rollups = list.filter(f => f.isRollup);
+  const take = [...primary.slice(0, FINDINGS_DIGEST_LIMIT), ...rollups.slice(0, 3)];
+  return take.map(f => ({
+    sev: f.sev || "Info",
+    cat: f.cat || "",
+    loc: f.loc || "",
+    desc: String(f.desc || "").slice(0, 240),
+    rec: String(f.rec || "").slice(0, 160),
+    isRollup: !!f.isRollup,
+  }));
+}
+
+function reviewStatusMeta(status) {
+  return REVIEW_STATUSES[status] || REVIEW_STATUSES.pending;
+}
+
+function reviewStatusBadge(status) {
+  const m = reviewStatusMeta(status || "pending");
+  return `<span class="badge ${m.badge}">${escapeHtml(m.label)}</span>`;
+}
+
+function issuesPreviewHtml(r, maxLines = 2) {
+  const digest = r.findingsDigest || [];
+  const rc = r.findingsCritical ?? 0;
+  const rh = r.findingsHigh ?? 0;
+  if (!digest.length && rc === 0 && rh === 0) {
+    return `<span class="muted">Clean</span>`;
+  }
+  if (!digest.length) {
+    return `<span class="runs-issues-preview">${rc ? `<span class="ri-line">${rc} critical</span>` : ""}${rh ? `<span class="ri-line">${rh} high</span>` : ""}</span>`;
+  }
+  const lines = digest.filter(f => !f.isRollup).slice(0, maxLines);
+  return `<span class="runs-issues-preview">${lines.map(f => {
+    const sev = f.sev === "Critical" ? "crit" : f.sev === "High" ? "high" : "";
+    return `<span class="ri-line" title="${escapeHtml(f.desc)}">${sev ? `<strong>${escapeHtml(f.sev)}:</strong> ` : ""}${escapeHtml(f.loc || f.cat)} — ${escapeHtml(f.desc).slice(0, 72)}${f.desc.length > 72 ? "…" : ""}</span>`;
+  }).join("")}${digest.length > maxLines ? `<span class="ri-line muted">+${digest.length - maxLines} more…</span>` : ""}</span>`;
+}
+
+function renderDigestCards(digest, limit = 12) {
+  if (!digest?.length) {
+    return `<div class="muted" style="font-size:12px;padding:8px 0;">No issue summary saved — expand loads from audit or re-save the run.</div>`;
+  }
+  const sevCls = { Critical: "crit", High: "high", Medium: "med", Low: "low", Info: "info" };
+  return digest.slice(0, limit).map(f => `
+    <div class="rdp-issue ${sevCls[f.sev] || ""}">
+      <div class="ri-head">
+        <span class="ri-sev">${escapeHtml(f.sev)}</span>
+        <span>${escapeHtml(f.cat)}</span>
+        <span class="ri-loc">${escapeHtml(f.loc)}</span>
+      </div>
+      <div class="ri-desc">${escapeHtml(f.desc)}</div>
+    </div>`).join("")
+    + (digest.length > limit ? `<div class="muted" style="font-size:11px;margin-top:4px;">+${digest.length - limit} more in full audit</div>` : "");
+}
+
+async function ensureFindingsDigest(r) {
+  if (!r?.id) return [];
+  if (r.findingsDigest?.length) return r.findingsDigest;
+  if (_findingsDigestCache.has(r.id)) {
+    r.findingsDigest = _findingsDigestCache.get(r.id);
+    return r.findingsDigest;
+  }
+  try {
+    const full = await runStore.fetchRun(r.id);
+    if (!full) return [];
+    const hydrated = rehydrateRun(full);
+    const digest = buildFindingsDigest(hydrated.findings);
+    _findingsDigestCache.set(r.id, digest);
+    r.findingsDigest = digest;
+    const idx = runStore.getListIndex?.(r.id);
+    if (idx >= 0) runStore.patchListRow?.(r.id, { findingsDigest: digest });
+    return digest;
+  } catch (e) {
+    console.warn("ensureFindingsDigest:", e.message);
+    return [];
+  }
+}
+
 function summaryRowToRun(row) {
+  const num = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const mfn = num(row.filed_mfn);
+  const ch99 = num(row.filed_ch99);
+  const mpf = num(row.filed_mpf);
+  const cotton = num(row.filed_cotton);
+  const totalDuty = num(row.total_duty);
+  const entered = num(row.entered_value);
+  let findingsDigest = row.findings_digest;
+  if (typeof findingsDigest === "string") {
+    try { findingsDigest = JSON.parse(findingsDigest); } catch { findingsDigest = []; }
+  }
+  if (!Array.isArray(findingsDigest)) findingsDigest = [];
   return {
     id: row.id,
     name: row.name,
@@ -4123,6 +4420,11 @@ function summaryRowToRun(row) {
     findingsCount: row.findings_count ?? 0,
     findingsCritical: row.findings_critical ?? 0,
     findingsHigh: row.findings_high ?? 0,
+    findingsDigest,
+    reviewStatus: row.review_status || "pending",
+    reviewNote: row.review_note || "",
+    reviewedBy: row.reviewed_by || "",
+    reviewedAt: row.reviewed_at || null,
     inputs: {
       freight: row.freight ?? 0,
       insurance: row.insurance ?? 0,
@@ -4136,8 +4438,16 @@ function summaryRowToRun(row) {
         importer: row.importer || "",
         importerEin: row.importer_ein || "",
         aggLines: row.agg_lines ?? 0,
-        enteredAgg: row.entered_value,
-        filedCH99: row.total_duty,
+        enteredAgg: entered,
+        enteredFiled: entered,
+        filedMFN: mfn,
+        filedCH99: ch99,
+        filedMPF: mpf,
+        filedCotton: cotton,
+        totalDuty,
+        strictMatched: num(row.strict_matched),
+        looseMatched: num(row.loose_matched),
+        noMatch: num(row.no_match),
       },
       agg: [],
     },
@@ -4154,6 +4464,11 @@ function fullSnapshotToListRun(r) {
     findingsCount: r.findingsCount ?? 0,
     findingsCritical: r.findingsCritical ?? 0,
     findingsHigh: r.findingsHigh ?? 0,
+    findingsDigest: r.findingsDigest || [],
+    reviewStatus: r.reviewStatus || "pending",
+    reviewNote: r.reviewNote || "",
+    reviewedBy: r.reviewedBy || "",
+    reviewedAt: r.reviewedAt || null,
     inputs: { ...(r.inputs || {}) },
     state: {
       ctx: {
@@ -4265,6 +4580,47 @@ const runStore = (() => {
 
     getCachedFull(id) {
       return fullCache.get(id) || null;
+    },
+
+    getListIndex(id) {
+      return cache.findIndex(x => x.id === id);
+    },
+
+    patchListRow(id, patch) {
+      const idx = cache.findIndex(x => x.id === id);
+      if (idx < 0) return;
+      Object.assign(cache[idx], patch);
+    },
+
+    async patchReview(id, { status, note }) {
+      if (backend !== "postgres") {
+        const runs = JSON.parse(this.get() || "[]");
+        const r = runs.find(x => x.id === id);
+        if (!r) throw new Error("run not found");
+        r.reviewStatus = status;
+        r.reviewNote = note ?? r.reviewNote ?? "";
+        r.reviewedBy = status === "pending" ? "" : (auth.username || "");
+        r.reviewedAt = status === "pending" ? null : new Date().toISOString();
+        this.set(JSON.stringify(runs));
+        return r;
+      }
+      const res = await authFetch(apiBase + "/runs/" + encodeURIComponent(id) + "/review", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, note }),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t.slice(0, 160) || "review update failed");
+      }
+      const data = await res.json();
+      this.patchListRow(id, {
+        reviewStatus: data.review_status,
+        reviewNote: data.review_note || "",
+        reviewedBy: data.reviewed_by || "",
+        reviewedAt: data.reviewed_at || null,
+      });
+      return data;
     },
 
     async saveRun(r) {
@@ -4559,9 +4915,11 @@ function snapshotCurrentRun(name, existingId) {
   const findingsCount = state.findings?.length || 0;
   const findingsCritical = state.findings?.filter(f => f.sev === "Critical").length || 0;
   const findingsHigh     = state.findings?.filter(f => f.sev === "High").length || 0;
+  const runId = existingId || state.activeRunId || ("run_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8));
+  const existing = loadRunsFromStorage().find(r => r.id === runId);
 
   return {
-    id: existingId || ("run_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8)),
+    id: runId,
     name: name || defaultRunName(),
     savedAt: new Date().toISOString(),
     schemaVersion: 5,
@@ -4570,6 +4928,13 @@ function snapshotCurrentRun(name, existingId) {
     findingsCount,
     findingsCritical,
     findingsHigh,
+    findingsDigest: buildFindingsDigest(state.findings),
+    ...(existing ? {
+      reviewStatus: existing.reviewStatus || "pending",
+      reviewNote: existing.reviewNote || "",
+      reviewedBy: existing.reviewedBy || "",
+      reviewedAt: existing.reviewedAt || null,
+    } : {}),
     inputs: {
       ...txtInputsSummary(),
       xlsxName: state.xlsxName,
@@ -4779,12 +5144,13 @@ function saveCurrentRun(customName, existingId) {
         _logActivity("saved", snap);
         scheduleRenderRuns(true);
         _syncDashPill();
+        syncAuditReviewBar();
         toast(`Saved: ${snap.name} → Database`, "success");
       }
     });
     return true;
   }
-  const runs = loadRunsFromStorage();
+  const runs = loadRunsFromStorage().filter(r => r.id !== snap.id);
   runs.unshift(snap);
   const result = saveRunsToStorage(runs);
   state.activeRunId = snap.id;
@@ -4801,13 +5167,14 @@ function saveCurrentRun(customName, existingId) {
                  : runStore.backend === "memory"   ? " (in memory — Export to keep)"
                  : runStore.backend === "localStorage" ? " (browser storage)"
                  : "";
+    syncAuditReviewBar();
     toast(`Saved: ${snap.name}${suffix}`, "success");
   }
   return result.ok;
 }
 
 function closeDashOverlay() {
-  closeAllViews();
+  showAuditPage();
 }
 
 const APP_VIEWS = {
@@ -4816,7 +5183,6 @@ const APP_VIEWS = {
     navId: "dashboardBtn",
     onOpen: async () => {
       await renderDashboard();
-      trackActivity("view_dashboard", {}, "analytics");
     },
   },
   users: {
@@ -4827,13 +5193,14 @@ const APP_VIEWS = {
   reference: {
     overlayId: "referenceOverlay",
     navId: "referenceBtn",
-    onOpen: () => {
+    onOpen: async () => {
       updateHtsUi();
       updateAdminRulesMeta();
       renderAdminRules();
       applyReferencePermissions();
       renderAdminHtsTable();
       renderHtsVerification();
+      await renderRecentActivityPanel();
     },
   },
   activity: {
@@ -4842,7 +5209,66 @@ const APP_VIEWS = {
     onOpen: () => loadActivity(),
   },
 };
-let _activeView = "audit";
+let _activeView = "dashboard";
+
+function showAuditPage() {
+  Object.values(APP_VIEWS).forEach(v => {
+    document.getElementById(v.overlayId)?.classList.remove("open");
+  });
+  document.body.style.overflow = "";
+  const page = document.querySelector(".page");
+  if (page) page.style.display = "";
+  setActiveNav("audit");
+}
+
+function showDashboardShell() {
+  Object.values(APP_VIEWS).forEach(v => {
+    document.getElementById(v.overlayId)?.classList.remove("open");
+  });
+  document.getElementById("dashOverlay")?.classList.add("open");
+  document.body.style.overflow = "hidden";
+  setActiveNav("dashboard");
+}
+
+function showDashboardLoading() {
+  const dashList = document.getElementById("runsDashList");
+  if (dashList) {
+    dashList.innerHTML = `
+      <div class="empty" style="margin:64px 0;">
+        <h3>Loading dashboard…</h3>
+        <p class="muted">Fetching saved runs and analytics.</p>
+      </div>`;
+  }
+}
+
+async function goHomeDashboard() {
+  if (!auth.token) {
+    showAuditPage();
+    return;
+  }
+  showDashboardShell();
+  showDashboardLoading();
+  try {
+    if (runStore.backend === "postgres" && !loadRunsFromStorage().length) {
+      await runStore.refresh();
+    }
+    await renderDashboard();
+    trackActivity("view_dashboard", {}, "analytics");
+  } catch (e) {
+    console.error("goHomeDashboard renderDashboard failed:", e);
+    const dashList = document.getElementById("runsDashList");
+    if (dashList) {
+      dashList.innerHTML = `
+        <div class="empty" style="margin:64px 0;">
+          <h3>Dashboard failed to load</h3>
+          <p class="muted">${escapeHtml(e.message || String(e))}</p>
+          <button type="button" class="btn btn-primary btn-sm" id="dashRetryBtn" style="margin-top:12px;">Retry</button>
+        </div>`;
+      dashList.querySelector("#dashRetryBtn")?.addEventListener("click", () => goHomeDashboard());
+    }
+    toast("Dashboard failed to load — try refreshing.", "error");
+  }
+}
 
 function setTopbarHeight() {
   const tb = document.querySelector(".topbar");
@@ -4859,11 +5285,7 @@ function setActiveNav(view) {
 }
 
 function closeAllViews() {
-  Object.values(APP_VIEWS).forEach(v => {
-    document.getElementById(v.overlayId)?.classList.remove("open");
-  });
-  document.body.style.overflow = "";
-  setActiveNav("audit");
+  goHomeDashboard();
 }
 
 async function openView(name) {
@@ -4872,10 +5294,18 @@ async function openView(name) {
   Object.values(APP_VIEWS).forEach(v => {
     document.getElementById(v.overlayId)?.classList.remove("open");
   });
-  if (cfg.onOpen) await cfg.onOpen();
   document.getElementById(cfg.overlayId)?.classList.add("open");
   document.body.style.overflow = "hidden";
   setActiveNav(name);
+  if (cfg.onOpen) {
+    try {
+      await cfg.onOpen();
+    } catch (e) {
+      console.error(`openView(${name}) failed:`, e);
+      if (name === "dashboard") toast("Dashboard failed to load.", "error");
+    }
+  }
+  if (name === "dashboard") trackActivity("view_dashboard", {}, "analytics");
 }
 
 async function toggleView(name) {
@@ -4885,7 +5315,13 @@ async function toggleView(name) {
     return;
   }
   if (_activeView === name) {
-    closeAllViews();
+    if (name === "dashboard") return;
+    else {
+      const cur = APP_VIEWS[name];
+      document.getElementById(cur?.overlayId)?.classList.remove("open");
+      document.body.style.overflow = "";
+      setActiveNav("audit");
+    }
     return;
   }
   await openView(name);
@@ -5034,9 +5470,15 @@ async function clearAllRuns() {
   _rdSelectedIds.clear();
   state.activeRunId = null;
   setActiveBadge(null);
-  scheduleRenderRuns(true);
-  if (_activeView === "dashboard") renderDashboard();
+  refreshRunsViewsAfterBulkChange();
   toast("All runs cleared.", "success");
+}
+
+function refreshRunsViewsAfterBulkChange() {
+  scheduleRenderRuns(true);
+  _syncDashPill();
+  if (_activeView === "dashboard") renderDashboard();
+  if (_activeView === "reference") renderRecentActivityPanel();
 }
 
 function setActiveBadge(name) {
@@ -5055,7 +5497,7 @@ function startNewRun() {
     if (!confirm("You have an unsaved audit. Start a new run anyway? (Your unsaved results will be lost.)")) return;
   }
 
-  closeAllViews();
+  showAuditPage();
 
   // Clear all audit state
   clearUploadedFiles();
@@ -5140,7 +5582,7 @@ let _mfnExpanded = new Set(); // COO|HTS keys with expanded 7501 line detail
 let _rdMidSort = "entries"; // "mid"|"entries"|"lines"|"coo"|"value"|"entered"
 let _rdMidSortDir = -1;
 let _rdMidSearch = "";
-let _dashSections = { mid: false, mfr: true, mfn: true, htsCross: true, activity: true, runs: true };
+let _dashSections = { mid: false, mfr: true, mfn: true, htsCross: true, runs: true };
 
 function renderDashPanel(key, title, subtitle, badgeHtml, bodyHtml) {
   const open = _dashSections[key];
@@ -5198,6 +5640,7 @@ function renderMidTableRows(midRows, emptyMsg) {
 
 // ── Activity feed (server-backed in Postgres mode — no artificial caps) ─────
 let _serverActivityCache = null;
+let _portfolioCooCache = null;
 
 async function refreshServerActivity() {
   if (runStore.backend !== "postgres" || !auth.token) {
@@ -5213,6 +5656,21 @@ async function refreshServerActivity() {
   }
 }
 
+async function refreshPortfolioCoo(force = false) {
+  if (runStore.backend !== "postgres" || !auth.token) {
+    _portfolioCooCache = null;
+    return;
+  }
+  if (!force && _portfolioCooCache !== null) return;
+  try {
+    const res = await authFetch("/api/runs/_portfolio");
+    _portfolioCooCache = res.ok ? await res.json() : [];
+  } catch (e) {
+    console.warn("refreshPortfolioCoo failed:", e.message);
+    _portfolioCooCache = [];
+  }
+}
+
 async function refreshDashboardData(force = false) {
   if (runStore.backend === "postgres") {
     if (force || Date.now() - _runsRefreshAt > RUNS_REFRESH_MS) {
@@ -5220,6 +5678,9 @@ async function refreshDashboardData(force = false) {
     }
     if (force || _serverActivityCache === null) {
       await refreshServerActivity();
+    }
+    if (force || _portfolioCooCache === null) {
+      await refreshPortfolioCoo(force);
     }
   }
 }
@@ -5324,6 +5785,76 @@ function formatActivityLabel(e) {
   return `${escapeHtml(label)}${who}`;
 }
 
+function fmtActivityRelTime(ts) {
+  const d = Date.now() - ts;
+  if (d < 60000) return "just now";
+  if (d < 3600000) return `${Math.round(d / 60000)}m ago`;
+  if (d < 86400000) return `${Math.round(d / 3600000)}h ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
+function recentActivityFeedHtml(actFiltered) {
+  if (!actFiltered.length) {
+    return `<div class="dash-panel-empty">No activity yet.</div>`;
+  }
+  return actFiltered.map(e => `
+    <div class="rd-act-item">
+      <div class="rd-act-dot ${e.sev || "info"}"></div>
+      <div class="rd-act-body">
+        <div class="rd-act-text">${formatActivityLabel(e)}</div>
+        <div class="rd-act-time">${fmtActivityRelTime(e.ts)}</div>
+      </div>
+    </div>`).join("");
+}
+
+function wireRecentActivityFilter(container, refreshFn) {
+  const afEl = container?.querySelector("#rdActFilter");
+  if (!afEl) return;
+  afEl.addEventListener("change", e => {
+    _rdActFilter = e.target.value;
+    refreshFn();
+  });
+  afEl.addEventListener("click", e => e.stopPropagation());
+}
+
+async function renderRecentActivityPanel(mountId = "refActivityMount") {
+  const mount = document.getElementById(mountId);
+  if (!mount) return;
+  if (runStore.backend === "postgres" && auth.token) {
+    await refreshServerActivity();
+  }
+  const runs = loadRunsFromStorage();
+  const feedItems = buildActivityFeedItems(runs);
+  const actFiltered = feedItems.filter(e => activityMatchesFilter(e, _rdActFilter));
+  const subtitle = runStore.backend === "postgres"
+    ? `All recorded actions from the database (${feedItems.length} total)`
+    : "Saves, loads, renames, and deletes in this session";
+
+  mount.innerHTML = `
+    <div style="background:white;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;margin-bottom:16px;">
+      <div class="users-toolbar">
+        <div>
+          <h3 style="margin:0;font-size:14px;">Recent Activity</h3>
+          <div style="font-size:11px;color:var(--gray-400);margin-top:4px;">${escapeHtml(subtitle)}</div>
+        </div>
+        <span class="dash-panel-badge">${actFiltered.length}</span>
+      </div>
+      <div class="dash-panel-toolbar" style="padding:0 20px 10px;">
+        <select id="rdActFilter" class="rd-act-ctrl">
+          <option value="all"     ${_rdActFilter === "all"     ? "selected" : ""}>All types</option>
+          <option value="saved"   ${_rdActFilter === "saved"   ? "selected" : ""}>Saved</option>
+          <option value="loaded"  ${_rdActFilter === "loaded"  ? "selected" : ""}>Loaded</option>
+          <option value="deleted" ${_rdActFilter === "deleted" ? "selected" : ""}>Deleted</option>
+          <option value="renamed" ${_rdActFilter === "renamed" ? "selected" : ""}>Renamed</option>
+        </select>
+      </div>
+      <div class="dash-panel-list" style="max-height:360px;overflow-y:auto;padding:0 12px 12px;">
+        <div class="rd-act-feed">${recentActivityFeedHtml(actFiltered)}</div>
+      </div>
+    </div>`;
+  wireRecentActivityFilter(mount, () => renderRecentActivityPanel(mountId));
+}
+
 // Pick a 7501 header column by exact name or partial label match.
 function pick7501Col(row, candidates, opts = {}) {
   if (!row) return "";
@@ -5426,13 +5957,48 @@ function extract7501ImporterFromRows(rows) {
 
 function runCtxFromRun(r) {
   const ctx = { ...(r?.state?.ctx || {}) };
-  if (!normalizeImporterEin(ctx.importerEin || ctx.importerId)) {
-    const full = runStore.getCachedFull?.(r.id);
-    const fc = full?.state?.ctx;
-    if (fc?.importerEin) ctx.importerEin = fc.importerEin;
-    if (fc?.importerId && !ctx.importerId) ctx.importerId = fc.importerId;
+  const full = runStore.getCachedFull?.(r.id);
+  const fc = full?.state?.ctx;
+  if (fc) {
+    const numericKeys = [
+      "filedMFN", "filedCH99", "filedMPF", "filedCotton", "totalDuty",
+      "enteredAgg", "enteredFiled",
+      "strictMatched", "looseMatched", "noMatch",
+    ];
+    for (const k of numericKeys) {
+      const fv = fc[k];
+      if (fv == null || fv === "") continue;
+      const fn = Number(fv);
+      if (!Number.isFinite(fn)) continue;
+      const sv = Number(ctx[k]);
+      // Don't let a cached full snapshot with zeros clobber good summary totals.
+      if (fn === 0 && Number.isFinite(sv) && sv > 0) continue;
+      ctx[k] = fn;
+    }
+    for (const k of ["importerEin", "importerId"]) {
+      if (fc[k] != null && fc[k] !== "") ctx[k] = fc[k];
+    }
+  }
+  if (!normalizeImporterEin(ctx.importerEin || ctx.importerId) && fc?.importerEin) {
+    ctx.importerEin = fc.importerEin;
   }
   return ctx;
+}
+
+function roundUSD(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+function dutyFromCtx(ctx) {
+  const mfn = roundUSD(ctx?.filedMFN);
+  const ch99 = roundUSD(ctx?.filedCH99);
+  const mpf = roundUSD(ctx?.filedMPF);
+  const cotton = roundUSD(ctx?.filedCotton);
+  let total = roundUSD(mfn + ch99 + mpf + cotton);
+  if (total === 0 && roundUSD(ctx?.totalDuty) > 0) {
+    total = roundUSD(ctx.totalDuty);
+  }
+  return { mfn, ch99, mpf, cotton, total };
 }
 
 // Strip punctuation, quotes, zero-width chars, and unicode whitespace so
@@ -5451,7 +6017,8 @@ function normalizeImporterKey(s) {
 
 // Normalise IRS EIN / importer ID to digits for grouping (9-digit EIN when available).
 function normalizeImporterEin(s) {
-  const raw = String(s || "").trim();
+  let raw = String(s || "").trim();
+  raw = raw.replace(/^["']+|["']+$/g, "");
   if (!raw || /^same$/i.test(raw)) return "";
   const digits = raw.replace(/\D/g, "");
   if (digits.length >= 9) return digits.slice(0, 9);
@@ -5468,7 +6035,8 @@ function importerIdentityFromCtx(ctx) {
   const einDigits = normalizeImporterEin(ctx?.importerEin || ctx?.importerId || "");
   const displayName = normalizeImporterName(ctx?.importer || "") || String(ctx?.importer || "").trim() || "Unknown";
   const displayEin = formatImporterEin(ctx?.importerEin || ctx?.importerId || einDigits);
-  const groupKey = einDigits ? `ein:${einDigits}` : `name:${displayName}`;
+  // Always group by normalized legal name — EIN is shown when any run in the group has it.
+  const groupKey = `name:${normalizeImporterKey(displayName)}`;
   return { groupKey, displayName, einDigits, displayEin };
 }
 
@@ -5478,9 +6046,7 @@ function displayImporter(ctx) {
 }
 
 function runDutyTotal(ctx) {
-  if (!ctx) return 0;
-  return Number(ctx.filedMFN || 0) + Number(ctx.filedCH99 || 0)
-       + Number(ctx.filedMPF || 0) + Number(ctx.filedCotton || 0);
+  return dutyFromCtx(ctx).total;
 }
 
 function runsPanelSubtitle(filteredCount, totalCount, page, totalPages) {
@@ -5494,6 +6060,10 @@ function buildAuditRunsPanelBody(pageRows, totalPages, allPageSelected, statusBa
   const selCount = _rdSelectedIds.size;
   const euCapByRun = opts.euCapByRun || null;
   const panelHint = opts.panelHint || "";
+  const ft = opts.filteredTotals || {};
+  const filtLines = ft.lines ?? 0;
+  const filtDuty = ft.duty ?? 0;
+  const filtCount = ft.count ?? 0;
   const paginationHtml = totalPages > 1 ? `
     <span class="runs-page-info">Page ${_rdPage + 1} of ${totalPages}</span>
     <button type="button" class="btn btn-secondary btn-sm rd-runs-prev" ${_rdPage <= 0 ? "disabled" : ""}>← Prev</button>
@@ -5507,9 +6077,9 @@ function buildAuditRunsPanelBody(pageRows, totalPages, allPageSelected, statusBa
     </div>
   ` : "";
   const rowsHtml = pageRows.length === 0
-    ? `<tr><td colspan="10"><div class="dash-panel-empty">No runs match this filter or search.</div></td></tr>`
+    ? `<tr><td colspan="12"><div class="dash-panel-empty">No runs match this filter or search.</div></td></tr>`
     : pageRows.map((r) => {
-        const ctx = r.state?.ctx || {};
+        const ctx = runCtxFromRun(r);
         const aggLines = r.state?.agg?.length || ctx.aggLines || 0;
         const duty = runDutyTotal(ctx);
         const matched = (ctx.strictMatched || 0) + (ctx.looseMatched || 0);
@@ -5530,10 +6100,12 @@ function buildAuditRunsPanelBody(pageRows, totalPages, allPageSelected, statusBa
           <td class="sm">${escapeHtml(displayImporter(ctx))}</td>
           <td><span class="run-link">${escapeHtml(r.name)}</span>${isActive ? `<span class="badge badge-active" style="margin-left:4px;font-size:10px;">ACTIVE</span>` : ""}${euBadge}</td>
           <td>${statusBadgeFn(r)}</td>
+          <td class="sm issues-col" onclick="event.stopPropagation();">${issuesPreviewHtml(r)}</td>
           <td class="mono">${escapeHtml(String(ctx.entryNum || "—"))}</td>
           <td class="r">${aggLines > 0 ? aggLines.toLocaleString() : "—"}</td>
           <td class="r">${duty > 0 ? fmtUSD(duty) : "—"}</td>
           <td class="r" style="color:${mc};">${mPct !== null ? mPct + "%" : "—"}</td>
+          <td onclick="event.stopPropagation();">${reviewStatusBadge(r.reviewStatus)}</td>
           <td class="sm">${new Date(r.savedAt).toLocaleDateString()}</td>
           <td class="tog">${isSel ? "▲" : "▼"}</td>
         </tr>
@@ -5553,17 +6125,35 @@ function buildAuditRunsPanelBody(pageRows, totalPages, allPageSelected, statusBa
         <option value="recent" ${_rdFilter === "recent" ? "selected" : ""}>Last 7 Days</option>
         <option value="eu_cap" ${_rdFilter === "eu_cap" ? "selected" : ""}>EU cap affected (${opts.euCapRunCount ?? "—"})</option>
       </select>
+      <select id="rdReviewFilter" class="rd-runs-fsel" title="Filter by reviewer sign-off">
+        <option value="all"     ${_rdReviewFilter === "all"     ? "selected" : ""}>All reviews</option>
+        <option value="pending" ${_rdReviewFilter === "pending" ? "selected" : ""}>Not reviewed</option>
+        <option value="in_progress" ${_rdReviewFilter === "in_progress" ? "selected" : ""}>In progress</option>
+        <option value="reviewed" ${_rdReviewFilter === "reviewed" ? "selected" : ""}>Reviewed / waived</option>
+        <option value="action"  ${_rdReviewFilter === "action"  ? "selected" : ""}>Needs follow-up</option>
+        <option value="needs_deeper_review" ${_rdReviewFilter === "needs_deeper_review" ? "selected" : ""}>Needs deeper review</option>
+        <option value="broker_contacted" ${_rdReviewFilter === "broker_contacted" ? "selected" : ""}>Broker contacted</option>
+        <option value="data_issue" ${_rdReviewFilter === "data_issue" ? "selected" : ""}>Data issue</option>
+      </select>
       ${paginationHtml}
     </div>
     <div class="dash-panel-list runs-tbl-wrap">
       <table class="runs-tbl">
-        <thead><tr>
+        <thead>
+          <tr>
           <th style="width:32px;"><input type="checkbox" id="rdSelectPage" ${allPageSelected ? "checked" : ""} title="Select all on this page" /></th>
-          <th>Company</th><th>Run</th><th>Status</th>
+          <th>Company</th><th>Run</th><th>Status</th><th>Issues</th>
           <th>Entry #</th><th class="r">Lines</th>
           <th class="r">Duty Filed</th><th class="r">Matched</th>
-          <th>Created</th><th></th>
-        </tr></thead>
+          <th>Review</th><th>Created</th><th></th>
+        </tr>
+        ${filtCount > 0 ? `<tr class="thead-totals">
+          <td colspan="6">Totals (${filtCount} run${filtCount !== 1 ? "s" : ""}${totalPages > 1 ? ", filtered" : ""})</td>
+          <td class="r">${filtLines > 0 ? filtLines.toLocaleString() : "—"}</td>
+          <td class="r">${filtDuty > 0 ? fmtUSD(filtDuty) : "—"}</td>
+          <td colspan="4"></td>
+        </tr>` : ""}
+        </thead>
         <tbody>${rowsHtml}</tbody>
       </table>
     </div>`;
@@ -5571,16 +6161,29 @@ function buildAuditRunsPanelBody(pageRows, totalPages, allPageSelected, statusBa
 
 function wireAuditRunsPanel(container, pageRows, totalPages, refreshFn) {
   if (!container) return;
-  container.querySelectorAll("tr[data-rd-id]").forEach(tr => {
-    tr.addEventListener("click", () => loadRunById(tr.dataset.rdId));
+  container.querySelectorAll(".run-link").forEach(el => {
+    el.addEventListener("click", e => {
+      e.stopPropagation();
+      const tr = el.closest("tr[data-rd-id]");
+      if (tr) loadRunById(tr.dataset.rdId);
+    });
   });
   container.querySelectorAll("td.tog").forEach(td => {
-    td.addEventListener("click", e => {
+    td.addEventListener("click", async e => {
       e.stopPropagation();
       const tr = td.closest("tr[data-rd-id]");
       if (!tr) return;
-      _rdSelectedId = (_rdSelectedId === tr.dataset.rdId) ? null : tr.dataset.rdId;
+      const id = tr.dataset.rdId;
+      const wasSel = _rdSelectedId === id;
+      _rdSelectedId = wasSel ? null : id;
       refreshFn();
+      if (!wasSel && _rdSelectedId === id) {
+        const r = pageRows.find(x => x.id === id) || loadRunsFromStorage().find(x => x.id === id);
+        if (r) {
+          await ensureFindingsDigest(r);
+          refreshFn();
+        }
+      }
     });
   });
   container.querySelectorAll(".rd-run-check").forEach(cb => {
@@ -5639,6 +6242,52 @@ function wireAuditRunsPanel(container, pageRows, totalPages, refreshFn) {
     });
     rfEl.addEventListener("click", e => e.stopPropagation());
   }
+  const rrEl = container.querySelector("#rdReviewFilter");
+  if (rrEl) {
+    rrEl.addEventListener("change", e => {
+      _rdReviewFilter = e.target.value;
+      _rdSelectedId = null;
+      _rdPage = 0;
+      refreshFn();
+    });
+    rrEl.addEventListener("click", e => e.stopPropagation());
+  }
+  container.querySelectorAll(".rd-review-save").forEach(btn => {
+    btn.addEventListener("click", async e => {
+      e.stopPropagation();
+      const id = btn.dataset.rdId;
+      const panel = btn.closest(".rdp");
+      const status = panel?.querySelector(".rd-review-status")?.value || "pending";
+      const note = panel?.querySelector(".rd-review-note")?.value ?? "";
+      btn.disabled = true;
+      try {
+        await runStore.patchReview(id, { status, note });
+        toast("Review status saved.", "success");
+        refreshFn();
+      } catch (err) {
+        toast("Could not save review: " + err.message, "error");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+  container.querySelectorAll(".rd-refresh-issues").forEach(btn => {
+    btn.addEventListener("click", async e => {
+      e.stopPropagation();
+      const id = btn.dataset.rdId;
+      const r = loadRunsFromStorage().find(x => x.id === id);
+      if (!r) return;
+      _findingsDigestCache.delete(id);
+      r.findingsDigest = null;
+      btn.disabled = true;
+      try {
+        await ensureFindingsDigest(r);
+        refreshFn();
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
   container.querySelectorAll(".rdp-load-btn").forEach(b => {
     b.addEventListener("click", e => { e.stopPropagation(); loadRunById(b.dataset.rdId); });
   });
@@ -5689,14 +6338,83 @@ function _logActivity(type, snap) {
   }
 }
 
+function reviewStatusOptions(selected) {
+  const sel = selected || "pending";
+  return Object.keys(REVIEW_STATUSES).map(k => {
+    const label = REVIEW_STATUSES[k].label;
+    return `<option value="${k}"${k === sel ? " selected" : ""}>${escapeHtml(label)}</option>`;
+  }).join("");
+}
+
+function getActiveRunListRow() {
+  if (!state.activeRunId) return null;
+  return loadRunsFromStorage().find(r => r.id === state.activeRunId) || null;
+}
+
+function syncAuditReviewBar() {
+  const bar = document.getElementById("auditReviewBar");
+  if (!bar) return;
+  const hasAudit = !!(state.cmp && state.cmp.length);
+  if (!hasAudit) {
+    bar.style.display = "none";
+    return;
+  }
+  bar.style.display = "";
+  const row = getActiveRunListRow();
+  const unsaved = !state.activeRunId;
+  const hint = document.getElementById("auditReviewHint");
+  const statusEl = document.getElementById("auditReviewStatus");
+  const noteEl = document.getElementById("auditReviewNote");
+  const metaEl = document.getElementById("auditReviewMeta");
+  const badgeEl = document.getElementById("auditReviewBadge");
+  const saveBtn = document.getElementById("auditReviewSaveBtn");
+
+  if (hint) hint.style.display = unsaved ? "" : "none";
+  if (statusEl) {
+    statusEl.innerHTML = reviewStatusOptions(row?.reviewStatus || "pending");
+    statusEl.disabled = unsaved;
+  }
+  if (noteEl) {
+    noteEl.value = row?.reviewNote || "";
+    noteEl.disabled = unsaved;
+  }
+  if (saveBtn) saveBtn.disabled = unsaved;
+  if (badgeEl) badgeEl.innerHTML = unsaved ? "" : reviewStatusBadge(row?.reviewStatus);
+  if (metaEl) {
+    metaEl.textContent = unsaved
+      ? "Save this run to record who reviewed it and track follow-up status."
+      : row?.reviewedBy
+        ? `Last updated by ${row.reviewedBy} · ${row.reviewedAt ? new Date(row.reviewedAt).toLocaleString() : ""}`
+        : "No review sign-off recorded yet.";
+  }
+}
+
+async function saveAuditReviewFromAudit() {
+  if (!state.activeRunId) {
+    toast("Save this run first before recording review sign-off.", "error");
+    return;
+  }
+  const status = document.getElementById("auditReviewStatus")?.value || "pending";
+  const note = document.getElementById("auditReviewNote")?.value ?? "";
+  const btn = document.getElementById("auditReviewSaveBtn");
+  if (btn) btn.disabled = true;
+  try {
+    await runStore.patchReview(state.activeRunId, { status, note });
+    toast("Review status saved.", "success");
+    syncAuditReviewBar();
+    scheduleRenderRuns();
+    if (_activeView === "dashboard") renderDashboard();
+  } catch (e) {
+    toast("Could not save review: " + e.message, "error");
+  } finally {
+    syncAuditReviewBar();
+  }
+}
+
 function rdDetailPanel(r) {
-  const ctx = r.state?.ctx || {};
+  const ctx = runCtxFromRun(r);
   const aggLines = r.state?.agg?.length || ctx.aggLines || 0;
-  const mfn    = ctx.filedMFN    || 0;
-  const ch99   = ctx.filedCH99   || 0;
-  const mpf    = ctx.filedMPF    || 0;
-  const cotton = ctx.filedCotton || 0;
-  const duty   = mfn + ch99 + mpf + cotton;
+  const { mfn, ch99, mpf, cotton, total: duty } = dutyFromCtx(ctx);
   const rc = r.findingsCritical ?? 0;
   const rh = r.findingsHigh     ?? 0;
   const rf = r.findingsCount    ?? 0;
@@ -5706,9 +6424,12 @@ function rdDetailPanel(r) {
   const sevHtml = rf === 0
     ? `<span class="sev-clean">✓ Clean</span>`
     : `${rc > 0 ? `<span class="sev-crit">${rc} crit</span> ` : ""}${rh > 0 ? `<span class="sev-high">${rh} high</span>` : ""}`;
+  const reviewMeta = r.reviewedBy
+    ? `Last updated by ${escapeHtml(r.reviewedBy)} · ${r.reviewedAt ? new Date(r.reviewedAt).toLocaleString() : ""}`
+    : "No review sign-off recorded yet.";
 
   return `<tr>
-    <td colspan="10" style="padding:0;border-bottom:2px solid var(--primary-100);">
+    <td colspan="12" style="padding:0;border-bottom:2px solid var(--primary-100);">
       <div class="rdp">
         <div class="rdp-hd">
           <div>
@@ -5721,9 +6442,28 @@ function rdDetailPanel(r) {
           <div class="rdp-mc"><div class="rdp-mk">Entry #</div><div class="rdp-mv">${escapeHtml(String(ctx.entryNum || "—"))}</div></div>
           <div class="rdp-mc"><div class="rdp-mk">Invoice</div><div class="rdp-mv">${escapeHtml(String(ctx.invoice || "—"))}</div></div>
           <div class="rdp-mc"><div class="rdp-mk">Importer</div><div class="rdp-mv" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(displayImporter(ctx))}${ctx.importerEin ? `<div style="font-size:11px;color:var(--gray-500);font-weight:400;">EIN ${escapeHtml(formatImporterEin(ctx.importerEin))}</div>` : ""}</div></div>
-          <div class="rdp-mc"><div class="rdp-mk">Freight / Insurance</div><div class="rdp-mv">${fmtUSD(r.inputs?.freight ?? 0)} / ${fmtUSD(r.inputs?.insurance ?? 0)}${((r.inputs?.freight ?? 0) === 0 && (r.inputs?.insurance ?? 0) === 0) ? ' <span style="color:var(--marigold-700);">(both $0)</span>' : ""}</div></div>
-          <div class="rdp-mc"><div class="rdp-mk">Lines (Agg)</div><div class="rdp-mv">${aggLines.toLocaleString()}</div></div>
+          <div class="rdp-mc"><div class="rdp-mk">Entered (7501)</div><div class="rdp-mv">${fmtUSD(ctx.enteredFiled || ctx.enteredAgg || 0)}</div></div>
+          <div class="rdp-mc"><div class="rdp-mk">Total Duty</div><div class="rdp-mv" style="font-weight:700;color:var(--green-700);">${fmtUSD(duty)}</div></div>
           <div class="rdp-mc"><div class="rdp-mk">Findings</div><div class="rdp-mv">${sevHtml}</div></div>
+          <div class="rdp-mc"><div class="rdp-mk">Review</div><div class="rdp-mv">${reviewStatusBadge(r.reviewStatus)}</div></div>
+        </div>
+        <div class="rdp-review">
+          <div class="rdp-review-hd">Reviewer sign-off</div>
+          <div class="rdp-review-row">
+            <select class="rd-review-status" data-rd-id="${escapeHtml(r.id)}" style="min-width:180px;padding:8px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);">
+              ${reviewStatusOptions(r.reviewStatus)}
+            </select>
+            <textarea class="rd-review-note" data-rd-id="${escapeHtml(r.id)}" placeholder="Optional note (broker ticket #, data fix needed, etc.)">${escapeHtml(r.reviewNote || "")}</textarea>
+            <button type="button" class="btn btn-primary btn-sm rd-review-save" data-rd-id="${escapeHtml(r.id)}">Save review</button>
+          </div>
+          <div class="rdp-review-meta">${reviewMeta}</div>
+        </div>
+        <div class="rdp-issues">
+          <div class="rdp-issues-hd">
+            <span>Issues (${rf})</span>
+            <button type="button" class="btn btn-ghost btn-sm rd-refresh-issues" data-rd-id="${escapeHtml(r.id)}">Refresh list</button>
+          </div>
+          <div class="rdp-issues-body" data-rd-id="${escapeHtml(r.id)}">${renderDigestCards(r.findingsDigest)}</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
           <div style="background:var(--gray-100);border-radius:var(--radius-sm);padding:12px 14px;">
@@ -5746,7 +6486,7 @@ function rdDetailPanel(r) {
           </div>
         </div>
         <div class="rdp-acts">
-          <button class="btn btn-primary rdp-load-btn" data-rd-id="${escapeHtml(r.id)}">Load Audit</button>
+          <button class="btn btn-primary rdp-load-btn" data-rd-id="${escapeHtml(r.id)}">Open full audit</button>
           <button class="btn btn-secondary rdp-rename-btn" data-rd-id="${escapeHtml(r.id)}">Rename</button>
           <button class="btn btn-danger rdp-delete-btn" data-rd-id="${escapeHtml(r.id)}">Delete</button>
         </div>
@@ -5755,10 +6495,46 @@ function rdDetailPanel(r) {
   </tr>`;
 }
 
+function captureDashUiState() {
+  const overlay = document.getElementById("dashOverlay");
+  const active = document.activeElement;
+  const scrollEl = overlay?.classList.contains("open") ? overlay : null;
+  return {
+    scrollTop: scrollEl ? scrollEl.scrollTop : window.scrollY,
+    scrollEl,
+    focusId: active?.id || null,
+    selStart: typeof active?.selectionStart === "number" ? active.selectionStart : null,
+    selEnd: typeof active?.selectionEnd === "number" ? active.selectionEnd : null,
+  };
+}
+
+function restoreDashUiState(saved) {
+  if (!saved) return;
+  requestAnimationFrame(() => {
+    if (saved.scrollEl) saved.scrollEl.scrollTop = saved.scrollTop;
+    else window.scrollTo(0, saved.scrollTop);
+    if (saved.focusId) {
+      const el = document.getElementById(saved.focusId);
+      if (el) {
+        try { el.focus({ preventScroll: true }); } catch { el.focus(); }
+        if (saved.selStart != null && typeof el.setSelectionRange === "function") {
+          el.setSelectionRange(saved.selStart, saved.selEnd ?? saved.selStart);
+        }
+      }
+    }
+  });
+}
+
 // ── renderDashboard — full analytics view (opened from header button) ────────
 async function renderDashboard() {
+  const dashUiSnap = document.getElementById("dashOverlay")?.classList.contains("open")
+    ? captureDashUiState() : null;
   await refreshDashboardData();
-  const runs = loadRunsFromStorage();
+  let runs = loadRunsFromStorage();
+  if (runs.length === 0 && runStore.backend === "postgres" && (runStore.serverInfo?.run_count ?? 0) > 0) {
+    await runStore.refresh();
+    runs = loadRunsFromStorage();
+  }
   const pillDash = document.getElementById("pillDash");
   if (pillDash) pillDash.textContent = runs.length;
 
@@ -5772,6 +6548,7 @@ async function renderDashboard() {
         <h3>No saved runs yet</h3>
         <p>Run an audit and save it to see analytics here. Use <strong>Dashboard</strong> in the header to browse all saved runs.</p>
       </div>`;
+    restoreDashUiState(dashUiSnap);
     return;
   }
 
@@ -5779,12 +6556,13 @@ async function renderDashboard() {
   const sevenDaysAgo = Date.now() - 7 * 86400000;
 
   // Totals
-  let totalMFN = 0, totalCH99 = 0, totalMPF = 0, totalCotton = 0;
+  let totalMFN = 0, totalCH99 = 0, totalMPF = 0, totalCotton = 0, totalDutyAllAcc = 0;
   let totalEntered = 0, totalLinesAll = 0;
   let totalStrict = 0, totalLoose = 0, totalNoMatch = 0;
   let totalMidMismatch = 0, totalCh99Mismatch = 0;
   let totalFindings = 0, totalCrit = 0, totalHigh = 0;
   let critRunCount = 0, highOnlyCount = 0, cleanCount = 0;
+  let pendingReviewCount = 0, actionReviewCount = 0;
   const importerSet = new Set();
 
   // Per-importer stats
@@ -5796,13 +6574,14 @@ async function renderDashboard() {
 
   for (const r of runs) {
     const ctx = runCtxFromRun(r);
-    const mfn = ctx.filedMFN||0, ch99 = ctx.filedCH99||0,
-          mpf = ctx.filedMPF||0, cot = ctx.filedCotton||0;
+    const duty = dutyFromCtx(ctx);
+    const { mfn, ch99, mpf, cotton } = duty;
     totalMFN    += mfn;
     totalCH99   += ch99;
     totalMPF    += mpf;
-    totalCotton += cot;
-    totalEntered   += ctx.enteredFiled || 0;
+    totalCotton += cotton;
+    totalDutyAllAcc += duty.total;
+    totalEntered   += Number(ctx.enteredFiled || ctx.enteredAgg || 0);
     totalLinesAll  += (r.state?.agg?.length || ctx.aggLines || 0);
     totalStrict    += ctx.strictMatched   || 0;
     totalLoose     += ctx.looseMatched    || 0;
@@ -5821,7 +6600,11 @@ async function renderDashboard() {
     else if (rh > 0) highOnlyCount++;
     else cleanCount++;
 
-    // Importer map — group by EIN (CS Importer ID) when present, else normalised name
+    const rs = r.reviewStatus || "pending";
+    if (rs === "pending" || rs === "in_progress") pendingReviewCount++;
+    if (rs === "needs_deeper_review" || rs === "broker_contacted" || rs === "data_issue") actionReviewCount++;
+
+    // Importer map — group by normalized legal name; EIN shown when any run has it
     const impId = importerIdentityFromCtx(ctx);
     if (ctx.importer || impId.einDigits) importerSet.add(impId.groupKey);
     if (!importerMap.has(impId.groupKey)) {
@@ -5836,8 +6619,8 @@ async function renderDashboard() {
     if (!im.ein && impId.displayEin) im.ein = impId.displayEin;
     im.runs++;
     im.lines    += r.state?.agg?.length || ctx.aggLines || 0;
-    im.entered  += ctx.enteredFiled || 0;
-    im.duty     += mfn + ch99 + mpf + cot;
+    im.entered  += Number(ctx.enteredFiled || ctx.enteredAgg || 0);
+    im.duty     += dutyFromCtx(ctx).total;
     im.ch99     += ch99;
     im.crit     += rc;
     im.high     += rh;
@@ -5867,7 +6650,7 @@ async function renderDashboard() {
     }
   }
 
-  const totalDutyAll  = totalMFN + totalCH99 + totalMPF + totalCotton;
+  const totalDutyAll  = totalDutyAllAcc || (totalMFN + totalCH99 + totalMPF + totalCotton);
   const totalMatched  = totalStrict + totalLoose;
   const totalLines    = totalStrict + totalLoose + totalNoMatch || 1; // for pct
   const matchRate     = Math.round((totalMatched / totalLines) * 100);
@@ -5879,10 +6662,23 @@ async function renderDashboard() {
   const importerRows = [...importerMap.values()]
     .sort((a, b) => b.duty - a.duty);
 
-  // Top 8 COOs by duty
-  const cooRows = [...cooMap.entries()]
-    .sort((a, b) => b[1].duty - a[1].duty)
-    .slice(0, 8);
+  // Top 8 COOs by duty — prefer server portfolio rollup (summary runs have no filed[])
+  let cooRows;
+  if (_portfolioCooCache && _portfolioCooCache.length > 0) {
+    cooRows = _portfolioCooCache
+      .map(row => [row.coo, {
+        lines: Number(row.lines) || 0,
+        duty: Number(row.duty) || 0,
+        ch99: Number(row.ch99) || 0,
+        entered: Number(row.entered) || 0,
+      }])
+      .sort((a, b) => b[1].duty - a[1].duty)
+      .slice(0, 8);
+  } else {
+    cooRows = [...cooMap.entries()]
+      .sort((a, b) => b[1].duty - a[1].duty)
+      .slice(0, 8);
+  }
 
   // All MIDs — sort and search applied below before rendering
   const allMidRows = [...midMap.entries()]
@@ -5908,6 +6704,7 @@ async function renderDashboard() {
   if (_rdFilter === "high")   filtered = filtered.filter(r => (r.findingsCritical??0) === 0 && (r.findingsHigh??0) > 0);
   if (_rdFilter === "recent") filtered = filtered.filter(r => new Date(r.savedAt).getTime() > sevenDaysAgo);
   if (_rdFilter === "eu_cap") filtered = filtered.filter(runMatchesEuCapFilter);
+  if (_rdReviewFilter !== "all") filtered = filtered.filter(runMatchesReviewFilter);
   if (_rdSearch.trim()) {
     const q = _rdSearch.trim().toLowerCase();
     filtered = filtered.filter(r => {
@@ -5928,18 +6725,20 @@ async function renderDashboard() {
   const pageSelectedOnPage = pageRows.filter(r => _rdSelectedIds.has(r.id)).length;
   const allPageSelected = pageRows.length > 0 && pageSelectedOnPage === pageRows.length;
 
-  // ── Activity feed (full server log — not capped to run count) ───────
-  const feedItems = buildActivityFeedItems(runs);
-  let actFiltered = feedItems.filter(e => activityMatchesFilter(e, _rdActFilter));
-
-  function fmtRelTime(ts) {
-    const d = Date.now()-ts;
-    if (d<60000)   return "just now";
-    if (d<3600000) return `${Math.round(d/60000)}m ago`;
-    if (d<86400000)return `${Math.round(d/3600000)}h ago`;
-    return new Date(ts).toLocaleDateString();
+  let filtLines = 0, filtDuty = 0;
+  for (const r of filtered) {
+    const ctx = runCtxFromRun(r);
+    filtLines += r.state?.agg?.length || ctx.aggLines || 0;
+    filtDuty += runDutyTotal(ctx);
   }
-  function actLabel(e) { return formatActivityLabel(e); }
+  const filteredTotals = { count: filtered.length, lines: filtLines, duty: filtDuty };
+
+  const dashViewSub = document.querySelector("#dashOverlay .view-sub");
+  if (dashViewSub) {
+    dashViewSub.textContent = `${runs.length} run${runs.length !== 1 ? "s" : ""} · ${fmtUSD(totalDutyAll)} duty filed · ${fmtUSD(totalEntered)} entered`;
+  }
+
+  // ── Status badge helper ────────────────────────────────────────────
   function statusBadge(r) {
     const rc=r.findingsCritical??0, rh=r.findingsHigh??0;
     if (rc>0) return `<span class="badge badge-crit">Critical</span>`;
@@ -6038,6 +6837,16 @@ async function renderDashboard() {
         <div class="rd-sc-val amber">${euCapStats.runCount}</div>
         <div class="rd-sc-sub">${euCapStats.lineCount} line${euCapStats.lineCount !== 1 ? "s" : ""}${euCapStats.mismatchRuns ? ` · ${euCapStats.mismatchRuns} mismatch` : ""}</div>
       </div>
+      <div class="rd-status-card ${_rdReviewFilter==="pending"?"sel":""}" data-rd-review-filter="pending" title="Runs with no reviewer sign-off yet">
+        <div class="rd-sc-lbl">Pending Review</div>
+        <div class="rd-sc-val amber">${pendingReviewCount}</div>
+        <div class="rd-sc-sub">Not reviewed / in progress</div>
+      </div>
+      <div class="rd-status-card ${_rdReviewFilter==="action"?"sel-high":""}" data-rd-review-filter="action" title="Needs deeper review, broker contacted, or data issue">
+        <div class="rd-sc-lbl">Follow-up</div>
+        <div class="rd-sc-val red">${actionReviewCount}</div>
+        <div class="rd-sc-sub">Action required</div>
+      </div>
       <div class="rd-status-card" style="cursor:default;">
         <div class="rd-sc-lbl">Importers</div>
         <div class="rd-sc-val blue">${importerCount}</div>
@@ -6053,7 +6862,11 @@ async function renderDashboard() {
     </div>
 
     <!-- ── Analytics row ── -->
-    <div class="dash-sec"><span class="dash-sec-lbl">Analytics</span><div class="dash-sec-line"></div></div>
+    <div class="dash-sec">
+      <span class="dash-sec-lbl">Analytics</span>
+      <span class="dash-sec-meta">${fmtUSD(totalDutyAll)} duty · ${matchRate}% matched · ${totalFindings} finding${totalFindings !== 1 ? "s" : ""}</span>
+      <div class="dash-sec-line"></div>
+    </div>
     <div class="an-row">
 
       <!-- Duty Composition -->
@@ -6120,11 +6933,21 @@ async function renderDashboard() {
     </div>
 
     <!-- ── By Importer ── -->
-    ${importerRows.length > 0 ? `
-    <div class="dash-sec"><span class="dash-sec-lbl">By Importer</span><div class="dash-sec-line"></div></div>
+    ${importerRows.length > 0 ? (() => {
+      const impDutyTot = importerRows.reduce((s, x) => s + x.duty, 0);
+      const impEnteredTot = importerRows.reduce((s, x) => s + x.entered, 0);
+      const impLinesTot = importerRows.reduce((s, x) => s + x.lines, 0);
+      const impCh99Tot = importerRows.reduce((s, x) => s + x.ch99, 0);
+      return `
+    <div class="dash-sec">
+      <span class="dash-sec-lbl">By Importer</span>
+      <span class="dash-sec-meta">${importerRows.length} importer${importerRows.length !== 1 ? "s" : ""} · ${fmtUSD(impDutyTot)} duty · ${fmtUSD(impEnteredTot)} entered</span>
+      <div class="dash-sec-line"></div>
+    </div>
     <div class="imp-tbl-wrap">
       <table class="imp-tbl">
-        <thead><tr>
+        <thead>
+          <tr>
           <th>Importer</th>
           <th>EIN</th>
           <th class="r">Runs</th>
@@ -6135,7 +6958,19 @@ async function renderDashboard() {
           <th class="r">CH99 %</th>
           <th class="r">Findings</th>
           <th class="r">Status</th>
-        </tr></thead>
+        </tr>
+        <tr class="thead-totals">
+          <td colspan="2">Totals</td>
+          <td class="r">${importerRows.reduce((s, x) => s + x.runs, 0)}</td>
+          <td class="r">${impLinesTot.toLocaleString()}</td>
+          <td class="r">${fmtUSD(impEnteredTot)}</td>
+          <td class="r">${fmtUSD(impDutyTot)}</td>
+          <td class="r">${fmtUSD(impCh99Tot)}</td>
+          <td class="r">${impDutyTot > 0 ? Math.round((impCh99Tot / impDutyTot) * 100) : 0}%</td>
+          <td class="r">${importerRows.reduce((s, x) => s + x.findings, 0) || "—"}</td>
+          <td></td>
+        </tr>
+        </thead>
         <tbody>
           ${importerRows.map(s => {
             const ch99Pct = s.duty>0 ? Math.round((s.ch99/s.duty)*100) : 0;
@@ -6157,12 +6992,31 @@ async function renderDashboard() {
             </tr>`;
           }).join("")}
         </tbody>
+        <tfoot class="imp-totals"><tr>
+          <td colspan="2">Total</td>
+          <td class="r">${importerRows.reduce((s, x) => s + x.runs, 0)}</td>
+          <td class="r">${impLinesTot.toLocaleString()}</td>
+          <td class="r">${fmtUSD(impEnteredTot)}</td>
+          <td class="r">${fmtUSD(impDutyTot)}</td>
+          <td class="r">${fmtUSD(impCh99Tot)}</td>
+          <td class="r">${impDutyTot > 0 ? Math.round((impCh99Tot / impDutyTot) * 100) : 0}%</td>
+          <td class="r">${importerRows.reduce((s, x) => s + x.findings, 0) || "—"}</td>
+          <td></td>
+        </tr></tfoot>
       </table>
-    </div>` : ""}
+    </div>`;
+    })() : ""}
 
     <!-- ── By Country of Origin ── -->
-    ${cooRows.length > 0 ? `
-    <div class="dash-sec"><span class="dash-sec-lbl">By Country of Origin</span><div class="dash-sec-line"></div></div>
+    ${cooRows.length > 0 ? (() => {
+      const cooDutyTot = cooRows.reduce((s, [, x]) => s + x.duty, 0);
+      const cooCh99Tot = cooRows.reduce((s, [, x]) => s + x.ch99, 0);
+      return `
+    <div class="dash-sec">
+      <span class="dash-sec-lbl">By Country of Origin</span>
+      <span class="dash-sec-meta">Top ${cooRows.length} · ${fmtUSD(cooDutyTot)} duty · ${fmtUSD(cooCh99Tot)} CH99</span>
+      <div class="dash-sec-line"></div>
+    </div>
     <div class="coo-grid">
       ${cooRows.map(([coo, s]) => {
         const ch99Pct = s.duty>0 ? Math.round((s.ch99/s.duty)*100) : 0;
@@ -6174,7 +7028,8 @@ async function renderDashboard() {
           ${ch99Pct>0?`<div class="coo-row"><span>CH99 %</span><span class="coo-val" style="${ch99Pct>20?"color:var(--red-700)":""}">${ch99Pct}%</span></div>`:""}
         </div>`;
       }).join("")}
-    </div>` : ""}
+    </div>`;
+    })() : ""}
 
     <!-- ── By Manufacturer (MID) ── -->
     ${allMidRows.length > 0 ? (() => {
@@ -6231,69 +7086,46 @@ async function renderDashboard() {
       <div class="imp-tbl-wrap dash-panel-scroll" style="max-height:480px;"><table class="data" id="dashHtsCrossTable"></table></div>`
     )}
 
-    <!-- ── Runs + Activity ── -->
-    <div class="dash-sec dash-sec-runs-act" style="margin-top:20px;"><span class="dash-sec-lbl">Runs &amp; Activity</span><div class="dash-sec-line"></div></div>
-    <div class="dash-panels-row">
-
-      ${renderDashPanel(
-        "activity",
-        "Recent Activity",
-        runStore.backend === "postgres"
-          ? `All recorded actions from the database (${feedItems.length} total)`
-          : "Saves, loads, renames, and deletes in this session",
-        `<span class="dash-panel-badge">${actFiltered.length}</span>`,
-        `
-        <div class="dash-panel-toolbar">
-          <select id="rdActFilter" class="rd-act-ctrl">
-            <option value="all"     ${_rdActFilter==="all"    ?"selected":""}>All types</option>
-            <option value="saved"   ${_rdActFilter==="saved"  ?"selected":""}>Saved</option>
-            <option value="loaded"  ${_rdActFilter==="loaded" ?"selected":""}>Loaded</option>
-            <option value="deleted" ${_rdActFilter==="deleted"?"selected":""}>Deleted</option>
-            <option value="renamed" ${_rdActFilter==="renamed"?"selected":""}>Renamed</option>
-          </select>
-        </div>
-        <div class="dash-panel-list">
-          <div class="rd-act-feed" style="padding:4px 12px;">
-            ${actFiltered.length===0
-              ? `<div class="dash-panel-empty">No activity yet.</div>`
-              : actFiltered.map(e=>`
-                <div class="rd-act-item">
-                  <div class="rd-act-dot ${e.sev||"info"}"></div>
-                  <div class="rd-act-body">
-                    <div class="rd-act-text">${actLabel(e)}</div>
-                    <div class="rd-act-time">${fmtRelTime(e.ts)}</div>
-                  </div>
-                </div>`).join("")}
-          </div>
-        </div>`
-      )}
-
-      ${renderDashPanel(
-        "runs",
-        "Audit Runs",
-        runsPanelSubtitle(filtered.length, runs.length, _rdPage, totalPages),
-        `<span class="dash-panel-badge">${runs.length}</span>`,
-        buildAuditRunsPanelBody(pageRows, totalPages, allPageSelected, statusBadge, {
-          euCapByRun: euCapStats.byRun,
-          euCapRunCount: euCapStats.runCount,
-          panelHint: euCapPanelHint(euCapStats, filtered.length),
-        })
-      )}
-
+    <!-- ── Audit Runs ── -->
+    <div class="dash-sec dash-sec-runs-act" style="margin-top:20px;">
+      <span class="dash-sec-lbl">Audit Runs</span>
+      <span class="dash-sec-meta">${filtered.length} shown · ${fmtUSD(filtDuty)} duty · ${filtLines.toLocaleString()} lines</span>
+      <div class="dash-sec-line"></div>
     </div>
+
+    ${renderDashPanel(
+      "runs",
+      "Audit Runs",
+      runsPanelSubtitle(filtered.length, runs.length, _rdPage, totalPages),
+      `<span class="dash-panel-badge">${runs.length}</span>`,
+      buildAuditRunsPanelBody(pageRows, totalPages, allPageSelected, statusBadge, {
+        euCapByRun: euCapStats.byRun,
+        euCapRunCount: euCapStats.runCount,
+        panelHint: euCapPanelHint(euCapStats, filtered.length),
+        filteredTotals,
+      })
+    )}
   </div>`;
 
   // ── Wire all events ────────────────────────────────────────────────
   dashList.querySelectorAll("[data-rd-filter]").forEach(el => {
     el.addEventListener("click", e => { e.stopPropagation(); _rdFilter=el.dataset.rdFilter; _rdSelectedId=null; _rdPage=0; renderDashboard(); });
   });
+  dashList.querySelectorAll("[data-rd-review-filter]").forEach(el => {
+    el.addEventListener("click", e => {
+      e.stopPropagation();
+      const f = el.dataset.rdReviewFilter;
+      _rdReviewFilter = _rdReviewFilter === f ? "all" : f;
+      _rdSelectedId = null;
+      _rdPage = 0;
+      renderDashboard();
+    });
+  });
   dashList.querySelectorAll("[data-rd-load]").forEach(a => {
     a.addEventListener("click", e => { e.stopPropagation(); loadRunById(a.dataset.rdLoad); });
   });
   const runsPanel = dashList.querySelector('[data-dash-panel="runs"]');
   wireAuditRunsPanel(runsPanel, pageRows, totalPages, renderDashboard);
-  const afEl = dashList.querySelector("#rdActFilter");
-  if (afEl) { afEl.addEventListener("change",e=>{_rdActFilter=e.target.value;renderDashboard();}); afEl.addEventListener("click",e=>e.stopPropagation()); }
 
   // MID sort + search
   const midSearchEl = dashList.querySelector("#rdMidSearch");
@@ -6315,6 +7147,7 @@ async function renderDashboard() {
   // Cross-run HTS / MFN analytics — dashboard only
   renderMfnDbLayer({ tableId: "dashMfnTable", msgId: "dashMfnMsg", pillId: "dashMfnPill" });
   renderHtsCrossRunsLayer({ tableId: "dashHtsCrossTable", emptyId: "dashHtsCrossEmpty", pillId: "dashHtsCrossPill" });
+  restoreDashUiState(dashUiSnap);
 }
 
 
@@ -6370,14 +7203,14 @@ async function renderRuns(forceRefresh = false) {
           </div>
           <div style="font-size:13px;color:#4B5563;margin-bottom:10px;">
             <strong>Fix it once:</strong> start the local Flask + Postgres server.
-            <strong>Or:</strong> Export to JSON, clear storage, then re-import.
+            <strong>Or:</strong> open <strong>Reference</strong> → Export all, then Clear all, and re-import.
           </div>
           <div style="display:flex;gap:8px;">
             <button class="btn btn-secondary" id="storageBannerExportBtn" style="font-size:13px;">Export runs to JSON</button>
             <button class="btn btn-secondary" id="storageBannerClearBtn" style="font-size:13px;color:#B42B23;">Clear browser storage</button>
           </div>
         </div>`;
-      document.getElementById("storageBannerExportBtn")?.addEventListener("click", () => document.getElementById("exportRunsBtn")?.click());
+      document.getElementById("storageBannerExportBtn")?.addEventListener("click", () => exportAllRuns());
       document.getElementById("storageBannerClearBtn")?.addEventListener("click", clearAllRuns);
     } else {
       pressureBanner.style.display = "none";
@@ -6400,12 +7233,13 @@ async function renderRuns(forceRefresh = false) {
   const sevenDaysAgo = Date.now() - 7 * 86400000;
   let totalDutyAll = 0, totalCh99All = 0, totalLinesAll = 0;
   let critRunCount = 0, highOnlyCount = 0, cleanCount = 0;
+  let pendingReviewCount = 0, actionReviewCount = 0;
   const importerSet = new Set();
   for (const r of runs) {
     const ctx = runCtxFromRun(r);
-    const mfn = ctx.filedMFN || 0, ch99 = ctx.filedCH99 || 0, mpf = ctx.filedMPF || 0, cot = ctx.filedCotton || 0;
-    totalDutyAll  += mfn + ch99 + mpf + cot;
-    totalCh99All  += ch99;
+    const duty = dutyFromCtx(ctx);
+    totalDutyAll  += duty.total;
+    totalCh99All  += duty.ch99;
     totalLinesAll += (r.state?.agg?.length || ctx.aggLines || 0);
     const impId = importerIdentityFromCtx(ctx);
     if (ctx.importer || impId.einDigits) importerSet.add(impId.groupKey);
@@ -6413,6 +7247,9 @@ async function renderRuns(forceRefresh = false) {
     if (rc > 0) critRunCount++;
     else if (rh > 0) highOnlyCount++;
     else cleanCount++;
+    const rs = r.reviewStatus || "pending";
+    if (rs === "pending" || rs === "in_progress") pendingReviewCount++;
+    if (rs === "needs_deeper_review" || rs === "broker_contacted" || rs === "data_issue") actionReviewCount++;
   }
   const recentCount  = runs.filter(r => new Date(r.savedAt).getTime() > sevenDaysAgo).length;
   const importerCount = importerSet.size;
@@ -6425,6 +7262,7 @@ async function renderRuns(forceRefresh = false) {
   if (_rdFilter === "high")   filtered = filtered.filter(r => (r.findingsCritical ?? 0) === 0 && (r.findingsHigh ?? 0) > 0);
   if (_rdFilter === "recent") filtered = filtered.filter(r => new Date(r.savedAt).getTime() > sevenDaysAgo);
   if (_rdFilter === "eu_cap") filtered = filtered.filter(runMatchesEuCapFilter);
+  if (_rdReviewFilter !== "all") filtered = filtered.filter(runMatchesReviewFilter);
   if (_rdSearch.trim()) {
     const q = _rdSearch.trim().toLowerCase();
     filtered = filtered.filter(r => {
@@ -6445,19 +7283,13 @@ async function renderRuns(forceRefresh = false) {
   const pageSelectedOnPage = pageRows.filter(r => _rdSelectedIds.has(r.id)).length;
   const allPageSelected = pageRows.length > 0 && pageSelectedOnPage === pageRows.length;
 
-  // ── Activity feed (full server log — not capped to run count) ───────
-  const feedItems = buildActivityFeedItems(runs);
-  let actFiltered = feedItems.filter(e => activityMatchesFilter(e, _rdActFilter));
-
-  function fmtRelTime(ts) {
-    const diff = Date.now() - ts;
-    if (diff < 60000)   return "just now";
-    if (diff < 3600000) return `${Math.round(diff/60000)}m ago`;
-    if (diff < 86400000) return `${Math.round(diff/3600000)}h ago`;
-    return new Date(ts).toLocaleDateString();
+  let filtLines = 0, filtDuty = 0;
+  for (const r of filtered) {
+    const ctx = runCtxFromRun(r);
+    filtLines += r.state?.agg?.length || ctx.aggLines || 0;
+    filtDuty += runDutyTotal(ctx);
   }
-
-  function actLabel(e) { return formatActivityLabel(e); }
+  const filteredTotals = { count: filtered.length, lines: filtLines, duty: filtDuty };
 
   // Recent-3 queue for "My Queue" card
   const queueRuns = runs.slice(0, 4);
@@ -6528,6 +7360,16 @@ async function renderRuns(forceRefresh = false) {
         <div class="rd-sc-lbl">EU Cap Re-run</div>
         <div class="rd-sc-val amber">${euCapStats.runCount}</div>
         <div class="rd-sc-sub">${euCapStats.lineCount} line${euCapStats.lineCount !== 1 ? "s" : ""}${euCapStats.mismatchRuns ? ` · ${euCapStats.mismatchRuns} mismatch` : ""}</div>
+      </div>
+      <div class="rd-status-card ${_rdReviewFilter==="pending"?"sel":""}" data-rd-review-filter="pending" title="Runs with no reviewer sign-off yet">
+        <div class="rd-sc-lbl">Pending Review</div>
+        <div class="rd-sc-val amber">${pendingReviewCount}</div>
+        <div class="rd-sc-sub">Not reviewed / in progress</div>
+      </div>
+      <div class="rd-status-card ${_rdReviewFilter==="action"?"sel-high":""}" data-rd-review-filter="action" title="Needs deeper review, broker contacted, or data issue">
+        <div class="rd-sc-lbl">Follow-up</div>
+        <div class="rd-sc-val red">${actionReviewCount}</div>
+        <div class="rd-sc-sub">Action required</div>
       </div>
       <div class="rd-status-card" style="cursor:default;">
         <div class="rd-sc-lbl">Importers</div>
@@ -6670,56 +7512,18 @@ async function renderRuns(forceRefresh = false) {
       );
     })()}
 
-    <!-- ── Runs + Activity ── -->
-    <div class="dash-panels-row" style="margin-top:14px;">
-
-      ${renderDashPanel(
-        "activity",
-        "Recent Activity",
-        runStore.backend === "postgres"
-          ? `All recorded actions from the database (${feedItems.length} total)`
-          : "Saves, loads, renames, and deletes in this session",
-        `<span class="dash-panel-badge">${actFiltered.length}</span>`,
-        `
-        <div class="dash-panel-toolbar">
-          <input id="rdActSearch" class="rd-runs-search" placeholder="Search activity…" value="${escapeHtml(_rdSearch)}" />
-          <select id="rdActFilter" class="rd-act-ctrl">
-            <option value="all"     ${_rdActFilter === "all"     ? "selected" : ""}>All types</option>
-            <option value="saved"   ${_rdActFilter === "saved"   ? "selected" : ""}>Saved</option>
-            <option value="loaded"  ${_rdActFilter === "loaded"  ? "selected" : ""}>Loaded</option>
-            <option value="deleted" ${_rdActFilter === "deleted" ? "selected" : ""}>Deleted</option>
-            <option value="renamed" ${_rdActFilter === "renamed" ? "selected" : ""}>Renamed</option>
-          </select>
-        </div>
-        <div class="dash-panel-list">
-          <div class="rd-act-feed" style="padding:4px 12px;">
-            ${actFiltered.length === 0
-              ? `<div class="dash-panel-empty">No activity yet.</div>`
-              : actFiltered.map(e => `
-                <div class="rd-act-item">
-                  <div class="rd-act-dot ${e.sev || "info"}"></div>
-                  <div class="rd-act-body">
-                    <div class="rd-act-text">${actLabel(e)}</div>
-                    <div class="rd-act-time">${fmtRelTime(e.ts)}</div>
-                  </div>
-                </div>`).join("")}
-          </div>
-        </div>`
-      )}
-
-      ${renderDashPanel(
-        "runs",
-        "Audit Runs",
-        runsPanelSubtitle(filtered.length, runs.length, _rdPage, totalPages),
-        `<span class="dash-panel-badge">${runs.length}</span>`,
-        buildAuditRunsPanelBody(pageRows, totalPages, allPageSelected, statusBadge, {
-          euCapByRun: euCapStats.byRun,
-          euCapRunCount: euCapStats.runCount,
-          panelHint: euCapPanelHint(euCapStats, filtered.length),
-        })
-      )}
-
-    </div>
+    ${renderDashPanel(
+      "runs",
+      "Audit Runs",
+      runsPanelSubtitle(filtered.length, runs.length, _rdPage, totalPages),
+      `<span class="dash-panel-badge">${runs.length}</span>`,
+      buildAuditRunsPanelBody(pageRows, totalPages, allPageSelected, statusBadge, {
+        euCapByRun: euCapStats.byRun,
+        euCapRunCount: euCapStats.runCount,
+        panelHint: euCapPanelHint(euCapStats, filtered.length),
+        filteredTotals,
+      })
+    )}
   </div><!-- /runs-dash -->`;
 
   // ── Wire events ────────────────────────────────────────────────────
@@ -6733,6 +7537,16 @@ async function renderRuns(forceRefresh = false) {
       scheduleRenderRuns();
     });
   });
+  list.querySelectorAll("[data-rd-review-filter]").forEach(el => {
+    el.addEventListener("click", e => {
+      e.stopPropagation();
+      const f = el.dataset.rdReviewFilter;
+      _rdReviewFilter = _rdReviewFilter === f ? "all" : f;
+      _rdSelectedId = null;
+      _rdPage = 0;
+      scheduleRenderRuns();
+    });
+  });
 
   // Queue links (load a run)
   list.querySelectorAll("[data-rd-load]").forEach(a => {
@@ -6741,26 +7555,6 @@ async function renderRuns(forceRefresh = false) {
 
   const runsPanel = list.querySelector('[data-dash-panel="runs"]');
   wireAuditRunsPanel(runsPanel, pageRows, totalPages, () => scheduleRenderRuns());
-
-  // Activity type filter dropdown
-  const actFilterEl = list.querySelector("#rdActFilter");
-  if (actFilterEl) {
-    actFilterEl.addEventListener("change", e => {
-      _rdActFilter = e.target.value;
-      renderRuns();
-    });
-    actFilterEl.addEventListener("click", e => e.stopPropagation());
-  }
-
-  // Activity search (reuses _rdSearch for simplicity)
-  const actSearchEl = list.querySelector("#rdActSearch");
-  if (actSearchEl) {
-    actSearchEl.addEventListener("input", e => {
-      _rdSearch = e.target.value;
-      renderRuns();
-    });
-    actSearchEl.addEventListener("click", e => e.stopPropagation());
-  }
 
   wireDashPanels(list);
 }
@@ -6800,7 +7594,7 @@ function buildStackExportRows(respectFilters) {
       ? getMfnRateForEuCap(f.HTS, f.MFN_RATE_PCT)
       : getMfnRate(f.HTS, f.MFN_RATE_PCT);
     const exp = expectedChapter99(f.COO, f.HTS, mfn, dateRules);
-    const byCat = { "Reciprocal": [], "Reciprocal-EU": [], "IEEPA-Universal": [], "IEEPA-China": [], "Section-301": [] };
+    const byCat = { "Reciprocal": [], "Reciprocal-EU": [], "IEEPA-Universal": [], "IEEPA-China": [], "Section-301": [], "Section-122": [] };
     let totalExpCh99 = 0;
     for (const e of exp) {
       const amt = ev * (e.rate_pct || 0) / 100;
@@ -7295,7 +8089,34 @@ document.getElementById("saveRunBtn").addEventListener("click", () => {
   saveCurrentRun(customName || null);
   document.getElementById("runNameInput").value = "";
 });
+document.getElementById("auditReviewSaveBtn")?.addEventListener("click", () => saveAuditReviewFromAudit());
 document.getElementById("clearRunsBtn").addEventListener("click", clearAllRuns);
+
+async function exportAllRuns() {
+  const runs = loadRunsFromStorage();
+  if (runs.length === 0) { toast("No runs to export.", "error"); return; }
+  toast("Preparing export…", "info");
+  const full = [];
+  for (const r of runs) {
+    if (isSummaryRun(r)) {
+      try { full.push(await runStore.fetchRun(r.id)); }
+      catch (err) { console.warn("export skip", r.id, err); }
+    } else {
+      full.push(r);
+    }
+  }
+  const blob = new Blob([JSON.stringify(full, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `inditex_audit_runs_${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  trackActivity("export_runs", { count: full.length }, "run");
+  toast(`Exported ${full.length} run${full.length === 1 ? "" : "s"}.`, "success");
+}
+
+document.getElementById("exportRunsBtn").addEventListener("click", () => exportAllRuns());
 document.getElementById("rerunAuditBtn")?.addEventListener("click", () => rerunLoadedAudit());
 document.getElementById("rerunTxtFile")?.addEventListener("change", async e => {
   const files = [...(e.target.files || [])];
@@ -7323,29 +8144,6 @@ document.addEventListener("click", e => {
   const btn = e.target.closest("[data-csv-export]");
   if (!btn || btn.disabled) return;
   exportAuditCsvSection(btn.dataset.csvExport);
-});
-document.getElementById("exportRunsBtn").addEventListener("click", async () => {
-  const runs = loadRunsFromStorage();
-  if (runs.length === 0) { toast("No runs to export.", "error"); return; }
-  toast("Preparing export…", "info");
-  const full = [];
-  for (const r of runs) {
-    if (isSummaryRun(r)) {
-      try { full.push(await runStore.fetchRun(r.id)); }
-      catch (err) { console.warn("export skip", r.id, err); }
-    } else {
-      full.push(r);
-    }
-  }
-  const blob = new Blob([JSON.stringify(full, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `inditex_audit_runs_${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  trackActivity("export_runs", { count: full.length }, "run");
-  toast(`Exported ${full.length} run${full.length === 1 ? "" : "s"}.`, "success");
 });
 document.getElementById("importRunsBtn").addEventListener("click", () => {
   document.getElementById("importRunsFile").click();
@@ -7386,7 +8184,7 @@ document.getElementById("importRunsFile").addEventListener("change", async (e) =
       saveRunsToStorage(merged);
     }
 
-    renderRuns();
+    refreshRunsViewsAfterBulkChange();
     trackActivity("import_runs", { count: toAdd.length, skipped: incoming.length - toAdd.length }, "run");
     toast(`Imported ${toAdd.length} new run${toAdd.length === 1 ? "" : "s"}${incoming.length - toAdd.length > 0 ? ` (${incoming.length - toAdd.length} skipped as duplicates)` : ""}.`, "success");
   } catch (err) {
@@ -7437,14 +8235,21 @@ async function probeServerBuild() {
   showAppBuildBanner();
   auth.init();
   probeServerBuild();
-  if (!auth.token) return;   // show login overlay, wait for user to sign in
-  trackActivity("session_start", { source: "page_load" }, "session");
-  await runStore.init();
-  await loadReferenceFromServer();
-  renderStorageBanner();
-  renderRuns();
-  renderHtsVerification();
+  if (!auth.token) return;
+  try {
+    await runStore.init();
+  } catch (e) {
+    console.error("Bootstrap runStore.init failed:", e);
+  }
+  await goHomeDashboard();
   _syncDashPill();
+  loadReferenceFromServer()
+    .then(() => {
+      renderStorageBanner();
+      renderHtsVerification();
+      trackActivity("session_start", { source: "page_load" }, "session");
+    })
+    .catch(e => console.warn("Bootstrap reference load failed:", e.message));
 })();
 
 function syncRerunPanel() {
@@ -7847,13 +8652,15 @@ function render(options = {}) {
   const htsBase = Number(document.getElementById("htsCountBaseline")?.textContent || 0);
   document.getElementById("pillHts").textContent = htsIntra + htsBase;
   syncRerunPanel();
+  syncAuditReviewBar();
 }
 
 function renderKpis() {
   const c = state.ctx;
-  const filedDuty = c.filedMFN + c.filedCH99;            // Block 37 on the 7501
-  const filedFees = c.filedMPF + c.filedCotton;          // Block 39 (MPF + Cotton)
-  const totalDutyFees = filedDuty + filedFees;
+  const duty = dutyFromCtx(c);
+  const filedDuty = roundUSD(duty.mfn + duty.ch99);
+  const filedFees = roundUSD(duty.mpf + duty.cotton);
+  const totalDutyFees = roundUSD(filedDuty + filedFees);
 
   // Applicable-date label for Ch99 rule selection
   const dateLabel = c.applicableDate
@@ -7876,9 +8683,9 @@ function renderKpis() {
     { label: "Entered value (filed)", value: fmtUSD(c.enteredFiled),
       sub: `Δ ${fmtUSD(c.enteredAgg - c.enteredFiled)}` },
     { label: "Filed duty (Block 37)", value: fmtUSD(filedDuty),
-      sub: `MFN ${fmtUSD(c.filedMFN)} + CH99 ${fmtUSD(c.filedCH99)}` },
+      sub: `MFN ${fmtUSD(duty.mfn)} + CH99 ${fmtUSD(duty.ch99)}` },
     { label: "Fees (Block 39)", value: fmtUSD(filedFees),
-      sub: `MPF ${fmtUSD(c.filedMPF)} + Cotton ${fmtUSD(c.filedCotton)} · Grand total ${fmtUSD(totalDutyFees)}` },
+      sub: `MPF ${fmtUSD(duty.mpf)} + Cotton ${fmtUSD(duty.cotton)} · Grand total ${fmtUSD(totalDutyFees)}` },
     { label: "Ch99 rules as of", value: dateLabel,
       sub: `${dateSourceLabel} · ${c.effectiveRulesCount || 0} of ${c.totalRulesCount || 0} rules in effect`,
       kind: dateKind },
@@ -7983,7 +8790,7 @@ function renderStack() {
       : state.rules;
     const exp = expectedChapter99(f.COO, f.HTS, mfn, dateRules);
     // Group expected by category
-    const byCat = { "Reciprocal": [], "Reciprocal-EU": [], "IEEPA-Universal": [], "IEEPA-China": [], "Section-301": [] };
+    const byCat = { "Reciprocal": [], "Reciprocal-EU": [], "IEEPA-Universal": [], "IEEPA-China": [], "Section-301": [], "Section-122": [] };
     let totalExpCh99 = 0;
     for (const e of exp) {
       const amt = ev * (e.rate_pct||0)/100;
@@ -8044,30 +8851,48 @@ function renderStack() {
 
   const diffClass = (d) => Math.abs(d) < 1 ? "badge-success" : Math.abs(d) < 5 ? "badge-warn" : "badge-danger";
 
+  const sumEntered = sorted.reduce((s, r) => s + (r.ENTERED_VALUE || 0), 0);
+  const sumMfnAmt = sorted.reduce((s, r) => s + (r.MFN_AMT || 0), 0);
+  const sumExpCh99 = sorted.reduce((s, r) => s + (r.totalExpCh99 || 0), 0);
+  const sumFiledCh99 = sorted.reduce((s, r) => s + (r.filedCh99 || 0), 0);
+  const sumDiff = roundUSD(sumExpCh99 - sumFiledCh99);
+  const sumCatAmt = (cat) => sorted.reduce((s, r) => {
+    const layers = cat === "Reciprocal"
+      ? [...(r.byCat["Reciprocal"] || []), ...(r.byCat["Reciprocal-EU"] || [])]
+      : (r.byCat[cat] || []);
+    return s + layers.reduce((t, l) => t + (Number(l.amt) || 0), 0);
+  }, 0);
+  const catHdr = (cat, label) => {
+    const amt = sumCatAmt(cat);
+    return `${label}<span class="th-total-sub">${amt > 0 ? fmtUSD(amt) : "—"}</span>`;
+  };
+
   document.getElementById("stackTable").innerHTML = `
     <thead>
       <tr>
         <th data-k="ITEM" rowspan="2">Item ${sortIndicator("stackTable","ITEM")}</th>
         <th data-k="COO" rowspan="2">COO ${sortIndicator("stackTable","COO")}</th>
         <th data-k="HTS" rowspan="2">HTS ${sortIndicator("stackTable","HTS")}</th>
-        <th data-k="ENTERED_VALUE" rowspan="2" class="num">Entered $ ${sortIndicator("stackTable","ENTERED_VALUE")}</th>
+        <th data-k="ENTERED_VALUE" rowspan="2" class="num">Entered $<span class="th-total-sub">${fmtUSD(sumEntered)}</span> ${sortIndicator("stackTable","ENTERED_VALUE")}</th>
         <th data-k="MFN_RATE" rowspan="2" class="num">MFN ${sortIndicator("stackTable","MFN_RATE")}</th>
-        <th data-k="MFN_AMT" rowspan="2" class="num">MFN duty ${sortIndicator("stackTable","MFN_AMT")}</th>
+        <th data-k="MFN_AMT" rowspan="2" class="num">MFN duty<span class="th-total-sub">${fmtUSD(sumMfnAmt)}</span> ${sortIndicator("stackTable","MFN_AMT")}</th>
         <th class="col-cat-Reciprocal" colspan="1">Reciprocal</th>
+        <th class="col-cat-Section-122" colspan="1">Sec 122</th>
         <th class="col-cat-IEEPA-Universal" colspan="1">IEEPA Universal</th>
         <th class="col-cat-IEEPA-China" colspan="1">IEEPA CN/HK</th>
         <th class="col-cat-Section-301" colspan="1">Sec 301</th>
         <th class="col-cat-Section-232" colspan="1">Sec 232</th>
         <th class="col-cat-232-Exclusion" colspan="1">232 Excl</th>
-        <th data-k="totalExpCh99" rowspan="2" class="num col-total">Total Ch99 (exp) ${sortIndicator("stackTable","totalExpCh99")}</th>
-        <th data-k="filedCh99" rowspan="2" class="num col-total">Filed Ch99 ${sortIndicator("stackTable","filedCh99")}</th>
-        <th data-k="diff" rowspan="2" class="num">Δ vs Filed ${sortIndicator("stackTable","diff")}</th>
+        <th data-k="totalExpCh99" rowspan="2" class="num col-total">Total Ch99 (exp)<span class="th-total-sub">${fmtUSD(sumExpCh99)}</span> ${sortIndicator("stackTable","totalExpCh99")}</th>
+        <th data-k="filedCh99" rowspan="2" class="num col-total">Filed Ch99<span class="th-total-sub">${fmtUSD(sumFiledCh99)}</span> ${sortIndicator("stackTable","filedCh99")}</th>
+        <th data-k="diff" rowspan="2" class="num">Δ vs Filed<span class="th-total-sub">${sumDiff >= 0 ? "+" : ""}${fmtUSD(sumDiff)}</span> ${sortIndicator("stackTable","diff")}</th>
       </tr>
       <tr>
-        <th class="col-cat-Reciprocal" style="font-size:9px;font-weight:400;">Code · rate · $</th>
-        <th class="col-cat-IEEPA-Universal" style="font-size:9px;font-weight:400;">Code · rate · $</th>
-        <th class="col-cat-IEEPA-China" style="font-size:9px;font-weight:400;">Code · rate · $</th>
-        <th class="col-cat-Section-301" style="font-size:9px;font-weight:400;">Code · rate · $</th>
+        <th class="col-cat-Reciprocal" style="font-size:9px;font-weight:400;">${catHdr("Reciprocal", "Code · rate · $")}</th>
+        <th class="col-cat-Section-122" style="font-size:9px;font-weight:400;">${catHdr("Section-122", "Code · rate · $")}</th>
+        <th class="col-cat-IEEPA-Universal" style="font-size:9px;font-weight:400;">${catHdr("IEEPA-Universal", "Code · rate · $")}</th>
+        <th class="col-cat-IEEPA-China" style="font-size:9px;font-weight:400;">${catHdr("IEEPA-China", "Code · rate · $")}</th>
+        <th class="col-cat-Section-301" style="font-size:9px;font-weight:400;">${catHdr("Section-301", "Code · rate · $")}</th>
         <th class="col-cat-Section-232" style="font-size:9px;font-weight:400;">Filed 232</th>
         <th class="col-cat-232-Exclusion" style="font-size:9px;font-weight:400;">Filed excl</th>
       </tr>
@@ -8086,6 +8911,7 @@ function renderStack() {
           })()}</td>
           <td class="num">${fmtUSD(r.MFN_AMT)}</td>
           <td>${cellFor([...(r.byCat["Reciprocal"]||[]), ...(r.byCat["Reciprocal-EU"]||[])])}</td>
+          <td>${cellFor(r.byCat["Section-122"])}</td>
           <td>${cellFor(r.byCat["IEEPA-Universal"])}</td>
           <td>${cellFor(r.byCat["IEEPA-China"])}</td>
           <td>${cellFor(r.byCat["Section-301"])}</td>
@@ -8096,6 +8922,16 @@ function renderStack() {
           <td class="num">${r.has232Stack ? `<span class="badge badge-neutral">232 stack</span>` : `<span class="badge ${diffClass(r.diff)}">${r.diff >= 0 ? "+" : ""}${fmtUSD(r.diff)}</span>`}</td>
         </tr>`).join("")}
     </tbody>
+    <tfoot class="stack-totals"><tr>
+      <td colspan="3">Total (${sorted.length} line${sorted.length !== 1 ? "s" : ""})</td>
+      <td class="num">${fmtUSD(sumEntered)}</td>
+      <td></td>
+      <td class="num">${fmtUSD(sumMfnAmt)}</td>
+      <td colspan="7"></td>
+      <td class="num">${fmtUSD(sumExpCh99)}</td>
+      <td class="num">${fmtUSD(sumFiledCh99)}</td>
+      <td class="num">${sumDiff >= 0 ? "+" : ""}${fmtUSD(sumDiff)}</td>
+    </tr></tfoot>
   `;
   makeSortable("stackTable", renderStack);
   document.getElementById("stackCount").textContent = `${sorted.length} of ${stackRows.length}`;
