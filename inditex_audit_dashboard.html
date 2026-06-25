@@ -1961,6 +1961,16 @@ const ANNEX_I_EFFECTIVE_TO   = "2026-02-24";
 const ANNEX_I_AUTHORITY      = "EO 14326 (Jul 31, 2025)";
 const ANNEX_I_EFFECTIVE_STR  = "Aug 7, 2025 → Feb 24, 2026";
 
+// EU reciprocal (9903.02.19 / 9903.02.20) — EO 14326 / EO 14257 as amended, CBP CSMS #65829726,
+// replacement-duty filing per CSMS #65475725 / #65829726 / #66242844 (FRNs 90 FR 37963, 27851, 44638).
+// Col-1 ≥ 15% → 9903.02.19 (0% additional); Col-1 < 15% (incl. Free) → 9903.02.20 (+15% additive).
+// Rate-determination date per 19 U.S.C. 1315(a), 19 CFR 141.68 (release), 141.69(a) warehouse withdrawal,
+// 141.69(b) IT at port of original importation, 141.69(c) overcarried return.
+const EU_RECIPROCAL_START = ANNEX_I_EFFECTIVE_FROM;
+const EU_RECIPROCAL_IN_TRANSIT_ENTER_BY = "2025-10-05";
+const EU_RECIPROCAL_PRIOR_CODE = "9903.01.25";
+const EO14389_REVIEW_FROM = "2026-02-20";
+
 const SECTION_122_CODE = "9903.03.01";
 const SECTION_122_FROM = "2026-02-24";
 const SECTION_122_TO   = "2026-07-24";
@@ -2143,48 +2153,129 @@ const DEFAULT_CH99_RULES = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────
-// resolveApplicableDate — pick the date that governs which Ch99 rules apply.
-// CBP policy: tariff treatment is fixed at the date of entry. If the 7501
-// doesn't yet carry an entry date (entry not yet filed/released), fall back
-// to the import date (Block 11). Last resort: the audit run date.
-// All inputs may be ISO date strings, Excel-parsed Date objects, or null.
-// Returns: { date: ISO-string-yyyy-mm-dd, source: "entry"|"import"|"today" }
+// parseIsoDate — normalize 7501 date cells to ISO yyyy-mm-dd.
 // ─────────────────────────────────────────────────────────────────────────
-function resolveApplicableDate(entryDate, importDate) {
-  const toIso = (v) => {
-    if (v == null || v === "") return null;
-    // Excel serial number (e.g. 46039) — pandas/SheetJS produce these for date cells
-    // when read in raw mode. Excel epoch is 1899-12-30 (Excel's 1900-bug-aware origin).
-    if (typeof v === "number" && isFinite(v) && v > 1 && v < 1e6) {
-      const ms = (v - 25569) * 86400 * 1000;   // 25569 = days from Unix epoch to Excel epoch
+function parseIsoDate(v) {
+  if (v == null || v === "") return null;
+  if (typeof v === "number" && isFinite(v) && v > 1 && v < 1e6) {
+    const ms = (v - 25569) * 86400 * 1000;
+    const d = new Date(ms);
+    return isNaN(d) ? null : d.toISOString().slice(0, 10);
+  }
+  if (v instanceof Date) {
+    if (isNaN(v)) return null;
+    return v.toISOString().slice(0, 10);
+  }
+  const s = String(v).trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    const n = parseFloat(s);
+    if (n > 1 && n < 1e6) {
+      const ms = (n - 25569) * 86400 * 1000;
       const d = new Date(ms);
       return isNaN(d) ? null : d.toISOString().slice(0, 10);
     }
-    if (v instanceof Date) {
-      if (isNaN(v)) return null;
-      return v.toISOString().slice(0, 10);
+  }
+  const d = new Date(s);
+  return isNaN(d) ? null : d.toISOString().slice(0, 10);
+}
+
+function pick7501HeaderField(row0, candidates) {
+  if (!row0) return null;
+  for (const k of candidates) {
+    if (row0[k] != null && row0[k] !== "") return row0[k];
+  }
+  for (const cand of candidates) {
+    const needle = cand.replace(/^\d+\.\s*/, "").toLowerCase();
+    for (const k of Object.keys(row0)) {
+      if (k.toLowerCase().includes(needle) && row0[k] != null && row0[k] !== "") return row0[k];
     }
-    const s = String(v).trim();
-    if (!s) return null;
-    // Already ISO?
-    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-    // Pure number-as-string (Excel serial as string)
-    if (/^\d+(\.\d+)?$/.test(s)) {
-      const n = parseFloat(s);
-      if (n > 1 && n < 1e6) {
-        const ms = (n - 25569) * 86400 * 1000;
-        const d = new Date(ms);
-        return isNaN(d) ? null : d.toISOString().slice(0, 10);
-      }
-    }
-    const d = new Date(s);
-    return isNaN(d) ? null : d.toISOString().slice(0, 10);
+  }
+  return null;
+}
+
+function extractEntryDateFields(xl) {
+  const r0 = xl?.rows?.[0] || {};
+  return {
+    itDate: pick7501HeaderField(r0, ["17. CS IT Date"]),
+    warehouseWithdrawalDate: pick7501HeaderField(r0, ["3. CS Summary Date"]),
+    overcarriedOriginalEntryDate: pick7501HeaderField(r0, ["CS Overcarried Original Entry Date"]),
+    latestReleaseDate: pick7501HeaderField(r0, ["7. CS Entry Date"]),
+    entryDate: pick7501HeaderField(r0, ["7. CS Entry Date"]),
+    importDate: pick7501HeaderField(r0, ["11. CS Import Date"]),
+    exportDate: pick7501HeaderField(r0, ["15. CS Export Date"]),
+    entryType: pick7501HeaderField(r0, ["2. CS Entry Type"]),
   };
-  const e = toIso(entryDate);
-  if (e) return { date: e, source: "entry" };
-  const i = toIso(importDate);
-  if (i) return { date: i, source: "import" };
-  return { date: new Date().toISOString().slice(0, 10), source: "today" };
+}
+
+function isWarehouseWithdrawalEntry(entryType) {
+  const s = String(entryType || "").toLowerCase();
+  return /\b31\b/.test(s) || s.includes("warehouse withdrawal");
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// resolveRateDeterminationDate — legally operative rate date (19 CFR 141.68/141.69).
+// Priority: IT Date → warehouse withdrawal → overcarried original → Latest Release Date
+// → entry date fallback → import date fallback → today.
+// Returns: { date, source, missing[] }
+// ─────────────────────────────────────────────────────────────────────────
+function resolveRateDeterminationDate(fields) {
+  const f = fields || {};
+  const missing = [];
+
+  const it = parseIsoDate(f.itDate);
+  if (it) return { date: it, source: "it", missing };
+
+  if (isWarehouseWithdrawalEntry(f.entryType)) {
+    const wd = parseIsoDate(f.warehouseWithdrawalDate) || parseIsoDate(f.entryDate);
+    if (wd) return { date: wd, source: "warehouse_withdrawal", missing };
+    missing.push("warehouse_withdrawal_date");
+  }
+
+  const overcarried = parseIsoDate(f.overcarriedOriginalEntryDate);
+  if (overcarried) return { date: overcarried, source: "overcarried_original", missing };
+
+  const release = parseIsoDate(f.latestReleaseDate);
+  if (release) return { date: release, source: "release", missing };
+
+  const entry = parseIsoDate(f.entryDate);
+  if (entry) {
+    missing.push("latest_release_date");
+    return { date: entry, source: "entry_fallback", missing };
+  }
+  const imp = parseIsoDate(f.importDate);
+  if (imp) return { date: imp, source: "import_fallback", missing };
+  return { date: new Date().toISOString().slice(0, 10), source: "today", missing };
+}
+
+function isEuReciprocalInTransitGrandfathered(fields, rateDateIso) {
+  const exportDate = parseIsoDate(fields?.exportDate);
+  if (!exportDate || !rateDateIso) return false;
+  return exportDate < EU_RECIPROCAL_START && rateDateIso < EU_RECIPROCAL_IN_TRANSIT_ENTER_BY;
+}
+
+function buildCh99Opts(ctx) {
+  const rateDate = ctx?.rateDeterminationDate || ctx?.applicableDate || null;
+  return {
+    rateDate,
+    inTransitGrandfathered: !!ctx?.euReciprocalInTransit,
+  };
+}
+
+/** @deprecated use resolveRateDeterminationDate — kept for callers passing entry/import only */
+function resolveApplicableDate(entryDate, importDate) {
+  return resolveRateDeterminationDate({ entryDate, importDate, latestReleaseDate: entryDate });
+}
+
+function resolveRateDateFromXl(xl) {
+  const fields = extractEntryDateFields(xl);
+  const resolved = resolveRateDeterminationDate(fields);
+  return {
+    ...resolved,
+    fields,
+    euReciprocalInTransit: isEuReciprocalInTransitGrandfathered(fields, resolved.date),
+  };
 }
 
 // Filter rules to those in effect on a given ISO date.
@@ -2252,10 +2343,16 @@ function partitionCh99NormCodes(normCodes) {
 
 function evaluateCh99Check(row) {
   const filNorm = row.CH99_FILED.map(c => htsNormalize(c));
-  const expNorm = row.CH99_EXPECTED.map(e => htsNormalize(e.ch99));
+  const expNorm = row.CH99_EXPECTED.map(e => htsNormalize(e.ch99)).filter(c => c && c !== "—");
   const filPart = partitionCh99NormCodes(filNorm);
   const expPart = partitionCh99NormCodes(expNorm);
   const has232Stack = filPart.section232.length > 0 || filPart.exclusion232.length > 0;
+
+  if (row.CH99_EXPECTED.some(e => e.review_code === "NEEDS_REVIEW_EO14389")) {
+    row.CH99_CHECK = "REVIEW";
+    row.CH99_REVIEW_CODE = "NEEDS_REVIEW_EO14389";
+    return;
+  }
 
   if (has232Stack) {
     row.SECTION_232_STACK = true;
@@ -2405,6 +2502,31 @@ function getMfnRateForEuCap(hts, brokerRate) {
   return null;
 }
 
+function priorEuReciprocalLayer() {
+  return {
+    ch99: EU_RECIPROCAL_PRIOR_CODE,
+    rate_pct: 10.0,
+    category: "IEEPA-Universal",
+    basis: "IEEPA Universal baseline (pre–Aug 7, 2025)",
+    notes: `Before ${EU_RECIPROCAL_START}, or in-transit grandfathered through ${EU_RECIPROCAL_IN_TRANSIT_ENTER_BY}, EU reciprocal uses prior 10% regime (${EU_RECIPROCAL_PRIOR_CODE}).`,
+    authority: "EO 14257 / in-transit carve-out per CSMS #65829726",
+    effective: `before ${EU_RECIPROCAL_START}`,
+  };
+}
+
+function euNeedsReviewEo14389Layer(rateDate) {
+  return {
+    ch99: "—",
+    rate_pct: null,
+    category: "Reciprocal-EU",
+    basis: "EO 14389 — tariff review required",
+    review_code: "NEEDS_REVIEW_EO14389",
+    notes: `Rate determination date ${rateDate} is on/after ${EO14389_REVIEW_FROM}. USITC has not modified HTS — human review required; do not auto-clear EU reciprocal expectations.`,
+    authority: "EO 14389 (Ending Certain Tariff Actions, Feb 2026)",
+    effective: `from ${EO14389_REVIEW_FROM}`,
+  };
+}
+
 function resolveEuReciprocalLayer(mfnPct, rules, coo) {
   const euRules = (rules || []).filter(r => r.coo === coo && r.category === "Reciprocal-EU");
   const gteRule = euRules.find(r => r.eu_cap_when === "mfn_gte_15")
@@ -2459,8 +2581,9 @@ function scanRunEuCap(r, rules) {
     return { lineCount: 0, mismatchCount: 0, lines: [], incomplete: isSummaryRun(r), runId: r?.id };
   }
   const ruleset = rules || r.state?.rules || state.rules || DEFAULT_CH99_RULES;
-  const applicableDate = r.state?.ctx?.applicableDate;
+  const applicableDate = r.state?.ctx?.rateDeterminationDate || r.state?.ctx?.applicableDate;
   const effectiveRules = applicableDate ? rulesInEffectOn(ruleset, applicableDate) : ruleset;
+  const ch99Opts = buildCh99Opts(r.state?.ctx || {});
   const lines = [];
   let mismatchCount = 0;
   for (const f of filed) {
@@ -2468,7 +2591,7 @@ function scanRunEuCap(r, rules) {
     if (!EU_COUNTRIES.has(coo)) continue;
     const filedCodes = parseFiledCh99Codes(f);
     const mfn = getMfnRateForEuCap(f.HTS, f.MFN_RATE_PCT);
-    const exp = expectedChapter99(coo, f.HTS, mfn, effectiveRules);
+    const exp = expectedChapter99(coo, f.HTS, mfn, effectiveRules, ch99Opts);
     const expCodes = exp.map(e => e.ch99);
     const touchesCap = filedCodes.some(isEuCapCh99Code) || expCodes.some(isEuCapCh99Code);
     if (!touchesCap) continue;
@@ -3423,14 +3546,24 @@ function collapseSection301Expected(out) {
   return nonSec301;
 }
 
-function expectedChapter99(country, hts, mfnPct, rules) {
+function expectedChapter99(country, hts, mfnPct, rules, opts) {
   const c = (country || "").trim().toUpperCase();
+  const rateDate = opts?.rateDate || null;
+  const inTransit = !!opts?.inTransitGrandfathered;
   const out = [];
   const s122 = section122Layer(rules);
   const euReciprocalActive = (rules || []).some(r =>
     r.coo === c && (r.category === "Reciprocal-EU" || r.category === "Reciprocal"));
 
   if (EU_COUNTRIES.has(c)) {
+    if (rateDate && rateDate >= EO14389_REVIEW_FROM) {
+      out.push(euNeedsReviewEo14389Layer(rateDate));
+      return collapseSection301Expected(out);
+    }
+    if (inTransit || (rateDate && rateDate < EU_RECIPROCAL_START)) {
+      out.push(priorEuReciprocalLayer());
+      return collapseSection301Expected(out);
+    }
     if (euReciprocalActive) {
       out.push(resolveEuReciprocalLayer(mfnPct, rules, c));
       return collapseSection301Expected(out);
@@ -3498,7 +3631,7 @@ function build7501Filed(xl) {
   return arr;
 }
 
-function compareAggToFiled(agg, filed, rules) {
+function compareAggToFiled(agg, filed, rules, ch99Opts) {
   const filedByStrict = new Map();
   const filedByStrictNoInv = new Map();
   const filedByLoose = new Map();   // COO|HTS → [filed indexes]
@@ -3526,7 +3659,7 @@ function compareAggToFiled(agg, filed, rules) {
     if (fi != null && !usedFiledIdx.has(fi)) {
       const f = filed[fi];
       usedFiledIdx.add(fi);
-      out.push(makeCompareRow(a, f, "STRICT", rules));
+      out.push(makeCompareRow(a, f, "STRICT", rules, ch99Opts));
     } else {
       out.push({ AGG_LINE: a.AGG_LINE, _aggRow: a, _unmatched: true });
     }
@@ -3541,11 +3674,11 @@ function compareAggToFiled(agg, filed, rules) {
     if (fi != null) {
       usedFiledIdx.add(fi);
       const f = filed[fi];
-      const replaced = makeCompareRow(a, f, "LOOSE (MID mismatch)", rules);
+      const replaced = makeCompareRow(a, f, "LOOSE (MID mismatch)", rules, ch99Opts);
       Object.keys(row).forEach(k => delete row[k]);
       Object.assign(row, replaced);
     } else {
-      const replaced = makeCompareRow(a, null, "NO MATCH (TXT only)", rules);
+      const replaced = makeCompareRow(a, null, "NO MATCH (TXT only)", rules, ch99Opts);
       Object.keys(row).forEach(k => delete row[k]);
       Object.assign(row, replaced);
     }
@@ -3553,7 +3686,7 @@ function compareAggToFiled(agg, filed, rules) {
   // Filed rows never matched — try Section 232 adjunct pairing before finalizing orphans
   filed.forEach((f, i) => {
     if (!usedFiledIdx.has(i)) {
-      out.push(makeCompareRow(null, f, "NO MATCH (7501 only)", rules));
+      out.push(makeCompareRow(null, f, "NO MATCH (7501 only)", rules, ch99Opts));
     }
   });
 
@@ -3588,7 +3721,7 @@ function pairSection232OrphanRows(out) {
   }
 }
 
-function makeCompareRow(a, f, matchType, rules) {
+function makeCompareRow(a, f, matchType, rules, ch99Opts) {
   const ev_txt = a ? a.INVOICE_VALUE - (a._allocFreight||0) - (a._allocInsurance||0) : null;
   const htsForLookup = a ? a.DESTINATION_HS : (f ? f.HTS : "");
   const tableEntry = htsLookup ? htsLookup.get(htsNormalize(htsForLookup)) : null;
@@ -3614,7 +3747,7 @@ function makeCompareRow(a, f, matchType, rules) {
     MFN_RATE_PCT: f ? f.MFN_RATE_PCT : null,
     MFN_RATE_TABLE,
     CH99_FILED: f ? (f.CH99_HTS || "").split(",").map(s => htsFormat(s.trim())).filter(Boolean) : [],
-    CH99_EXPECTED: a ? expectedChapter99(a.ORIGIN, a.DESTINATION_HS, mfnForCh99, rules) : [],
+    CH99_EXPECTED: a ? expectedChapter99(a.ORIGIN, a.DESTINATION_HS, mfnForCh99, rules, ch99Opts) : [],
   };
 
   // MID check
@@ -3689,6 +3822,14 @@ function buildFindings(cmp, ctx) {
       isRollup: true,
     });
   }
+
+  const ch99Review = cmp.filter(r => r.CH99_CHECK === "REVIEW" && r.MATCH && !r.MATCH.startsWith("NO MATCH"));
+  ch99Review.slice(0, CAP).forEach(r => out.push({
+    sev: "Info", cat: "Chapter 99 application",
+    loc: `Item #${r.ITEM} (Agg #${r.AGG_LINE}) · ${r.COO} · ${r.HTS}`,
+    desc: `EU reciprocal line requires human review (${r.CH99_REVIEW_CODE || "NEEDS_REVIEW_EO14389"}) — rate determination date on/after ${EO14389_REVIEW_FROM}. Filed: [${r.CH99_FILED.join(", ") || "—"}].`,
+    rec: "EO 14389 ended certain IEEPA collections but USITC has not updated HTS. Confirm with counsel whether reciprocal expectations changed before amending the entry.",
+  }));
 
   // ── Section 301 coverage advisory (PARTIAL Ch99 check) ──────────────────
   // PARTIAL fires when the engine expects a Section 301 layer for a China item
@@ -4957,6 +5098,7 @@ function rehydrateRun(r) {
   // Use the applicable date stored in the snapshot to filter rules. Falls back
   // to using all rules if no date was captured (older snapshots).
   const effectiveRules = ctx.applicableDate ? rulesInEffectOn(rules, ctx.applicableDate) : rules;
+  const ch99Opts = buildCh99Opts(ctx);
   // v1 snapshots have raw + full cmp; v2 dropped raw; v3 dropped cmp + findings too
   let cmp = r.state.cmp;
   let findings = r.state.findings;
@@ -4974,13 +5116,13 @@ function rehydrateRun(r) {
   }
   if (!cmp || aggNeedsInvoiceKey) {
     // Schema v3+ — rebuild cmp from agg + filed + date-filtered rules
-    cmp = compareAggToFiled(agg, r.state.filed, effectiveRules);
+    cmp = compareAggToFiled(agg, r.state.filed, effectiveRules, ch99Opts);
   } else if (cmp[0] && "CH99_EXPECTED_CODES" in cmp[0]) {
     // Schema v2 — codes-only Ch99 expected, re-expand to full layer objects
     cmp = cmp.map(row => {
       const codes = row.CH99_EXPECTED_CODES || [];
       const CH99_EXPECTED = row.COO
-        ? expectedChapter99(row.COO, row.HTS, row.MFN_RATE_PCT, effectiveRules)
+        ? expectedChapter99(row.COO, row.HTS, row.MFN_RATE_PCT, effectiveRules, ch99Opts)
               .filter(e => codes.length === 0 || codes.includes(e.ch99))
         : [];
       const { CH99_EXPECTED_CODES, ...rest } = row;
@@ -4993,7 +5135,7 @@ function rehydrateRun(r) {
   return { ...r.state, raw, agg, cmp, findings };
 }
 
-function recomputeRawDuties(raw, filed, effectiveRules) {
+function recomputeRawDuties(raw, filed, effectiveRules, ch99Opts) {
   const mfnLookup = new Map();
   for (const f of filed) {
     if (f.MFN_RATE_PCT != null && f.COO && f.HTS) {
@@ -5007,7 +5149,7 @@ function recomputeRawDuties(raw, filed, effectiveRules) {
     const mfn = EU_COUNTRIES.has(coo)
       ? getMfnRateForEuCap(hts, brokerMfn)
       : getMfnRate(hts, brokerMfn);
-    const exp = expectedChapter99(coo, hts, mfn, effectiveRules);
+    const exp = expectedChapter99(coo, hts, mfn, effectiveRules, ch99Opts);
     const mfnDuty = r.ENTERED_VALUE * (mfn || 0) / 100;
     const ch99Duty = exp.reduce((s, a) => s + r.ENTERED_VALUE * (a.rate_pct || 0) / 100, 0);
     const cotton = (r.TOT_NET_WEIGHT || 0) * cottonFeePerKg(hts);
@@ -5053,10 +5195,11 @@ function recomputeSavedRun(r, options = {}) {
   const effectiveRules = (r.state?.ctx?.applicableDate)
     ? rulesInEffectOn(state.rules, r.state.ctx.applicableDate)
     : state.rules;
+  const ch99Opts = buildCh99Opts(r.state?.ctx || {});
   if (raw.length && filed.length) {
-    raw = recomputeRawDuties(raw, filed, effectiveRules);
+    raw = recomputeRawDuties(raw, filed, effectiveRules, ch99Opts);
   }
-  const cmp = compareAggToFiled(agg, filed, effectiveRules);
+  const cmp = compareAggToFiled(agg, filed, effectiveRules, ch99Opts);
   const ctx = {
     ...(r.state?.ctx || {}),
     freight,
@@ -7587,13 +7730,14 @@ function buildStackExportRows(respectFilters) {
   const dateRules = state.ctx?.applicableDate
     ? rulesInEffectOn(state.rules, state.ctx.applicableDate)
     : state.rules;
+  const ch99Opts = buildCh99Opts(state.ctx || {});
   let rows = (state.filed || []).map(f => {
     const ev = Number(f.ENTERED_VALUE) || 0;
     const coo = (f.COO || "").trim().toUpperCase();
     const mfn = EU_COUNTRIES.has(coo)
       ? getMfnRateForEuCap(f.HTS, f.MFN_RATE_PCT)
       : getMfnRate(f.HTS, f.MFN_RATE_PCT);
-    const exp = expectedChapter99(f.COO, f.HTS, mfn, dateRules);
+    const exp = expectedChapter99(f.COO, f.HTS, mfn, dateRules, ch99Opts);
     const byCat = { "Reciprocal": [], "Reciprocal-EU": [], "IEEPA-Universal": [], "IEEPA-China": [], "Section-301": [], "Section-122": [] };
     let totalExpCh99 = 0;
     for (const e of exp) {
@@ -8329,11 +8473,15 @@ async function rerunLoadedAudit() {
     if (state.rerunXlsxBuffer) {
       const xl = parse7501Xlsx(state.rerunXlsxBuffer);
       filed = build7501Filed(xl);
-      const entryDateRaw = xl.rows[0]?.["7. CS Entry Date"];
-      const importDateRaw = xl.rows[0]?.["11. CS Import Date"];
-      const applicable = resolveApplicableDate(entryDateRaw, importDateRaw);
-      ctx.applicableDate = applicable.date;
-      ctx.applicableDateSource = applicable.source;
+      const rateResolved = resolveRateDateFromXl(xl);
+      ctx.rateDeterminationDate = rateResolved.date;
+      ctx.rateDeterminationDateSource = rateResolved.source;
+      ctx.rateDeterminationDateGaps = rateResolved.missing;
+      ctx.euReciprocalInTransit = rateResolved.euReciprocalInTransit;
+      ctx.applicableDate = rateResolved.date;
+      ctx.applicableDateSource = rateResolved.source;
+      ctx.itDate = rateResolved.fields.itDate ?? null;
+      ctx.exportDate = rateResolved.fields.exportDate ?? null;
       state.xlsxName = state.rerunXlsxName || state.xlsxName;
     }
 
@@ -8447,16 +8595,18 @@ function runAudit(options = {}) {
 
     const filed = build7501Filed(xl);
 
-    // ── Resolve applicable date for Chapter 99 rule selection ──────────
-    // CBP tariff treatment is fixed at the date of entry. If the 7501 lacks an
-    // entry date (entry not yet released), fall back to import date.
-    const entryDateRaw  = xl.rows[0]?.["7. CS Entry Date"];
-    const importDateRaw = xl.rows[0]?.["11. CS Import Date"];
-    const applicable = resolveApplicableDate(entryDateRaw, importDateRaw);
-    // Filter rules to those in effect on the applicable date — these become the
-    // engine baseline for both raw-line projection and the comparison pass.
+    // ── Rate determination date for Chapter 99 rule selection (19 CFR 141.68/141.69) ──
+    const rateResolved = resolveRateDateFromXl(xl);
+    const applicable = rateResolved;
+    const ch99Opts = {
+      rateDate: applicable.date,
+      inTransitGrandfathered: applicable.euReciprocalInTransit,
+    };
     const effectiveRules = rulesInEffectOn(state.rules, applicable.date);
-    console.info(`Ch99 rules date: ${applicable.date} (${applicable.source}) — ${effectiveRules.length} of ${state.rules.length} rules active`);
+    console.info(`Ch99 rate-determination date: ${applicable.date} (${applicable.source}) — ${effectiveRules.length} of ${state.rules.length} rules active`);
+    if (applicable.missing?.length) {
+      console.info("Rate date field gaps:", applicable.missing.join(", "));
+    }
 
     // Raw with computed duty (use filed MFN lookup)
     const mfnLookup = new Map();
@@ -8473,7 +8623,7 @@ function runAudit(options = {}) {
     const mfn = EU_COUNTRIES.has(coo)
       ? getMfnRateForEuCap(hts, brokerMfn)
       : getMfnRate(hts, brokerMfn);
-      const exp = expectedChapter99(coo, hts, mfn, effectiveRules);
+      const exp = expectedChapter99(coo, hts, mfn, effectiveRules, ch99Opts);
       const mfnDuty = r.ENTERED_VALUE * (mfn || 0) / 100;
       const ch99Duty = exp.reduce((s, a) => s + r.ENTERED_VALUE * (a.rate_pct || 0) / 100, 0);
       const cotton = (r.TOT_NET_WEIGHT || 0) * cottonFeePerKg(hts);
@@ -8492,7 +8642,7 @@ function runAudit(options = {}) {
 
     // Comparison — use date-filtered rules so Ch99 expectations reflect the
     // tariff regime that was in force on the applicable date.
-    const cmp = compareAggToFiled(agg, filed, effectiveRules);
+    const cmp = compareAggToFiled(agg, filed, effectiveRules, ch99Opts);
 
     // Context
     const ctx = {
@@ -8523,14 +8673,19 @@ function runAudit(options = {}) {
           importerId: imp.ein || "",
         };
       })(),
-      // Applicable-date metadata so the UI can show which date governed Ch99 selection
+      rateDeterminationDate:       applicable.date,
+      rateDeterminationDateSource: applicable.source,
+      rateDeterminationDateGaps:   applicable.missing || [],
+      euReciprocalInTransit:       applicable.euReciprocalInTransit || false,
       applicableDate:       applicable.date,
-      applicableDateSource: applicable.source,   // "entry" | "import" | "today"
-      entryDate:            xl.rows[0]?.["7. CS Entry Date"] ?? null,
-      importDate:           xl.rows[0]?.["11. CS Import Date"] ?? null,
+      applicableDateSource: applicable.source,
+      entryDate:            rateResolved.fields.entryDate ?? null,
+      importDate:           rateResolved.fields.importDate ?? null,
+      itDate:               rateResolved.fields.itDate ?? null,
+      exportDate:           rateResolved.fields.exportDate ?? null,
       effectiveRulesCount:  effectiveRules.length,
       totalRulesCount:      state.rules.length,
-      dupesPrimary:  xl.dupes || [],   // 7501 extract defect: duplicate primary HTS rows
+      dupesPrimary:  xl.dupes || [],
     };
 
     // ── Cross-file sanity: do the TXT invoice and the 7501 invoice agree? ──
@@ -8666,12 +8821,17 @@ function renderKpis() {
   const dateLabel = c.applicableDate
     ? new Date(c.applicableDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : "—";
-  const dateSourceLabel = c.applicableDateSource === "entry"  ? "Entry date (Block 7)"
-                       : c.applicableDateSource === "import" ? "Import date (Block 11) · Entry date not yet set"
-                       : c.applicableDateSource === "today"  ? "Today's date · 7501 has no entry or import date"
-                       : "—";
-  const dateKind = c.applicableDateSource === "entry" ? "good"
-                 : c.applicableDateSource === "import" ? "warn"
+  const dateSourceLabel = {
+    it: "IT date (Block 17) · 19 CFR 141.69(b)",
+    warehouse_withdrawal: "Warehouse withdrawal date · 19 CFR 141.69(a)",
+    overcarried_original: "Original entry date · 19 CFR 141.69(c)",
+    release: "Latest release date (Block 7) · 19 CFR 141.68",
+    entry_fallback: "Entry date fallback (Block 7) — release date not distinguished in extract",
+    import_fallback: "Import date (Block 11) · entry/release not set",
+    today: "Today's date · 7501 has no entry or import date",
+  }[c.applicableDateSource] || c.applicableDateSource || "—";
+  const dateKind = ["it", "release", "warehouse_withdrawal", "overcarried_original"].includes(c.applicableDateSource) ? "good"
+                 : c.applicableDateSource === "entry_fallback" ? "warn"
                  : "warn";
 
   const kpis = [
@@ -8788,7 +8948,8 @@ function renderStack() {
     const dateRules = state.ctx?.applicableDate
       ? rulesInEffectOn(state.rules, state.ctx.applicableDate)
       : state.rules;
-    const exp = expectedChapter99(f.COO, f.HTS, mfn, dateRules);
+    const ch99Opts = buildCh99Opts(state.ctx || {});
+    const exp = expectedChapter99(f.COO, f.HTS, mfn, dateRules, ch99Opts);
     // Group expected by category
     const byCat = { "Reciprocal": [], "Reciprocal-EU": [], "IEEPA-Universal": [], "IEEPA-China": [], "Section-301": [], "Section-122": [] };
     let totalExpCh99 = 0;
