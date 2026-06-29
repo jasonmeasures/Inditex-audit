@@ -1,9 +1,11 @@
-# 7501 Audit — User Manual
+# 7501 Audit — User Manual (local)
 
 **Version:** June 2026 (Dashboard landing, review sign-off, rate-determination date)  
-**Audience:** Customs analysts, brokers, and admins using the 7501 Audit dashboard
+**Audience:** Developers and analysts running the tool **on their own machine** (`./start.sh` / `localhost`)
 
-This guide covers day-to-day use of the web dashboard. For installation, see [SETUP.md](SETUP.md). For engineering details, see [BUILD.md](BUILD.md).
+> **Using the hosted playground?** See **[USER_MANUAL_PLAYGROUND.md](USER_MANUAL_PLAYGROUND.md)** — no local install required.
+
+This guide covers day-to-day use when you run the Flask server locally. For installation, see [SETUP.md](SETUP.md). For engineering details, see [BUILD.md](BUILD.md).
 
 ---
 
@@ -305,7 +307,7 @@ Hard-refresh (`Cmd+Shift+R` on Mac) to load the latest UI.
 
 ## 14. Getting help
 
+- **Playground (hosted):** [USER_MANUAL_PLAYGROUND.md](USER_MANUAL_PLAYGROUND.md)
 - **Setup:** [SETUP.md](SETUP.md)
 - **Engine / API:** [BUILD.md](BUILD.md)
 - **EU reciprocal regression tests:** `python3 verify_eu_reciprocal_rules.py`
-- **Playground / production:** kn-playground merge → Inditex Audit Deploy workflow

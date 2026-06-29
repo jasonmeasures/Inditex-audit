@@ -142,6 +142,8 @@ Local `./deploy.sh` targets Elastic Beanstalk and requires Terraform init in `te
 
 **Standard team workflow:** sync app files to `klearnow/kn-playground` → open PR to `master` → merge → **Inditex Audit Deploy** workflow updates playground prod. See repo README.
 
+**End users on playground:** share **[USER_MANUAL_PLAYGROUND.md](USER_MANUAL_PLAYGROUND.md)** (not this SETUP guide).
+
 ---
 
 ## Next steps

@@ -10,7 +10,8 @@ Validated against Inditex / Zara entry 113-3957214-9 (Jan 2026): 44/44 lines rec
 
 | Doc | Audience |
 |-----|----------|
-| **[USER_MANUAL.md](USER_MANUAL.md)** | **Start here** — sign-in, Dashboard, audit workflow, review sign-off, Reference, re-run |
+| **[USER_MANUAL_PLAYGROUND.md](USER_MANUAL_PLAYGROUND.md)** | **Playground users** — hosted app, shared database, no local install |
+| **[USER_MANUAL.md](USER_MANUAL.md)** | **Local dev** — sign-in, Dashboard, audit workflow, review sign-off, Reference, re-run |
 | **[SETUP.md](SETUP.md)** | First-time install (Postgres, venv, `./start.sh`) |
 | **[BUILD.md](BUILD.md)** | Architecture and extension guide for developers |
 

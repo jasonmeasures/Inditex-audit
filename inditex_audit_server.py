@@ -51,7 +51,7 @@ INITIAL_ADMIN_USERNAME = os.environ.get("INITIAL_ADMIN_USERNAME", "admin")
 INITIAL_ADMIN_PASSWORD = os.environ.get("INITIAL_ADMIN_PASSWORD", "")
 
 DASHBOARD_PATH = Path(__file__).parent / "inditex_audit_dashboard.html"
-APP_BUILD_ID = "2026.06.25-hts-cross"
+APP_BUILD_ID = "2026.06.25-rerun-txt-meta"
 
 # ---------------------------------------------------------------------------
 # Database helpers

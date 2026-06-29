@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="app-build" content="2026.06.25-hts-cross" />
+<meta name="app-build" content="2026.06.25-rerun-txt-meta" />
 <title>7501 Audit</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -3093,24 +3093,48 @@ function txtInputsSummary() {
       txtName: state.txtFiles.map(f => f.name).join("; "),
     };
   }
-  return {
-    txtFiles: state.txtName ? [{ id: "legacy", name: state.txtName }] : [],
-    txtName: state.txtName || "",
-  };
+  if (state.txtName) {
+    return {
+      txtFiles: [{ id: "legacy", name: state.txtName }],
+      txtName: state.txtName,
+    };
+  }
+  const meta = state.savedInputMeta || {};
+  if (meta.txtFiles?.length) {
+    return {
+      txtFiles: meta.txtFiles.map(f => ({ id: f.id || "saved", name: f.name })),
+      txtName: meta.txtName || meta.txtFiles.map(f => f.name).join("; "),
+    };
+  }
+  if (meta.txtName) {
+    return { txtFiles: [{ id: "saved", name: meta.txtName }], txtName: meta.txtName };
+  }
+  return { txtFiles: [], txtName: "" };
+}
+
+function resolvedXlsxName() {
+  return state.xlsxName || state.savedInputMeta?.xlsxName || "";
 }
 
 function renderTxtFilesList() {
   const list = document.getElementById("txtFilesList");
   if (!list) return;
-  if (!state.txtFiles.length) {
+  const chips = state.txtFiles.length
+    ? state.txtFiles.map(f => ({ id: f.id, name: f.name, removable: true }))
+    : (state.savedInputMeta?.txtFiles || []).map(f => ({
+        id: f.id || "saved",
+        name: f.name,
+        removable: false,
+      }));
+  if (!chips.length) {
     list.innerHTML = "";
     syncSourceFileUi();
     return;
   }
-  list.innerHTML = state.txtFiles.map(f => `
-    <span class="txt-file-chip" title="${escapeHtml(f.name)}">
+  list.innerHTML = chips.map(f => `
+    <span class="txt-file-chip" title="${escapeHtml(f.name)}${f.removable ? "" : " (from saved run)"}">
       <span class="name">${escapeHtml(f.name)}</span>
-      <button type="button" data-txt-remove="${escapeHtml(f.id)}" title="Remove">×</button>
+      ${f.removable ? `<button type="button" data-txt-remove="${escapeHtml(f.id)}" title="Remove">×</button>` : ""}
     </span>`).join("");
   list.querySelectorAll("[data-txt-remove]").forEach(btn => {
     btn.addEventListener("click", e => {
@@ -3287,7 +3311,9 @@ function syncSourceFileUi() {
     }
     if (rerunTxtNameEl) {
       rerunTxtNameEl.textContent = state.raw?.length
-        ? "Using data from this run"
+        ? (state.savedInputMeta?.txtName
+          ? `${state.savedInputMeta.txtName} (from saved run)`
+          : "Using TXT data from this run")
         : "Click to add/replace TXT";
     }
   }
@@ -4120,6 +4146,33 @@ document.getElementById("runBtn").addEventListener("click", runAudit);
 //  Auth
 // ============================================================
 const AUTH_KEY = "inditex_auth_v1";
+const SESSION_ACTIVE_RUN_KEY = "inditex_active_run_v1";
+
+function persistActiveRunSession(runId) {
+  try {
+    if (runId) sessionStorage.setItem(SESSION_ACTIVE_RUN_KEY, runId);
+    else sessionStorage.removeItem(SESSION_ACTIVE_RUN_KEY);
+  } catch (e) { /* sessionStorage blocked */ }
+}
+
+function readActiveRunSession() {
+  try { return sessionStorage.getItem(SESSION_ACTIVE_RUN_KEY); } catch (e) { return null; }
+}
+
+async function restoreActiveRunSession() {
+  const id = readActiveRunSession();
+  if (!id || !auth.token) return false;
+  try {
+    await loadRunByIdAsync(id, { quiet: true });
+    if (state.activeRunId === id && state.cmp?.length) return true;
+    persistActiveRunSession(null);
+    return false;
+  } catch (e) {
+    console.warn("restoreActiveRunSession:", e.message);
+    persistActiveRunSession(null);
+    return false;
+  }
+}
 
 const auth = (() => {
   let _state = null;
@@ -4151,10 +4204,13 @@ const auth = (() => {
       if (htsRefSection) htsRefSection.style.display = "";
       updateHtsRefStatus();
       applyReferencePermissions();
-      document.querySelector(".page")?.style.setProperty("display", "none");
-      if (typeof showDashboardShell === "function" && !document.getElementById("dashOverlay")?.classList.contains("open")) {
-        showDashboardShell();
-        if (typeof showDashboardLoading === "function") showDashboardLoading();
+      const pendingRun = readActiveRunSession();
+      if (!pendingRun) {
+        document.querySelector(".page")?.style.setProperty("display", "none");
+        if (typeof showDashboardShell === "function" && !document.getElementById("dashOverlay")?.classList.contains("open")) {
+          showDashboardShell();
+          if (typeof showDashboardLoading === "function") showDashboardLoading();
+        }
       }
     } else {
       const usersBtn = document.getElementById("usersBtn");
@@ -4190,7 +4246,11 @@ const auth = (() => {
       trackActivity("session_start", { source: "login" }, "session");
     },
 
-    logout() { _clear(); _applyUI(); },
+    logout() {
+      persistActiveRunSession(null);
+      _clear();
+      _applyUI();
+    },
   };
 })();
 
@@ -4231,7 +4291,8 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
     await auth.login(username, password);
     document.getElementById("loginPassword").value = "";
     await runStore.init();
-    await goHomeDashboard();
+    const restored = await restoreActiveRunSession();
+    if (!restored) await goHomeDashboard();
     _syncDashPill();
     loadReferenceFromServer()
       .then(() => {
@@ -5164,7 +5225,7 @@ function snapshotCurrentRun(name, existingId) {
     } : {}),
     inputs: {
       ...txtInputsSummary(),
-      xlsxName: state.xlsxName,
+      xlsxName: resolvedXlsxName(),
       freight: parseFloat(document.getElementById("freight").value) || 0,
       insurance: parseFloat(document.getElementById("insurance").value) || 0,
     },
@@ -5357,9 +5418,10 @@ function saveCurrentRun(customName, existingId) {
   if (!state.cmp) { toast("No audit to save — run one first.", "error"); return false; }
   const snap = snapshotCurrentRun(customName, existingId || state.activeRunId);
   if (runStore.backend === "postgres") {
+    state.activeRunId = snap.id;
+    persistActiveRunSession(snap.id);
     runStore.saveRun(snap).then(result => {
       if (result.ok) {
-        state.activeRunId = snap.id;
         setActiveBadge(snap.name);
         _logActivity("saved", snap);
         scheduleRenderRuns(true);
@@ -5374,6 +5436,7 @@ function saveCurrentRun(customName, existingId) {
   runs.unshift(snap);
   const result = saveRunsToStorage(runs);
   state.activeRunId = snap.id;
+  persistActiveRunSession(snap.id);
   setActiveBadge(snap.name);
   _logActivity("saved", snap);
   renderRuns();
@@ -5577,8 +5640,11 @@ function restoreSavedRunInputs(r) {
   state.savedInputMeta = {
     txtName: inputs.txtName || "",
     xlsxName: inputs.xlsxName || "",
-    txtFiles: inputs.txtFiles || [],
+    txtFiles: Array.isArray(inputs.txtFiles) ? inputs.txtFiles : [],
   };
+  if (!state.savedInputMeta.txtName && state.savedInputMeta.txtFiles.length) {
+    state.savedInputMeta.txtName = state.savedInputMeta.txtFiles.map(f => f.name).join("; ");
+  }
   renderTxtFilesList();
   syncSourceFileUi();
 }
@@ -5597,11 +5663,12 @@ function loadRunById(id) {
   return loadRunByIdAsync(id);
 }
 
-async function loadRunByIdAsync(id) {
+async function loadRunByIdAsync(id, options = {}) {
   const seq = ++_loadRunSeq;
+  const quiet = !!options.quiet;
   try {
     await loadReferenceFromServer();
-    toast("Loading run…", "info");
+    if (!quiet) toast("Loading run…", "info");
     let r = null;
     if (runStore.backend === "postgres") {
       r = await runStore.fetchRun(id, { force: true });
@@ -5614,11 +5681,16 @@ async function loadRunByIdAsync(id) {
       if (!r || isSummaryRun(r)) r = await runStore.fetchRun(id);
     }
     if (seq !== _loadRunSeq) return;
-    if (!r) { toast("Run not found.", "error"); return; }
+    if (!r) {
+      persistActiveRunSession(null);
+      if (!quiet) toast("Run not found.", "error");
+      return;
+    }
 
     const fullState = rehydrateRun(r);
     applyRehydratedToState(r, fullState);
     state.activeRunId = r.id;
+    persistActiveRunSession(r.id);
     restoreSavedRunInputs(r);
     resetAuditFilterSelects();
     setActiveBadge(r.name);
@@ -5629,7 +5701,7 @@ async function loadRunByIdAsync(id) {
     document.querySelector('.tab[data-tab="comparison"]')?.click();
     render({ activeTab: "comparison", renderAll: true });
     scheduleRenderRuns();
-    toast("Audit loaded: " + r.name, "success");
+    if (!quiet) toast("Audit loaded: " + r.name, "success");
   } catch (e) {
     if (seq !== _loadRunSeq) return;
     toast("Failed to load run: " + e.message, "error");
@@ -5646,6 +5718,7 @@ async function deleteRunById(id) {
   _rdSelectedIds.delete(id);
   if (state.activeRunId === id) {
     state.activeRunId = null;
+    persistActiveRunSession(null);
     setActiveBadge(null);
   }
   scheduleRenderRuns(true);
@@ -5677,6 +5750,7 @@ async function deleteSelectedRuns() {
   _rdSelectedIds.clear();
   if (state.activeRunId && ids.includes(state.activeRunId)) {
     state.activeRunId = null;
+    persistActiveRunSession(null);
     setActiveBadge(null);
   }
   scheduleRenderRuns(true);
@@ -5690,6 +5764,7 @@ async function clearAllRuns() {
   await runStore.clearAll();
   _rdSelectedIds.clear();
   state.activeRunId = null;
+  persistActiveRunSession(null);
   setActiveBadge(null);
   refreshRunsViewsAfterBulkChange();
   toast("All runs cleared.", "success");
@@ -5725,6 +5800,7 @@ function startNewRun() {
   state.raw = null; state.agg = null; state.filed = null;
   state.cmp = null; state.findings = null; state.ctx = null;
   state.activeRunId  = null;
+  persistActiveRunSession(null);
   state.isLoadedRun  = false;
   state.rawDropped   = false;
   state.rawRowCount  = 0;
@@ -8448,7 +8524,7 @@ document.getElementById("importRunsFile").addEventListener("change", async (e) =
 });
 
 // Initial bootstrap
-const APP_BUILD_ID = "2026.06.25-hts-cross";
+const APP_BUILD_ID = "2026.06.25-rerun-txt-meta";
 
 function showAppBuildBanner() {
   const el = document.getElementById("appBuildBanner");
@@ -8494,7 +8570,8 @@ async function probeServerBuild() {
   } catch (e) {
     console.error("Bootstrap runStore.init failed:", e);
   }
-  await goHomeDashboard();
+  const restored = await restoreActiveRunSession();
+  if (!restored) await goHomeDashboard();
   _syncDashPill();
   loadReferenceFromServer()
     .then(() => {
@@ -8614,13 +8691,13 @@ async function rerunLoadedAudit() {
       name: document.getElementById("runNameInput")?.value?.trim() || defaultRunName(),
       inputs: {
         ...txtInputsSummary(),
-        xlsxName: state.xlsxName,
+        xlsxName: resolvedXlsxName(),
         freight,
         insurance,
       },
       state: { raw, agg, filed, ctx },
       rawDropped: state.rawDropped,
-      rawRowCount: state.rawRowCount,
+      rawRowCount: raw.length || state.rawRowCount || 0,
     };
 
     const updated = recomputeSavedRun(snap, {
@@ -8629,7 +8706,7 @@ async function rerunLoadedAudit() {
       filed,
       inputsPatch: {
         ...txtInputsSummary(),
-        xlsxName: state.xlsxName,
+        xlsxName: resolvedXlsxName(),
       },
     });
     applyRehydratedToState(updated, updated.state);
@@ -8641,9 +8718,11 @@ async function rerunLoadedAudit() {
     document.getElementById("rerunTxtFile").value = "";
     document.getElementById("rerunXlsxFile").value = "";
     state.savedInputMeta = {
-      ...txtInputsSummary(),
-      xlsxName: state.xlsxName || state.savedInputMeta?.xlsxName || "",
+      txtFiles: updated.inputs?.txtFiles || txtInputsSummary().txtFiles,
+      txtName: updated.inputs?.txtName || txtInputsSummary().txtName,
+      xlsxName: updated.inputs?.xlsxName || resolvedXlsxName(),
     };
+    renderTxtFilesList();
 
     if (state.activeRunId) {
       const saved = stripDerivedRunState({ ...updated, id: state.activeRunId, name: updated.name });
@@ -8666,10 +8745,13 @@ async function rerunLoadedAudit() {
 function buildTxtInvoiceContext(txt) {
   const invoices = [...new Set(txt.map(r => r.INVOICE_NUMBER).filter(inv => inv && inv !== "(blank)"))];
   const summary = txtInputsSummary();
+  const fileCount = state.txtFiles.length
+    || (state.txtBuffer ? 1 : 0)
+    || (summary.txtFiles?.length || 0);
   return {
     invoiceList: invoices,
     invoice: invoices.length === 0 ? "—" : invoices.length <= 3 ? invoices.join(", ") : `${invoices.length} invoices`,
-    txtFileCount: state.txtFiles.length || (state.txtBuffer ? 1 : 0),
+    txtFileCount: fileCount,
     txtFileNames: summary.txtName || "—",
   };
 }
@@ -8822,7 +8904,7 @@ function runAudit(options = {}) {
     state.rawRowCount = raw.length;
     state.savedInputMeta = {
       ...txtInputsSummary(),
-      xlsxName: state.xlsxName || "",
+      xlsxName: resolvedXlsxName(),
     };
 
     trackActivity("run_audit", {
@@ -8840,6 +8922,7 @@ function runAudit(options = {}) {
     syncRerunPanel();
     if (options.preserveRunId) {
       state.activeRunId = options.preserveRunId;
+      persistActiveRunSession(options.preserveRunId);
       saveCurrentRun(null, options.preserveRunId);
       toast("Audit re-run complete — saved run updated.", "success");
     } else {
